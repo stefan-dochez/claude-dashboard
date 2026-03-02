@@ -1,0 +1,28 @@
+{
+  "name": "@claude-dashboard/backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "chmod +x ../../node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper ../../node_modules/node-pty/prebuilds/darwin-arm64/pty.node 2>/dev/null || true",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.21.2",
+    "node-pty": "^1.1.0",
+    "pidusage": "^4.0.1",
+    "simple-git": "^3.32.3",
+    "socket.io": "^4.8.1",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.5",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
