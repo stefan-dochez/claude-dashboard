@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers } from 'lucide-react';
+import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree } from 'lucide-react';
 import type { Project, Instance } from '../types';
 import LaunchModal from './LaunchModal';
 
@@ -115,6 +115,7 @@ interface ProjectListProps {
 
 export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, onLaunch, onDeleteWorktree }: ProjectListProps) {
   const [filter, setFilter] = useState('');
+  const [viewMode, setViewMode] = useState<'tree' | 'flat'>('tree');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => new Set());
   const [launching, setLaunching] = useState<string | null>(null);
@@ -209,17 +210,31 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     );
   }, [projects, filter]);
 
+  const sortedFlatProjects = useMemo(
+    () => [...regularProjects].sort((a, b) => a.name.localeCompare(b.name)),
+    [regularProjects],
+  );
+
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="relative">
-        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-neutral-500" />
-        <input
-          type="text"
-          placeholder="Filter projects..."
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-          className="w-full rounded-md border border-neutral-800 bg-neutral-900/50 py-2 pl-8 pr-3 text-xs text-neutral-300 placeholder-neutral-600 outline-none focus:border-neutral-600 focus:ring-1 focus:ring-neutral-600"
-        />
+      <div className="flex items-center gap-1">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-neutral-500" />
+          <input
+            type="text"
+            placeholder="Filter projects..."
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            className="w-full rounded-md border border-neutral-800 bg-neutral-900/50 py-2 pl-8 pr-3 text-xs text-neutral-300 placeholder-neutral-600 outline-none focus:border-neutral-600 focus:ring-1 focus:ring-neutral-600"
+          />
+        </div>
+        <button
+          onClick={() => setViewMode(viewMode === 'tree' ? 'flat' : 'tree')}
+          className="shrink-0 rounded-md border border-neutral-800 bg-neutral-900/50 p-2 text-neutral-500 transition-colors hover:border-neutral-600 hover:text-neutral-300"
+          title={viewMode === 'tree' ? 'Switch to flat list' : 'Switch to tree view'}
+        >
+          {viewMode === 'tree' ? <List className="h-3.5 w-3.5" /> : <FolderTree className="h-3.5 w-3.5" />}
+        </button>
       </div>
 
       {loading ? (
@@ -238,14 +253,41 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                 <ProjectRow
                   key={project.path}
                   project={project}
-                  worktrees={[]}
-                  isProjectExpanded={false}
+                  worktrees={worktreesByParent.get(project.path) ?? []}
+                  isProjectExpanded={expandedProjects.has(project.path)}
                   isActive={activeProjectPaths.has(project.path)}
                   isLaunching={launching === project.path}
                   launching={launching}
                   depth={0}
                   onLaunch={isNestedWt ? () => handleDirectLaunch(project.path) : () => setLaunchTarget(project)}
-                  onToggleWorktrees={() => {}}
+                  onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
+                  onLaunchDirect={handleDirectLaunch}
+                  onDeleteWorktree={onDeleteWorktree}
+                />
+              );
+            })}
+          </div>
+        )
+      ) : viewMode === 'flat' ? (
+        // Flat alphabetical list
+        sortedFlatProjects.length === 0 ? (
+          <p className="py-4 text-center text-xs text-neutral-600">No projects found</p>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            {sortedFlatProjects.map(project => {
+              const worktrees = worktreesByParent.get(project.path) ?? [];
+              return (
+                <ProjectRow
+                  key={project.path}
+                  project={project}
+                  worktrees={worktrees}
+                  isProjectExpanded={expandedProjects.has(project.path)}
+                  isActive={activeProjectPaths.has(project.path)}
+                  isLaunching={launching === project.path}
+                  launching={launching}
+                  depth={0}
+                  onLaunch={() => setLaunchTarget(project)}
+                  onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={onDeleteWorktree}
                 />
