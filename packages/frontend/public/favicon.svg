@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#D97706"/>
+  <g transform="translate(32,32)">
+    <!-- Center circle -->
+    <circle r="5" fill="#0a0a0a"/>
+    <!-- Rays -->
+    <g stroke="#0a0a0a" stroke-width="3.5" stroke-linecap="round">
+      <line y1="-10" y2="-20"/>
+      <line y1="-10" y2="-20" transform="rotate(45)"/>
+      <line y1="-10" y2="-20" transform="rotate(90)"/>
+      <line y1="-10" y2="-20" transform="rotate(135)"/>
+      <line y1="-10" y2="-20" transform="rotate(180)"/>
+      <line y1="-10" y2="-20" transform="rotate(225)"/>
+      <line y1="-10" y2="-20" transform="rotate(270)"/>
+      <line y1="-10" y2="-20" transform="rotate(315)"/>
+    </g>
+  </g>
+</svg>
