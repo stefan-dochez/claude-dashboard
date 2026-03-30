@@ -75,7 +75,7 @@ export default function InstanceList({ instances, selectedId, queuedIds, onSelec
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="truncate text-xs font-medium text-neutral-200">
+                <span className="truncate text-xs font-medium text-neutral-200" title={instance.projectName}>
                   {instance.projectName}
                 </span>
                 {isWaiting && (
@@ -93,7 +93,7 @@ export default function InstanceList({ instances, selectedId, queuedIds, onSelec
                 {STATUS_LABELS[instance.status]}
               </span>
               {instance.taskDescription && (
-                <span className="block truncate text-[10px] text-neutral-500 italic">
+                <span className="block truncate text-[10px] text-neutral-500 italic" title={instance.taskDescription}>
                   {instance.taskDescription}
                 </span>
               )}

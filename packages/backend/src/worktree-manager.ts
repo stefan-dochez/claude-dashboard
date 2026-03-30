@@ -62,6 +62,137 @@ export class WorktreeManager {
     return { worktreePath, branchName: finalBranch };
   }
 
+  getDefaultBranch(projectPath: string): string | null {
+    // Try common default branch names
+    for (const candidate of ['main', 'master', 'develop']) {
+      try {
+        execSync(`git rev-parse --verify ${candidate}`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 5000,
+        });
+        return candidate;
+      } catch {
+        // Branch doesn't exist
+      }
+    }
+    return null;
+  }
+
+  isOnMainBranch(projectPath: string): boolean {
+    const branch = this.getGitBranch(projectPath);
+    if (!branch) return true;
+    return ['main', 'master', 'develop'].includes(branch);
+  }
+
+  detachBranchToWorktree(projectPath: string): WorktreeResult {
+    const currentBranch = this.getGitBranch(projectPath);
+    if (!currentBranch) {
+      throw new Error('Cannot determine current branch');
+    }
+
+    const defaultBranch = this.getDefaultBranch(projectPath);
+    if (!defaultBranch) {
+      throw new Error('Cannot determine default branch (looked for main, master, develop)');
+    }
+
+    if (currentBranch === defaultBranch) {
+      throw new Error(`Already on default branch ${defaultBranch}`);
+    }
+
+    const slug = this.slugify(currentBranch);
+    let worktreePath = `${projectPath}--${slug}`;
+
+    // Collision handling
+    let suffix = 1;
+    while (fs.existsSync(worktreePath)) {
+      suffix++;
+      worktreePath = `${projectPath}--${slug}-${suffix}`;
+    }
+
+    console.log(`[worktree-manager] Detaching branch ${currentBranch} to worktree at ${worktreePath}`);
+
+    // Step 1: Stash any local changes (including untracked files)
+    const stashResult = execSync('git stash push -u -m "claude-dashboard: detach branch"', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 15000,
+    }).trim();
+    const hasStash = !stashResult.includes('No local changes');
+    if (hasStash) {
+      console.log(`[worktree-manager] Stashed local changes`);
+    }
+
+    // Step 2: Switch repo to default branch
+    try {
+      execSync(`git checkout "${defaultBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 15000,
+      });
+    } catch (err) {
+      // Restore stash if checkout fails
+      if (hasStash) {
+        execSync('git stash pop', {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 15000,
+        });
+      }
+      throw err;
+    }
+
+    // Step 3: Create worktree using the existing branch (no -b flag)
+    try {
+      execSync(`git worktree add "${worktreePath}" "${currentBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 30000,
+      });
+    } catch (err) {
+      // Rollback: go back to original branch and restore stash
+      execSync(`git checkout "${currentBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 15000,
+      });
+      if (hasStash) {
+        execSync('git stash pop', {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 15000,
+        });
+      }
+      throw err;
+    }
+
+    // Step 4: Restore stashed changes in the worktree
+    if (hasStash) {
+      try {
+        execSync('git stash pop', {
+          cwd: worktreePath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 15000,
+        });
+        console.log(`[worktree-manager] Restored stashed changes in worktree`);
+      } catch (err) {
+        console.log(`[worktree-manager] Warning: failed to pop stash in worktree: ${err}`);
+      }
+    }
+
+    console.log(`[worktree-manager] Branch ${currentBranch} detached to worktree, repo now on ${defaultBranch}`);
+
+    return { worktreePath, branchName: currentBranch };
+  }
+
   removeWorktree(projectPath: string, worktreePath: string): void {
     const branchName = this.getBranchName(worktreePath);
 

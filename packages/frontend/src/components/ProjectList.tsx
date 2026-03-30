@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers } from 'lucide-react';
 import type { Project, Instance } from '../types';
 import LaunchModal from './LaunchModal';
 
@@ -109,7 +109,7 @@ interface ProjectListProps {
   loading: boolean;
   scanPaths: string[];
   selectedRoot: string | null;
-  onLaunch: (projectPath: string, taskDescription?: string) => void;
+  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
 }
 
@@ -187,9 +187,9 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     });
   }, []);
 
-  const handleLaunchFromModal = (projectPath: string, taskDescription?: string) => {
+  const handleLaunchFromModal = (projectPath: string, taskDescription?: string, detachBranch?: boolean) => {
     setLaunching(projectPath);
-    onLaunch(projectPath, taskDescription);
+    onLaunch(projectPath, taskDescription, detachBranch);
     setTimeout(() => setLaunching(null), 1000);
   };
 
@@ -278,6 +278,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
       {launchTarget && (
         <LaunchModal
           project={launchTarget}
+          worktrees={worktreesByParent.get(launchTarget.path) ?? []}
           onLaunch={handleLaunchFromModal}
           onClose={() => setLaunchTarget(null)}
         />
@@ -364,7 +365,7 @@ function FolderRow({
           <ChevronRight className="h-3 w-3 shrink-0 text-neutral-500" />
         )}
         <Folder className={`h-3.5 w-3.5 shrink-0 ${isExpanded ? 'text-amber-500/70' : 'text-neutral-500'}`} />
-        <span className="truncate text-xs font-medium text-neutral-400">{node.name}</span>
+        <span className="truncate text-xs font-medium text-neutral-400" title={node.name}>{node.name}</span>
         <span className="ml-auto shrink-0 text-[10px] text-neutral-600">{node.projectCount}</span>
       </button>
 
@@ -427,15 +428,24 @@ function ProjectRow({
           <span className="w-3 shrink-0" />
         )}
 
-        <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+        {project.isMeta ? (
+          <Layers className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+        ) : (
+          <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="truncate text-xs font-medium text-neutral-200">
+            <span className="truncate text-xs font-medium text-neutral-200" title={project.name}>
               {project.name}
             </span>
             {project.hasClaudeMd && (
               <span title="Has CLAUDE.md"><FileText className="h-3 w-3 shrink-0 text-amber-500/70" /></span>
+            )}
+            {project.isMeta && (
+              <span className="shrink-0 rounded bg-violet-500/10 px-1 py-0.5 text-[9px] font-medium text-violet-400">
+                META
+              </span>
             )}
             {project.isWorktree && (
               <span className="shrink-0 rounded bg-violet-500/10 px-1 py-0.5 text-[9px] font-medium text-violet-400">
@@ -454,7 +464,7 @@ function ProjectRow({
           {project.gitBranch && (
             <div className="flex items-center gap-1 text-[10px] text-neutral-500">
               <GitBranch className="h-2.5 w-2.5" />
-              <span className="truncate">{project.gitBranch}</span>
+              <span className="truncate" title={project.gitBranch ?? undefined}>{project.gitBranch}</span>
             </div>
           )}
         </div>
@@ -522,7 +532,7 @@ function WorktreeRow({
       style={{ paddingLeft: `${depth * 12 + 6}px` }}
     >
       <GitBranch className="h-3 w-3 shrink-0 text-violet-400" />
-      <span className="min-w-0 flex-1 truncate text-xs text-neutral-400">
+      <span className="min-w-0 flex-1 truncate text-xs text-neutral-400" title={worktree.gitBranch ?? worktree.name}>
         {worktree.gitBranch ?? worktree.name}
       </span>
 

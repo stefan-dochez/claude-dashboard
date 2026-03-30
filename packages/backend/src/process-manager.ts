@@ -133,7 +133,9 @@ export class ProcessManager extends EventEmitter {
 
     const id = randomUUID();
     const cwd = options.worktreePath ?? options.projectPath;
-    const projectName = path.basename(options.projectPath);
+    const projectName = options.worktreePath
+      ? `${path.basename(options.projectPath)} (${options.branchName ?? path.basename(options.worktreePath)})`
+      : path.basename(options.projectPath);
 
     // Build a fresh env each time to avoid stale state after tsx watch reloads
     const env = buildPtyEnv();

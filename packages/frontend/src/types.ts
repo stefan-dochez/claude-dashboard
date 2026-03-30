@@ -5,6 +5,7 @@ export interface Project {
   hasClaudeMd: boolean;
   lastModified: string;
   isWorktree: boolean;
+  isMeta: boolean;
   parentProject?: string;
 }
 

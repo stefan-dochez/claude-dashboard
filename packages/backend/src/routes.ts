@@ -66,7 +66,11 @@ export function createRoutes(
   });
 
   router.post('/api/instances', async (req, res) => {
-    const { projectPath, taskDescription } = req.body as { projectPath?: string; taskDescription?: string };
+    const { projectPath, taskDescription, detachBranch } = req.body as {
+      projectPath?: string;
+      taskDescription?: string;
+      detachBranch?: boolean;
+    };
     if (!projectPath) {
       res.status(400).json({ error: 'projectPath is required' });
       return;
@@ -77,7 +81,17 @@ export function createRoutes(
       let branchName: string | undefined;
       let parentProjectPath: string | undefined;
 
-      if (taskDescription && worktreeManager.isGitRepo(projectPath)) {
+      if (detachBranch && worktreeManager.isGitRepo(projectPath)) {
+        // Detach current branch to a worktree and reset repo to default branch
+        const result = worktreeManager.detachBranchToWorktree(projectPath);
+        worktreePath = result.worktreePath;
+        branchName = result.branchName;
+        parentProjectPath = projectPath;
+
+        scanner.refresh().catch(err => {
+          console.log('[routes] Background scanner refresh failed:', err);
+        });
+      } else if (taskDescription && worktreeManager.isGitRepo(projectPath)) {
         const result = worktreeManager.createWorktree(projectPath, taskDescription);
         worktreePath = result.worktreePath;
         branchName = result.branchName;

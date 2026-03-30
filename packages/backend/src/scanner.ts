@@ -10,6 +10,7 @@ interface Project {
   hasClaudeMd: boolean;
   lastModified: Date;
   isWorktree: boolean;
+  isMeta: boolean;
   parentProject?: string;
 }
 
@@ -30,9 +31,15 @@ export class ProjectScanner {
     const projects: Project[] = [];
     const seen = new Set<string>();
 
+    const resolvedMetaProjects = new Set(
+      (config.metaProjects ?? []).map(p =>
+        path.resolve(p.replace(/^~/, process.env.HOME ?? '')),
+      ),
+    );
+
     for (const scanPath of config.scanPaths) {
       const resolved = path.resolve(scanPath.replace(/^~/, process.env.HOME ?? ''));
-      await this.scanDirectory(resolved, config.projectMarkers, config.scanDepth, projects, seen);
+      await this.scanDirectory(resolved, config.projectMarkers, config.scanDepth, projects, seen, resolvedMetaProjects);
     }
 
     // Sort by name
@@ -56,6 +63,7 @@ export class ProjectScanner {
     depth: number,
     results: Project[],
     seen: Set<string>,
+    metaProjects: Set<string>,
   ): Promise<void> {
     if (depth < 0) return;
 
@@ -73,7 +81,8 @@ export class ProjectScanner {
     const isProject = await this.hasAnyMarker(dir, markers);
     if (isProject) {
       seen.add(realDir);
-      const project = await this.buildProject(dir);
+      const isMeta = metaProjects.has(realDir) || metaProjects.has(dir);
+      const project = await this.buildProject(dir, undefined, isMeta);
       results.push(project);
 
       // Also check for git worktrees
@@ -86,7 +95,23 @@ export class ProjectScanner {
         }
       }
 
-      return; // Don't scan subdirectories of a project
+      // For meta-projects, continue scanning subdirectories with a fresh depth
+      if (isMeta) {
+        const config = await this.configService.get();
+        const metaDepth = config.scanDepth;
+        try {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+              await this.scanDirectory(path.join(dir, entry.name), markers, metaDepth - 1, results, seen, metaProjects);
+            }
+          }
+        } catch {
+          // Permission denied or other errors
+        }
+      }
+
+      return;
     }
 
     // Not a project, scan subdirectories
@@ -94,7 +119,7 @@ export class ProjectScanner {
       const entries = await fs.readdir(dir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-          await this.scanDirectory(path.join(dir, entry.name), markers, depth - 1, results, seen);
+          await this.scanDirectory(path.join(dir, entry.name), markers, depth - 1, results, seen, metaProjects);
         }
       }
     } catch {
@@ -114,7 +139,7 @@ export class ProjectScanner {
     return false;
   }
 
-  private async buildProject(projectPath: string, parentProject?: string): Promise<Project> {
+  private async buildProject(projectPath: string, parentProject?: string, isMeta = false): Promise<Project> {
     const name = path.basename(projectPath);
     const gitBranch = this.getGitBranch(projectPath);
     const hasClaudeMd = await fs.access(path.join(projectPath, 'CLAUDE.md')).then(() => true).catch(() => false);
@@ -128,6 +153,7 @@ export class ProjectScanner {
       hasClaudeMd,
       lastModified,
       isWorktree,
+      isMeta,
       ...(parentProject ? { parentProject } : {}),
     };
   }

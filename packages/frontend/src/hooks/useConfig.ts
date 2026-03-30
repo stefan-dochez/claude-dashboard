@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 interface AppConfig {
   scanPaths: string[];
+  metaProjects: string[];
   projectMarkers: string[];
   scanDepth: number;
   port: number;

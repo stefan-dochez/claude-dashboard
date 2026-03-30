@@ -31,11 +31,11 @@ export default function App() {
     [queue],
   );
 
-  const handleLaunch = useCallback(async (projectPath: string, taskDescription?: string) => {
+  const handleLaunch = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean) => {
     try {
-      const instance = await spawnInstance(projectPath, taskDescription);
+      const instance = await spawnInstance(projectPath, taskDescription, detachBranch);
       setSelectedInstanceId(instance.id);
-      if (taskDescription) {
+      if (taskDescription || detachBranch) {
         // A worktree was created — refresh project list to show it
         refreshProjects();
       }
@@ -72,9 +72,9 @@ export default function App() {
     setTypingLocked(typing);
   }, []);
 
-  const handleSaveScanPaths = useCallback(async (paths: string[]) => {
+  const handleSaveScanPaths = useCallback(async (paths: string[], metaProjects: string[]) => {
     try {
-      await updateConfig({ scanPaths: paths });
+      await updateConfig({ scanPaths: paths, metaProjects });
       refreshProjects();
       setScanPathsOpen(false);
     } catch {
@@ -180,6 +180,7 @@ export default function App() {
       {scanPathsOpen && (
         <ScanPathsModal
           scanPaths={config?.scanPaths ?? []}
+          metaProjects={config?.metaProjects ?? []}
           onSave={handleSaveScanPaths}
           onClose={() => setScanPathsOpen(false)}
         />

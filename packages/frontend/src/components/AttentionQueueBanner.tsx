@@ -38,7 +38,7 @@ export default function AttentionQueueBanner({
                   : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-300'
               }`}
             >
-              <span className="max-w-[120px] truncate">{item.projectName}</span>
+              <span className="max-w-[120px] truncate" title={item.projectName}>{item.projectName}</span>
               <span
                 role="button"
                 onClick={e => {

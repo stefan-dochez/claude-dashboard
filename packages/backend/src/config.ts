@@ -7,6 +7,7 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 interface AppConfig {
   scanPaths: string[];
+  metaProjects: string[];
   projectMarkers: string[];
   scanDepth: number;
   port: number;
@@ -22,6 +23,7 @@ const DEFAULT_CONFIG: AppConfig = {
     path.join(os.homedir(), 'work'),
     path.join(os.homedir(), 'Workspace'),
   ],
+  metaProjects: [],
   projectMarkers: ['.git', 'CLAUDE.md', 'package.json', 'Cargo.toml', 'go.mod', 'pyproject.toml'],
   scanDepth: 3,
   port: 3200,
