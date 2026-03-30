@@ -1,5 +1,5 @@
 import { RefreshCw, FolderOpen, Zap, ChevronDown, ChevronRight, Settings } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import ProjectList from './ProjectList';
 import InstanceList from './InstanceList';
 import type { Project, Instance } from '../types';
@@ -43,12 +43,51 @@ export default function Sidebar({
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [instancesOpen, setInstancesOpen] = useState(true);
   const [selectedRoot, setSelectedRoot] = useState<string | null>(scanPaths[0] ?? null);
+  const [width, setWidth] = useState(280);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    isDragging.current = true;
+    startX.current = e.clientX;
+    startWidth.current = width;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [width]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const newWidth = Math.min(600, Math.max(200, startWidth.current + (e.clientX - startX.current)));
+      setWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const activeInstances = instances.filter(i => i.status !== 'exited');
   const waitingCount = instances.filter(i => i.status === 'waiting_input').length;
 
   return (
-    <aside className="flex h-full w-[280px] shrink-0 flex-col border-r border-neutral-800 bg-[#0f0f0f]">
+    <aside className="relative flex h-full shrink-0 flex-col border-r border-neutral-800 bg-[#0f0f0f]" style={{ width }}>
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-neutral-600"
+      />
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
         <div className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-orange-500 to-amber-600">
