@@ -327,6 +327,48 @@ export class WorktreeManager {
     }
   }
 
+  pullRepo(projectPath: string): { success: boolean; message: string } {
+    try {
+      const branch = this.getGitBranch(projectPath);
+      if (!branch) {
+        return { success: false, message: 'Cannot determine current branch' };
+      }
+
+      // Fetch first
+      try {
+        execSync('git fetch origin', {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000,
+        });
+      } catch {
+        return { success: false, message: 'Failed to fetch origin' };
+      }
+
+      // Pull with fast-forward only to avoid merge conflicts
+      const output = execSync(`git pull --ff-only origin "${branch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 30000,
+      }).trim();
+
+      const alreadyUpToDate = output.includes('Already up to date') || output.includes('Already up-to-date');
+      return {
+        success: true,
+        message: alreadyUpToDate ? 'Already up to date' : 'Updated',
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Pull failed';
+      // Check for common issues
+      if (msg.includes('Not possible to fast-forward')) {
+        return { success: false, message: 'Cannot fast-forward — local branch has diverged' };
+      }
+      return { success: false, message: msg.split('\n')[0] };
+    }
+  }
+
   getStatus(projectPath: string): Array<{ status: string; path: string }> {
     const output = execSync('git status --porcelain=v1', {
       cwd: projectPath,

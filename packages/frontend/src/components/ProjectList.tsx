@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star } from 'lucide-react';
+import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star, Download } from 'lucide-react';
 import type { Project, Instance } from '../types';
 import LaunchModal from './LaunchModal';
 
@@ -110,12 +110,14 @@ interface ProjectListProps {
   scanPaths: string[];
   selectedRoot: string | null;
   favoriteProjects: Set<string>;
+  pullingProjects: Set<string>;
   onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
+  onPullProject: (projectPath: string) => void;
 }
 
-export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, favoriteProjects, onLaunch, onDeleteWorktree, onToggleFavorite }: ProjectListProps) {
+export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, favoriteProjects, pullingProjects, onLaunch, onDeleteWorktree, onToggleFavorite, onPullProject }: ProjectListProps) {
   const [filter, setFilter] = useState('');
   const [viewMode, setViewMode] = useState<'tree' | 'flat'>('tree');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -280,11 +282,13 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   launching={launching}
                   depth={0}
                   isFavorite={favoriteProjects.has(project.path)}
+                  isPulling={pullingProjects.has(project.path)}
                   onLaunch={isNestedWt ? () => handleDirectLaunch(project.path) : () => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={requestDeleteWorktree}
                   onToggleFavorite={() => onToggleFavorite(project.path)}
+                  onPull={() => onPullProject(project.path)}
                 />
               );
             })}
@@ -309,11 +313,13 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   launching={launching}
                   depth={0}
                   isFavorite={favoriteProjects.has(project.path)}
+                  isPulling={pullingProjects.has(project.path)}
                   onLaunch={() => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={requestDeleteWorktree}
                   onToggleFavorite={() => onToggleFavorite(project.path)}
+                  onPull={() => onPullProject(project.path)}
                 />
               );
             })}
@@ -341,11 +347,13 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   launching={launching}
                   depth={0}
                   isFavorite
+                  isPulling={pullingProjects.has(project.path)}
                   onLaunch={() => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={requestDeleteWorktree}
                   onToggleFavorite={() => onToggleFavorite(project.path)}
+                  onPull={() => onPullProject(project.path)}
                 />
               ))}
               <div className="mx-2 my-1 border-t border-neutral-800" />
@@ -365,7 +373,9 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
             onLaunchDirect={handleDirectLaunch}
             onDeleteWorktree={requestDeleteWorktree}
             favoriteProjects={favoriteProjects}
+            pullingProjects={pullingProjects}
             onToggleFavorite={onToggleFavorite}
+            onPullProject={onPullProject}
           />
         </div>
       )}
@@ -428,12 +438,14 @@ interface TreeProps {
   launching: string | null;
   worktreesByParent: Map<string, Project[]>;
   favoriteProjects: Set<string>;
+  pullingProjects: Set<string>;
   onToggle: (path: string) => void;
   onToggleProjectWorktrees: (path: string) => void;
   onLaunchModal: (project: Project) => void;
   onLaunchDirect: (path: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
+  onPullProject: (projectPath: string) => void;
 }
 
 function TreeNodeList({
@@ -441,7 +453,7 @@ function TreeNodeList({
   depth,
   ...treeProps
 }: { nodes: TreeNode[]; depth: number } & TreeProps) {
-  const { expanded, expandedProjects, activeProjectPaths, launching, worktreesByParent, favoriteProjects, onToggle, onToggleProjectWorktrees, onLaunchModal, onLaunchDirect, onDeleteWorktree, onToggleFavorite } = treeProps;
+  const { expanded, expandedProjects, activeProjectPaths, launching, worktreesByParent, favoriteProjects, pullingProjects, onToggle, onToggleProjectWorktrees, onLaunchModal, onLaunchDirect, onDeleteWorktree, onToggleFavorite, onPullProject } = treeProps;
 
   return (
     <>
@@ -470,11 +482,13 @@ function TreeNodeList({
             launching={launching}
             depth={depth}
             isFavorite={favoriteProjects.has(node.project.path)}
+            isPulling={pullingProjects.has(node.project.path)}
             onLaunch={() => onLaunchModal(node.project)}
             onToggleWorktrees={() => onToggleProjectWorktrees(node.project.path)}
             onLaunchDirect={onLaunchDirect}
             onDeleteWorktree={onDeleteWorktree}
             onToggleFavorite={() => onToggleFavorite(node.project.path)}
+            onPull={() => onPullProject(node.project.path)}
           />
         );
       })}
@@ -527,11 +541,13 @@ function ProjectRow({
   launching,
   depth,
   isFavorite,
+  isPulling,
   onLaunch,
   onToggleWorktrees,
   onLaunchDirect,
   onDeleteWorktree,
   onToggleFavorite,
+  onPull,
 }: {
   project: Project;
   worktrees: Project[];
@@ -541,11 +557,13 @@ function ProjectRow({
   launching: string | null;
   depth: number;
   isFavorite?: boolean;
+  isPulling?: boolean;
   onLaunch: () => void;
   onToggleWorktrees: () => void;
   onLaunchDirect: (path: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite?: () => void;
+  onPull?: () => void;
 }) {
   const hasWorktrees = worktrees.length > 0;
 
@@ -624,6 +642,23 @@ function ProjectRow({
               title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             >
               <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
+            </button>
+          )}
+          {onPull && project.gitBranch && !project.isWorktree && (
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                onPull();
+              }}
+              disabled={isPulling}
+              className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-blue-400 group-hover:opacity-100 disabled:opacity-50"
+              title="Pull latest"
+            >
+              {isPulling ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Download className="h-3 w-3" />
+              )}
             </button>
           )}
           {project.isWorktree && project.parentProject && (

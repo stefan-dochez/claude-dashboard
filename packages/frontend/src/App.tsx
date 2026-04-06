@@ -7,10 +7,12 @@ import PullRequestView from './components/PullRequestView';
 import AttentionQueueBanner from './components/AttentionQueueBanner';
 import ContextBanner from './components/ContextBanner';
 import ScanPathsModal from './components/ScanPathsModal';
+import ToastContainer from './components/ToastContainer';
 import { useProjects } from './hooks/useProjects';
 import { useInstances } from './hooks/useInstances';
 import { useConfig } from './hooks/useConfig';
 import { useAttentionQueue } from './hooks/useAttentionQueue';
+import { useToasts } from './hooks/useToasts';
 
 export default function App() {
   const { config, updateConfig } = useConfig();
@@ -19,6 +21,7 @@ export default function App() {
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'terminal' | 'changes' | 'pr'>('terminal');
   const [typingLocked, setTypingLocked] = useState(false);
+  const { toasts, addToast, removeToast } = useToasts();
   const [scanPathsOpen, setScanPathsOpen] = useState(false);
   const autoOpenedRef = useRef(false);
 
@@ -107,6 +110,68 @@ export default function App() {
     await updateConfig({ favoriteProjects: next });
   }, [config?.favoriteProjects, updateConfig]);
 
+  const [pullingProjects, setPullingProjects] = useState<Set<string>>(new Set());
+  const [pullingAll, setPullingAll] = useState(false);
+
+  const handlePullProject = useCallback(async (projectPath: string) => {
+    setPullingProjects(prev => new Set(prev).add(projectPath));
+    const name = projectPath.split('/').pop() ?? projectPath;
+    try {
+      const res = await fetch('/api/git/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        addToast(
+          result.message === 'Already up to date' ? 'info' : 'success',
+          `${name}`,
+          result.message,
+        );
+      } else {
+        addToast('error', `${name} — pull failed`, result.message);
+      }
+    } catch (err) {
+      addToast('error', `${name} — pull failed`, err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setPullingProjects(prev => {
+        const next = new Set(prev);
+        next.delete(projectPath);
+        return next;
+      });
+      refreshProjects();
+    }
+  }, [refreshProjects, addToast]);
+
+  const handlePullAll = useCallback(async () => {
+    setPullingAll(true);
+    try {
+      const res = await fetch('/api/git/pull-all', { method: 'POST' });
+      const results: Array<{ name: string; success: boolean; message: string }> = await res.json();
+      const updated = results.filter(r => r.success && r.message !== 'Already up to date');
+      const failed = results.filter(r => !r.success);
+
+      if (failed.length === 0 && updated.length === 0) {
+        addToast('info', 'All repos up to date');
+      } else if (failed.length === 0) {
+        addToast('success', `${updated.length} repo${updated.length > 1 ? 's' : ''} updated`);
+      } else {
+        const detail = failed.map(r => `${r.name}: ${r.message}`).join('\n');
+        if (updated.length > 0) {
+          addToast('error', `${updated.length} updated, ${failed.length} failed`, detail, 8000);
+        } else {
+          addToast('error', `${failed.length} repo${failed.length > 1 ? 's' : ''} failed to update`, detail, 8000);
+        }
+      }
+    } catch (err) {
+      addToast('error', 'Pull all failed', err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setPullingAll(false);
+      refreshProjects();
+    }
+  }, [refreshProjects, addToast]);
+
   const selectedInstance = instances.find(i => i.id === selectedInstanceId);
 
   return (
@@ -119,6 +184,8 @@ export default function App() {
         selectedInstanceId={selectedInstanceId}
         scanPaths={config?.scanPaths ?? []}
         favoriteProjects={favoriteProjects}
+        pullingProjects={pullingProjects}
+        pullingAll={pullingAll}
         queuedIds={queuedIds}
         onRefreshProjects={refreshProjects}
         onLaunchProject={handleLaunch}
@@ -126,6 +193,8 @@ export default function App() {
         onKillInstance={handleKill}
         onDeleteWorktree={handleDeleteWorktree}
         onToggleFavorite={handleToggleFavorite}
+        onPullProject={handlePullProject}
+        onPullAll={handlePullAll}
         onOpenScanPaths={() => setScanPathsOpen(true)}
       />
 
@@ -257,6 +326,8 @@ export default function App() {
           onClose={() => setScanPathsOpen(false)}
         />
       )}
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

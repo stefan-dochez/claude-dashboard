@@ -177,6 +177,43 @@ export function createRoutes(
     }
   });
 
+  // Git — pull / update
+  router.post('/api/git/pull', (req, res) => {
+    const { projectPath } = req.body as { projectPath?: string };
+    if (!projectPath) {
+      res.status(400).json({ error: 'projectPath is required' });
+      return;
+    }
+    try {
+      const result = worktreeManager.pullRepo(projectPath);
+      res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Pull failed';
+      console.log('[routes] Error pulling repo:', err);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  router.post('/api/git/pull-all', async (req, res) => {
+    try {
+      const projects = await scanner.scan();
+      // Only pull non-worktree git projects
+      const gitProjects = projects.filter(
+        (p: { gitBranch: string | null; isWorktree: boolean }) => p.gitBranch !== null && !p.isWorktree,
+      );
+      const results: Array<{ path: string; name: string; success: boolean; message: string }> = [];
+      for (const project of gitProjects) {
+        const result = worktreeManager.pullRepo(project.path);
+        results.push({ path: project.path, name: project.name, ...result });
+      }
+      res.json(results);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Pull all failed';
+      console.log('[routes] Error pulling all repos:', err);
+      res.status(500).json({ error: message });
+    }
+  });
+
   // Git — status and diffs
   router.get('/api/git/status', (req, res) => {
     const projectPath = req.query.path as string | undefined;

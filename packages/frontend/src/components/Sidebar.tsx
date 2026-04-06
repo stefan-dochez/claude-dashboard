@@ -1,4 +1,4 @@
-import { RefreshCw, FolderOpen, Zap, ChevronDown, ChevronRight, Settings } from 'lucide-react';
+import { RefreshCw, FolderOpen, Zap, ChevronDown, ChevronRight, Settings, Download } from 'lucide-react';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import ProjectList from './ProjectList';
 import InstanceList from './InstanceList';
@@ -12,6 +12,8 @@ interface SidebarProps {
   selectedInstanceId: string | null;
   scanPaths: string[];
   favoriteProjects: Set<string>;
+  pullingProjects: Set<string>;
+  pullingAll: boolean;
   queuedIds: Set<string>;
   onRefreshProjects: () => void;
   onLaunchProject: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
@@ -19,6 +21,8 @@ interface SidebarProps {
   onKillInstance: (id: string, deleteWorktree?: boolean) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
+  onPullProject: (projectPath: string) => void;
+  onPullAll: () => void;
   onOpenScanPaths: () => void;
 }
 
@@ -35,6 +39,8 @@ export default function Sidebar({
   selectedInstanceId,
   scanPaths,
   favoriteProjects,
+  pullingProjects,
+  pullingAll,
   queuedIds,
   onRefreshProjects,
   onLaunchProject,
@@ -42,6 +48,8 @@ export default function Sidebar({
   onKillInstance,
   onDeleteWorktree,
   onToggleFavorite,
+  onPullProject,
+  onPullAll,
   onOpenScanPaths,
 }: SidebarProps) {
   const [projectsOpen, setProjectsOpen] = useState(true);
@@ -157,6 +165,14 @@ export default function Sidebar({
               <Settings className="h-3 w-3" />
             </button>
             <button
+              onClick={onPullAll}
+              disabled={pullingAll}
+              className="rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-blue-400 disabled:opacity-50"
+              title="Update all repos (git pull)"
+            >
+              <Download className={`h-3 w-3 ${pullingAll ? 'animate-pulse' : ''}`} />
+            </button>
+            <button
               onClick={onRefreshProjects}
               className="mr-2 rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
               title="Refresh projects"
@@ -192,9 +208,11 @@ export default function Sidebar({
                 scanPaths={scanPaths}
                 selectedRoot={selectedRoot}
                 favoriteProjects={favoriteProjects}
+                pullingProjects={pullingProjects}
                 onLaunch={onLaunchProject}
                 onDeleteWorktree={onDeleteWorktree}
                 onToggleFavorite={onToggleFavorite}
+                onPullProject={onPullProject}
               />
             </div>
           )}
