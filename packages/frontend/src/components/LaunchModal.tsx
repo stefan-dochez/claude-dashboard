@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Play, X, GitBranch, ArrowRightLeft } from 'lucide-react';
 import type { Project } from '../types';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const MAIN_BRANCHES = ['main', 'master', 'develop'];
 
@@ -25,16 +26,10 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
   const [taskDescription, setTaskDescription] = useState('');
   const [branchPrefix, setBranchPrefix] = useState('feat');
   const [mode, setMode] = useState<'new' | 'existing'>(worktrees.length > 0 ? 'existing' : 'new');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useFocusTrap<HTMLDivElement>();
 
   const isGit = project.gitBranch !== null;
   const canDetach = isGit && !project.isWorktree && project.gitBranch !== null && !MAIN_BRANCHES.includes(project.gitBranch);
-
-  useEffect(() => {
-    if (mode === 'new') {
-      inputRef.current?.focus();
-    }
-  }, [mode]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -72,6 +67,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
       onClick={onClose}
     >
       <div
+        ref={modalRef}
         className="mx-4 w-full max-w-sm rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
         onClick={e => e.stopPropagation()}
       >
@@ -176,7 +172,6 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
               </div>
             )}
             <input
-              ref={inputRef}
               type="text"
               value={taskDescription}
               onChange={e => setTaskDescription(e.target.value)}

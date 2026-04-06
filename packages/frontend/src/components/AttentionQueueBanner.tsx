@@ -39,16 +39,16 @@ export default function AttentionQueueBanner({
               }`}
             >
               <span className="max-w-[120px] truncate" title={item.projectName}>{item.projectName}</span>
-              <span
-                role="button"
+              <button
                 onClick={e => {
                   e.stopPropagation();
                   onSkip(item.instanceId);
                 }}
-                className="ml-0.5 rounded-full p-0.5 opacity-0 transition-opacity hover:bg-neutral-600 group-hover:opacity-100"
+                className="ml-0.5 rounded-full p-0.5 opacity-0 transition-opacity hover:bg-neutral-600 group-hover:opacity-100 focus-visible:opacity-100"
+                aria-label="Skip"
               >
                 <X className="h-2.5 w-2.5" />
-              </span>
+              </button>
             </button>
           );
         })}

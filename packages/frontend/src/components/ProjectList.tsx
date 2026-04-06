@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useContext, createContext } 
 import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star, Download } from 'lucide-react';
 import type { Project, Instance } from '../types';
 import LaunchModal from './LaunchModal';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 // --- Tree types ---
 
@@ -150,6 +151,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
   const [launching, setLaunching] = useState<string | null>(null);
   const [launchTarget, setLaunchTarget] = useState<Project | null>(null);
   const [confirmDeleteWt, setConfirmDeleteWt] = useState<{ projectPath: string; worktreePath: string; name: string } | null>(null);
+  const deleteModalRef = useFocusTrap<HTMLDivElement>();
 
   const requestDeleteWorktree = useCallback((projectPath: string, worktreePath: string) => {
     const name = worktreePath.split('/').pop() ?? worktreePath;
@@ -422,6 +424,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
           onClick={() => setConfirmDeleteWt(null)}
         >
           <div
+            ref={deleteModalRef}
             className="mx-4 w-full max-w-xs rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
             onClick={e => e.stopPropagation()}
           >
@@ -657,9 +660,10 @@ function ProjectRow({
               className={`shrink-0 rounded p-1 transition-all ${
                 isFavorite
                   ? 'text-amber-400 opacity-100'
-                  : 'text-neutral-500 opacity-0 hover:bg-neutral-700 hover:text-amber-400 group-hover:opacity-100'
+                  : 'text-neutral-500 opacity-0 hover:bg-neutral-700 hover:text-amber-400 group-hover:opacity-100 focus-visible:opacity-100'
               }`}
               title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             >
               <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
             </button>
@@ -675,8 +679,9 @@ function ProjectRow({
                   e.stopPropagation();
                   onPull();
                 }}
-                className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-blue-400 group-hover:opacity-100"
+                className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-blue-400 group-hover:opacity-100 focus-visible:opacity-100"
                 title="Pull latest"
+                aria-label="Pull latest"
               >
                 <Download className="h-3 w-3" />
               </button>
@@ -688,8 +693,9 @@ function ProjectRow({
                 e.stopPropagation();
                 onDeleteWorktree(project.parentProject!, project.path);
               }}
-              className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-red-400 group-hover:opacity-100"
+              className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-red-400 group-hover:opacity-100 focus-visible:opacity-100"
               title="Delete worktree"
+              aria-label="Delete worktree"
             >
               <Trash2 className="h-3 w-3" />
             </button>
@@ -697,8 +703,9 @@ function ProjectRow({
           <button
             onClick={onLaunch}
             disabled={isLaunching}
-            className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-green-400 group-hover:opacity-100 disabled:opacity-50"
+            className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-green-400 group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-50"
             title="Launch Claude Code"
+            aria-label="Launch"
           >
             {isLaunching ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -751,16 +758,18 @@ function WorktreeRow({
       <div className="flex shrink-0 items-center gap-0.5">
         <button
           onClick={e => { e.stopPropagation(); onDelete(); }}
-          className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-red-400 group-hover:opacity-100"
+          className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-red-400 group-hover:opacity-100 focus-visible:opacity-100"
           title="Delete worktree"
+          aria-label="Delete worktree"
         >
           <Trash2 className="h-3 w-3" />
         </button>
         <button
           onClick={onLaunch}
           disabled={isLaunching}
-          className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-green-400 group-hover:opacity-100 disabled:opacity-50"
+          className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-green-400 group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-50"
           title="Launch in worktree"
+          aria-label="Launch"
         >
           {isLaunching ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

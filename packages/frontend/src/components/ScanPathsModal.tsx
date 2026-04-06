@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Settings, X, Plus, Layers } from 'lucide-react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface ScanPathsModalProps {
   scanPaths: string[];
@@ -11,6 +12,7 @@ interface ScanPathsModalProps {
 export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClose }: ScanPathsModalProps) {
   const [paths, setPaths] = useState<string[]>(scanPaths.length > 0 ? [...scanPaths] : ['']);
   const [metas, setMetas] = useState<string[]>([...metaProjects]);
+  const modalRef = useFocusTrap<HTMLDivElement>();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const metaInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -65,6 +67,7 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
       onClick={onClose}
     >
       <div
+        ref={modalRef}
         className="mx-4 w-full max-w-sm rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
         onClick={e => e.stopPropagation()}
       >

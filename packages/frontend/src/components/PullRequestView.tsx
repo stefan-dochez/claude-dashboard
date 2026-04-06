@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info } from 'lucide-react';
+import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy } from 'lucide-react';
 import DiffViewer from './DiffViewer';
 import type { BranchDiffResponse } from '../types';
 
@@ -124,6 +124,7 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
             onClick={fetchBranchDiff}
             className="ml-auto rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
             title="Refresh"
+            aria-label="Refresh"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -135,11 +136,18 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
             {data.commits.map((c) => (
               <div
                 key={c.hash}
-                className="flex items-center gap-1.5 rounded bg-neutral-800/60 px-2 py-0.5"
+                className="group flex items-center gap-1.5 rounded bg-neutral-800/60 px-2 py-0.5"
                 title={`${c.hash} — ${c.date}`}
               >
                 <GitCommit className="h-3 w-3 text-neutral-500" />
                 <span className="font-mono text-[10px] text-neutral-500">{c.hash}</span>
+                <button
+                  onClick={() => navigator.clipboard.writeText(c.hash)}
+                  className="hidden text-neutral-600 transition-colors hover:text-neutral-300 group-hover:block"
+                  aria-label="Copy hash"
+                >
+                  <Copy className="h-2.5 w-2.5" />
+                </button>
                 <span className="max-w-[200px] truncate text-[11px] text-neutral-400">{c.message}</span>
               </div>
             ))}

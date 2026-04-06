@@ -12,9 +12,11 @@ import { useProjects } from './hooks/useProjects';
 import { useInstances } from './hooks/useInstances';
 import { useConfig } from './hooks/useConfig';
 import { useAttentionQueue } from './hooks/useAttentionQueue';
+import { useSocketStatus } from './hooks/useSocket';
 import { useToasts } from './hooks/useToasts';
 
 export default function App() {
+  const socketConnected = useSocketStatus();
   const { config, updateConfig } = useConfig();
   const { projects, loading: projectsLoading, refreshing: projectsRefreshing, refreshProjects, deleteWorktree } = useProjects();
   const { instances, spawnInstance, killInstance } = useInstances();
@@ -174,6 +176,24 @@ export default function App() {
 
   const selectedInstance = instances.find(i => i.id === selectedInstanceId);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture shortcuts when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (!selectedInstance) return;
+
+      // Ctrl/Cmd + 1/2/3 for tabs
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        if (e.key === '1') { e.preventDefault(); setActiveTab('terminal'); }
+        if (e.key === '2') { e.preventDefault(); setActiveTab('changes'); }
+        if (e.key === '3') { e.preventDefault(); setActiveTab('pr'); }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedInstance]);
+
   return (
     <div className="flex h-screen bg-[#0a0a0a]">
       <Sidebar
@@ -226,7 +246,7 @@ export default function App() {
                   { key: 'terminal' as const, label: 'Terminal', Icon: Terminal },
                   { key: 'changes' as const, label: 'Changes', Icon: FileCode2 },
                   { key: 'pr' as const, label: 'Pull Request', Icon: GitPullRequest },
-                ]).map(({ key, label, Icon }) => (
+                ]).map(({ key, label, Icon }, index) => (
                   <button
                     key={key}
                     onClick={() => setActiveTab(key)}
@@ -238,18 +258,25 @@ export default function App() {
                   >
                     <Icon className="h-3.5 w-3.5" />
                     {label}
+                    <span className="ml-1 hidden text-[9px] text-neutral-600 lg:inline">⌘{index + 1}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
           <div className="flex items-center gap-2 text-xs text-neutral-500">
+            {typingLocked && (
+              <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-400" title="Queue auto-select paused while you type">
+                typing
+              </span>
+            )}
             {queue.length > 0 && (
               <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-400">
                 {queue.length} queued
               </span>
             )}
             <span>{instances.filter(i => i.status !== 'exited').length} active</span>
+            <span className={`h-2 w-2 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} title={socketConnected ? 'Connected' : 'Disconnected'} />
           </div>
         </div>
 

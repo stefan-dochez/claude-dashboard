@@ -161,6 +161,7 @@ export default function Sidebar({
               onClick={onOpenScanPaths}
               className="rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
               title="Scan paths settings"
+              aria-label="Settings"
             >
               <Settings className="h-3 w-3" />
             </button>
@@ -169,6 +170,7 @@ export default function Sidebar({
               disabled={pullingAll}
               className="rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-blue-400 disabled:opacity-50"
               title="Update all repos (git pull)"
+              aria-label="Update all repos"
             >
               <Download className={`h-3 w-3 ${pullingAll ? 'animate-pulse' : ''}`} />
             </button>
@@ -176,6 +178,7 @@ export default function Sidebar({
               onClick={onRefreshProjects}
               className="mr-2 rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
               title="Refresh projects"
+              aria-label="Refresh projects"
             >
               <RefreshCw className={`h-3 w-3 ${projectsRefreshing ? 'animate-spin' : ''}`} />
             </button>

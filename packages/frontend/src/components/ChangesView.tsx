@@ -108,6 +108,7 @@ export default function ChangesView({ projectPath }: ChangesViewProps) {
             disabled={loading}
             className="rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
             title="Refresh"
+            aria-label="Refresh"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>

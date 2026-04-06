@@ -25,10 +25,8 @@ const ICON_COLOR_MAP = {
 } as const;
 
 export default function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
-  if (toasts.length === 0) return null;
-
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2" aria-live="polite" role="status">
       {toasts.map(toast => {
         const Icon = ICON_MAP[toast.type];
         return (
@@ -46,6 +44,7 @@ export default function ToastContainer({ toasts, onRemove }: ToastContainerProps
             <button
               onClick={() => onRemove(toast.id)}
               className="shrink-0 rounded p-0.5 text-neutral-500 transition-colors hover:text-neutral-300"
+              aria-label="Close notification"
             >
               <X className="h-3 w-3" />
             </button>

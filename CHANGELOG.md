@@ -34,6 +34,30 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **Scan paths editor** (`6de8a02`) — In-app settings modal to configure project scan paths. Auto-opens when no projects are found on first launch.
 
+### Accessibility
+
+- **Keyboard-discoverable actions** — All hover-only buttons (favorite, pull, delete, launch) now appear on `focus-visible`, making them accessible via keyboard Tab navigation.
+
+- **Toast aria-live** — Toast container uses `aria-live="polite"` and `role="status"` so screen readers announce notifications. Close button has `aria-label`.
+
+- **Semantic HTML fix** — Replaced `<span role="button">` with real `<button>` in AttentionQueueBanner.
+
+- **Modal focus trap** — Tab/Shift+Tab is trapped within LaunchModal, ScanPathsModal, and delete confirmation dialogs. First focusable element is auto-focused on open.
+
+- **Aria-labels** — All icon-only buttons across the app now have `aria-label` attributes.
+
+- **Focus outline** — Global `focus-visible` violet outline for all interactive elements.
+
+### UX
+
+- **Socket connection indicator** — Green/red dot in the topbar showing WebSocket connection status. Red pulses when disconnected.
+
+- **Typing lock indicator** — Violet "typing" badge in topbar when queue auto-select is paused because the user is typing in the terminal.
+
+- **Keyboard shortcuts** — `⌘1`/`⌘2`/`⌘3` (or Ctrl) to switch between Terminal, Changes, and Pull Request tabs. Hints shown on tab buttons.
+
+- **Copy commit hash** — Hover a commit chip in the Pull Request view to reveal a copy button for the hash.
+
 ### Refactoring
 
 - **Async git operations** — All `execSync` calls in the backend replaced with async `exec` (promisified). No longer blocks the event loop during git fetch, pull, diff, or worktree operations. `pull-all` now runs pulls in parallel via `Promise.all`.
