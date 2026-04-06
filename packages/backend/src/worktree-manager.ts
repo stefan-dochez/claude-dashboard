@@ -48,9 +48,28 @@ export class WorktreeManager {
 
     const finalBranch = suffix > 1 ? `${branchName}-${suffix}` : branchName;
 
+    // Fetch and use latest default branch as starting point
+    const defaultBranch = this.getDefaultBranch(projectPath);
+    let startPoint = '';
+    if (defaultBranch) {
+      try {
+        execSync('git fetch origin', {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000,
+        });
+        startPoint = `origin/${defaultBranch}`;
+        console.log(`[worktree-manager] Using ${startPoint} as starting point`);
+      } catch {
+        console.log(`[worktree-manager] Failed to fetch origin, using current HEAD`);
+      }
+    }
+
     console.log(`[worktree-manager] Creating worktree at ${worktreePath} (branch: ${finalBranch})`);
 
-    execSync(`git worktree add -b "${finalBranch}" "${worktreePath}"`, {
+    const startArg = startPoint ? ` "${startPoint}"` : '';
+    execSync(`git worktree add -b "${finalBranch}" "${worktreePath}"${startArg}`, {
       cwd: projectPath,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -125,7 +144,18 @@ export class WorktreeManager {
       console.log(`[worktree-manager] Stashed local changes`);
     }
 
-    // Step 2: Switch repo to default branch
+    // Step 2: Fetch origin and switch repo to default branch
+    try {
+      execSync('git fetch origin', {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 30000,
+      });
+    } catch {
+      console.log(`[worktree-manager] Failed to fetch origin, continuing with local state`);
+    }
+
     try {
       execSync(`git checkout "${defaultBranch}"`, {
         cwd: projectPath,
@@ -133,6 +163,18 @@ export class WorktreeManager {
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 15000,
       });
+      // Pull latest changes on default branch
+      try {
+        execSync(`git pull --ff-only origin "${defaultBranch}"`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000,
+        });
+        console.log(`[worktree-manager] Updated ${defaultBranch} to latest origin`);
+      } catch {
+        console.log(`[worktree-manager] Failed to pull ${defaultBranch}, continuing with local state`);
+      }
     } catch (err) {
       // Restore stash if checkout fails
       if (hasStash) {
@@ -195,18 +237,35 @@ export class WorktreeManager {
 
   removeWorktree(projectPath: string, worktreePath: string): void {
     const branchName = this.getBranchName(worktreePath);
+    const dirExists = fs.existsSync(worktreePath);
 
-    console.log(`[worktree-manager] Removing worktree at ${worktreePath}`);
+    console.log(`[worktree-manager] Removing worktree at ${worktreePath} (dirExists=${dirExists})`);
 
+    // Prune stale worktree references first so git doesn't choke on orphaned entries
     try {
-      execSync(`git worktree remove --force "${worktreePath}"`, {
+      execSync('git worktree prune', {
         cwd: projectPath,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 15000,
+        timeout: 5000,
       });
-    } catch (err) {
-      console.log(`[worktree-manager] Failed to remove worktree: ${err}`);
+    } catch {
+      // non-fatal
+    }
+
+    if (dirExists) {
+      try {
+        execSync(`git worktree remove --force "${worktreePath}"`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 15000,
+        });
+      } catch {
+        // git doesn't know about this worktree anymore — remove the directory manually
+        console.log(`[worktree-manager] git worktree remove failed, removing directory manually`);
+        fs.rmSync(worktreePath, { recursive: true, force: true });
+      }
     }
 
     if (branchName) {
@@ -218,20 +277,9 @@ export class WorktreeManager {
           timeout: 5000,
         });
         console.log(`[worktree-manager] Deleted branch ${branchName}`);
-      } catch (err) {
-        console.log(`[worktree-manager] Failed to delete branch ${branchName}: ${err}`);
+      } catch {
+        // Branch already deleted or never existed — not an error
       }
-    }
-
-    try {
-      execSync('git worktree prune', {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 5000,
-      });
-    } catch (err) {
-      console.log(`[worktree-manager] Failed to prune worktrees: ${err}`);
     }
   }
 

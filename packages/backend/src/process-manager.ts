@@ -312,7 +312,7 @@ export class ProcessManager extends EventEmitter {
 
   getBuffer(instanceId: string): string {
     const handle = this.handles.get(instanceId);
-    if (!handle) throw new Error(`Instance ${instanceId} not found`);
+    if (!handle) return '';
     return handle.buffer.join('');
   }
 

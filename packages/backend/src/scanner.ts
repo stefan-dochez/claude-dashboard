@@ -95,10 +95,11 @@ export class ProjectScanner {
         }
       }
 
-      // For meta-projects, continue scanning subdirectories with a fresh depth
+      // For meta-projects, continue scanning subdirectories with extra depth
+      // since sub-repos can be nested deeply (e.g. src/team/app/<repo>)
       if (isMeta) {
         const config = await this.configService.get();
-        const metaDepth = config.scanDepth;
+        const metaDepth = config.scanDepth + 3;
         try {
           const entries = await fs.readdir(dir, { withFileTypes: true });
           for (const entry of entries) {

@@ -120,6 +120,12 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => new Set());
   const [launching, setLaunching] = useState<string | null>(null);
   const [launchTarget, setLaunchTarget] = useState<Project | null>(null);
+  const [confirmDeleteWt, setConfirmDeleteWt] = useState<{ projectPath: string; worktreePath: string; name: string } | null>(null);
+
+  const requestDeleteWorktree = useCallback((projectPath: string, worktreePath: string) => {
+    const name = worktreePath.split('/').pop() ?? worktreePath;
+    setConfirmDeleteWt({ projectPath, worktreePath, name });
+  }, []);
 
   const activeProjectPaths = useMemo(
     () => new Set(instances.filter(i => i.status !== 'exited').map(i => i.projectPath)),
@@ -262,7 +268,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   onLaunch={isNestedWt ? () => handleDirectLaunch(project.path) : () => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
-                  onDeleteWorktree={onDeleteWorktree}
+                  onDeleteWorktree={requestDeleteWorktree}
                 />
               );
             })}
@@ -289,7 +295,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   onLaunch={() => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
-                  onDeleteWorktree={onDeleteWorktree}
+                  onDeleteWorktree={requestDeleteWorktree}
                 />
               );
             })}
@@ -312,7 +318,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
             onToggleProjectWorktrees={toggleProjectWorktrees}
             onLaunchModal={setLaunchTarget}
             onLaunchDirect={handleDirectLaunch}
-            onDeleteWorktree={onDeleteWorktree}
+            onDeleteWorktree={requestDeleteWorktree}
           />
         </div>
       )}
@@ -324,6 +330,43 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
           onLaunch={handleLaunchFromModal}
           onClose={() => setLaunchTarget(null)}
         />
+      )}
+
+      {confirmDeleteWt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setConfirmDeleteWt(null)}
+        >
+          <div
+            className="mx-4 w-full max-w-xs rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center gap-2 text-red-400">
+              <Trash2 className="h-4 w-4" />
+              <span className="text-sm font-semibold">Delete worktree</span>
+            </div>
+            <p className="mb-3 text-xs text-neutral-400">
+              Delete <span className="font-medium text-neutral-200">{confirmDeleteWt.name}</span>? The worktree directory and its branch will be removed.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteWt(null)}
+                className="rounded px-3 py-1.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteWorktree(confirmDeleteWt.projectPath, confirmDeleteWt.worktreePath);
+                  setConfirmDeleteWt(null);
+                }}
+                className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-500"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

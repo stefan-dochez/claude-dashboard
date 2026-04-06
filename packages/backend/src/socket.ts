@@ -60,8 +60,10 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager):
     });
 
     socket.on('terminal:detach', ({ instanceId }: { instanceId: string }) => {
-      console.log(`[socket] ${socket.id} detaching from ${instanceId}`);
-      attachments.get(instanceId)?.delete(socket.id);
+      const wasAttached = attachments.get(instanceId)?.delete(socket.id) ?? false;
+      if (wasAttached) {
+        console.log(`[socket] ${socket.id} detaching from ${instanceId}`);
+      }
     });
 
     socket.on('terminal:input', ({ instanceId, data }: { instanceId: string; data: string }) => {

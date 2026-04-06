@@ -155,7 +155,7 @@ export default function App() {
 
         {/* Terminal area */}
         <div className="flex-1 overflow-hidden">
-          {selectedInstance ? (
+          {selectedInstance && selectedInstance.status !== 'exited' ? (
             <TerminalView
               key={selectedInstance.id}
               instanceId={selectedInstance.id}

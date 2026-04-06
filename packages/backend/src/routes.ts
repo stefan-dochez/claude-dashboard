@@ -158,6 +158,12 @@ export function createRoutes(
     }
 
     try {
+      // Kill any instance running on this worktree before removing it
+      const runningInstance = processManager.getAll().find(i => i.worktreePath === worktreePath);
+      if (runningInstance) {
+        await processManager.kill(runningInstance.id);
+      }
+
       worktreeManager.removeWorktree(projectPath, worktreePath);
       scanner.refresh().catch(err => {
         console.log('[routes] Background scanner refresh failed:', err);
