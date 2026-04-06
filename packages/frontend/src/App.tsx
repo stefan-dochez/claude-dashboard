@@ -97,6 +97,16 @@ export default function App() {
     }
   }, [projectsLoading, projects.length]);
 
+  const favoriteProjects = useMemo(() => new Set(config?.favoriteProjects ?? []), [config?.favoriteProjects]);
+
+  const handleToggleFavorite = useCallback(async (projectPath: string) => {
+    const current = config?.favoriteProjects ?? [];
+    const next = current.includes(projectPath)
+      ? current.filter(p => p !== projectPath)
+      : [...current, projectPath];
+    await updateConfig({ favoriteProjects: next });
+  }, [config?.favoriteProjects, updateConfig]);
+
   const selectedInstance = instances.find(i => i.id === selectedInstanceId);
 
   return (
@@ -108,12 +118,14 @@ export default function App() {
         instances={instances}
         selectedInstanceId={selectedInstanceId}
         scanPaths={config?.scanPaths ?? []}
+        favoriteProjects={favoriteProjects}
         queuedIds={queuedIds}
         onRefreshProjects={refreshProjects}
         onLaunchProject={handleLaunch}
         onSelectInstance={handleSelectInstance}
         onKillInstance={handleKill}
         onDeleteWorktree={handleDeleteWorktree}
+        onToggleFavorite={handleToggleFavorite}
         onOpenScanPaths={() => setScanPathsOpen(true)}
       />
 

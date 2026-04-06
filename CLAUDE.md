@@ -203,6 +203,10 @@ interface AppConfig {
 - Animations minimales — transitions CSS courtes (150ms) pour les changements de statut
 - Sidebar : largeur fixe ~280px, collapsible
 
+## Changelog
+
+Après chaque commit qui ajoute une feature ou corrige un bug, mettre à jour `CHANGELOG.md` à la racine du projet. Voir `.claude/skills/update-changelog.md` pour le format.
+
 ## Ce qu'il ne faut PAS faire
 
 - Ne pas utiliser `child_process.spawn` directement — toujours passer par `node-pty` pour avoir un vrai PTY

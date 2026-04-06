@@ -11,12 +11,14 @@ interface SidebarProps {
   instances: Instance[];
   selectedInstanceId: string | null;
   scanPaths: string[];
+  favoriteProjects: Set<string>;
   queuedIds: Set<string>;
   onRefreshProjects: () => void;
   onLaunchProject: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
   onSelectInstance: (id: string) => void;
   onKillInstance: (id: string, deleteWorktree?: boolean) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
+  onToggleFavorite: (projectPath: string) => void;
   onOpenScanPaths: () => void;
 }
 
@@ -32,12 +34,14 @@ export default function Sidebar({
   instances,
   selectedInstanceId,
   scanPaths,
+  favoriteProjects,
   queuedIds,
   onRefreshProjects,
   onLaunchProject,
   onSelectInstance,
   onKillInstance,
   onDeleteWorktree,
+  onToggleFavorite,
   onOpenScanPaths,
 }: SidebarProps) {
   const [projectsOpen, setProjectsOpen] = useState(true);
@@ -187,8 +191,10 @@ export default function Sidebar({
                 loading={projectsLoading}
                 scanPaths={scanPaths}
                 selectedRoot={selectedRoot}
+                favoriteProjects={favoriteProjects}
                 onLaunch={onLaunchProject}
                 onDeleteWorktree={onDeleteWorktree}
+                onToggleFavorite={onToggleFavorite}
               />
             </div>
           )}

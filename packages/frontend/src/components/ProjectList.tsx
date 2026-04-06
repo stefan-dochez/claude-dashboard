@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree } from 'lucide-react';
+import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star } from 'lucide-react';
 import type { Project, Instance } from '../types';
 import LaunchModal from './LaunchModal';
 
@@ -109,11 +109,13 @@ interface ProjectListProps {
   loading: boolean;
   scanPaths: string[];
   selectedRoot: string | null;
+  favoriteProjects: Set<string>;
   onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
+  onToggleFavorite: (projectPath: string) => void;
 }
 
-export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, onLaunch, onDeleteWorktree }: ProjectListProps) {
+export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, favoriteProjects, onLaunch, onDeleteWorktree, onToggleFavorite }: ProjectListProps) {
   const [filter, setFilter] = useState('');
   const [viewMode, setViewMode] = useState<'tree' | 'flat'>('tree');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -206,6 +208,13 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     setTimeout(() => setLaunching(null), 1000);
   }, [onLaunch]);
 
+  const favSort = useCallback((a: Project, b: Project) => {
+    const aFav = favoriteProjects.has(a.path);
+    const bFav = favoriteProjects.has(b.path);
+    if (aFav !== bFav) return aFav ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  }, [favoriteProjects]);
+
   // Filtered flat list for search — includes all projects
   const filtered = useMemo(() => {
     if (!filter) return null;
@@ -213,12 +222,17 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
       p.name.toLowerCase().includes(filter.toLowerCase()) ||
       p.path.toLowerCase().includes(filter.toLowerCase()) ||
       (p.gitBranch?.toLowerCase().includes(filter.toLowerCase()) ?? false),
-    );
-  }, [projects, filter]);
+    ).sort(favSort);
+  }, [projects, filter, favSort]);
 
   const sortedFlatProjects = useMemo(
-    () => [...regularProjects].sort((a, b) => a.name.localeCompare(b.name)),
-    [regularProjects],
+    () => [...regularProjects].sort(favSort),
+    [regularProjects, favSort],
+  );
+
+  const favoriteProjectsList = useMemo(
+    () => regularProjects.filter(p => favoriteProjects.has(p.path)).sort((a, b) => a.name.localeCompare(b.name)),
+    [regularProjects, favoriteProjects],
   );
 
   return (
@@ -265,10 +279,12 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   isLaunching={launching === project.path}
                   launching={launching}
                   depth={0}
+                  isFavorite={favoriteProjects.has(project.path)}
                   onLaunch={isNestedWt ? () => handleDirectLaunch(project.path) : () => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={requestDeleteWorktree}
+                  onToggleFavorite={() => onToggleFavorite(project.path)}
                 />
               );
             })}
@@ -292,10 +308,12 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   isLaunching={launching === project.path}
                   launching={launching}
                   depth={0}
+                  isFavorite={favoriteProjects.has(project.path)}
                   onLaunch={() => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={requestDeleteWorktree}
+                  onToggleFavorite={() => onToggleFavorite(project.path)}
                 />
               );
             })}
@@ -306,6 +324,33 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
       ) : (
         // Tree view
         <div className="flex flex-col gap-0.5">
+          {favoriteProjectsList.length > 0 && (
+            <>
+              <div className="flex items-center gap-1.5 px-2 pt-1 pb-0.5">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-500">Favorites</span>
+              </div>
+              {favoriteProjectsList.map(project => (
+                <ProjectRow
+                  key={`fav-${project.path}`}
+                  project={project}
+                  worktrees={worktreesByParent.get(project.path) ?? []}
+                  isProjectExpanded={expandedProjects.has(project.path)}
+                  isActive={activeProjectPaths.has(project.path)}
+                  isLaunching={launching === project.path}
+                  launching={launching}
+                  depth={0}
+                  isFavorite
+                  onLaunch={() => setLaunchTarget(project)}
+                  onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
+                  onLaunchDirect={handleDirectLaunch}
+                  onDeleteWorktree={requestDeleteWorktree}
+                  onToggleFavorite={() => onToggleFavorite(project.path)}
+                />
+              ))}
+              <div className="mx-2 my-1 border-t border-neutral-800" />
+            </>
+          )}
           <TreeNodeList
             nodes={tree}
             depth={0}
@@ -319,6 +364,8 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
             onLaunchModal={setLaunchTarget}
             onLaunchDirect={handleDirectLaunch}
             onDeleteWorktree={requestDeleteWorktree}
+            favoriteProjects={favoriteProjects}
+            onToggleFavorite={onToggleFavorite}
           />
         </div>
       )}
@@ -380,11 +427,13 @@ interface TreeProps {
   activeProjectPaths: Set<string>;
   launching: string | null;
   worktreesByParent: Map<string, Project[]>;
+  favoriteProjects: Set<string>;
   onToggle: (path: string) => void;
   onToggleProjectWorktrees: (path: string) => void;
   onLaunchModal: (project: Project) => void;
   onLaunchDirect: (path: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
+  onToggleFavorite: (projectPath: string) => void;
 }
 
 function TreeNodeList({
@@ -392,7 +441,7 @@ function TreeNodeList({
   depth,
   ...treeProps
 }: { nodes: TreeNode[]; depth: number } & TreeProps) {
-  const { expanded, expandedProjects, activeProjectPaths, launching, worktreesByParent, onToggle, onToggleProjectWorktrees, onLaunchModal, onLaunchDirect, onDeleteWorktree } = treeProps;
+  const { expanded, expandedProjects, activeProjectPaths, launching, worktreesByParent, favoriteProjects, onToggle, onToggleProjectWorktrees, onLaunchModal, onLaunchDirect, onDeleteWorktree, onToggleFavorite } = treeProps;
 
   return (
     <>
@@ -420,10 +469,12 @@ function TreeNodeList({
             isLaunching={launching === node.project.path}
             launching={launching}
             depth={depth}
+            isFavorite={favoriteProjects.has(node.project.path)}
             onLaunch={() => onLaunchModal(node.project)}
             onToggleWorktrees={() => onToggleProjectWorktrees(node.project.path)}
             onLaunchDirect={onLaunchDirect}
             onDeleteWorktree={onDeleteWorktree}
+            onToggleFavorite={() => onToggleFavorite(node.project.path)}
           />
         );
       })}
@@ -475,10 +526,12 @@ function ProjectRow({
   isLaunching,
   launching,
   depth,
+  isFavorite,
   onLaunch,
   onToggleWorktrees,
   onLaunchDirect,
   onDeleteWorktree,
+  onToggleFavorite,
 }: {
   project: Project;
   worktrees: Project[];
@@ -487,10 +540,12 @@ function ProjectRow({
   isLaunching: boolean;
   launching: string | null;
   depth: number;
+  isFavorite?: boolean;
   onLaunch: () => void;
   onToggleWorktrees: () => void;
   onLaunchDirect: (path: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
+  onToggleFavorite?: () => void;
 }) {
   const hasWorktrees = worktrees.length > 0;
 
@@ -555,6 +610,22 @@ function ProjectRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          {onToggleFavorite && !project.isWorktree && (
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                onToggleFavorite();
+              }}
+              className={`shrink-0 rounded p-1 transition-all ${
+                isFavorite
+                  ? 'text-amber-400 opacity-100'
+                  : 'text-neutral-500 opacity-0 hover:bg-neutral-700 hover:text-amber-400 group-hover:opacity-100'
+              }`}
+              title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            >
+              <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
+            </button>
+          )}
           {project.isWorktree && project.parentProject && (
             <button
               onClick={e => {

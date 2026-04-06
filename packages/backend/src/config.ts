@@ -12,6 +12,7 @@ interface AppConfig {
   scanDepth: number;
   port: number;
   maxInstances: number;
+  favoriteProjects: string[];
   statusPatterns: {
     waitingInput: string[];
   };
@@ -24,6 +25,7 @@ const DEFAULT_CONFIG: AppConfig = {
     path.join(os.homedir(), 'Workspace'),
   ],
   metaProjects: [],
+  favoriteProjects: [],
   projectMarkers: ['.git', 'CLAUDE.md', 'package.json', 'Cargo.toml', 'go.mod', 'pyproject.toml'],
   scanDepth: 3,
   port: 3200,
