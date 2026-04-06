@@ -107,8 +107,8 @@ export default function DiffViewer({ diff }: DiffViewerProps) {
 
   return (
     <div className="h-full overflow-auto">
-      {files.map((file, fi) => (
-        <div key={fi} className="mb-1">
+      {files.map((file) => (
+        <div key={file.fileName} className="mb-1">
           {/* File header */}
           <div className="sticky top-0 z-10 border-b border-neutral-800 bg-[#1a1a2e] px-4 py-1.5">
             <span className="font-mono text-xs font-medium text-blue-300">{file.fileName}</span>

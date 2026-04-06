@@ -7,6 +7,15 @@ function getSocket(): Socket {
   if (!socketInstance) {
     socketInstance = io('/', {
       transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+    });
+    socketInstance.on('connect', () => {
+      console.log('[socket] Connected');
+    });
+    socketInstance.on('disconnect', (reason) => {
+      console.log('[socket] Disconnected:', reason);
     });
   }
   return socketInstance;

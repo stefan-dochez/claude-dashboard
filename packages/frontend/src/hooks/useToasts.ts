@@ -7,14 +7,12 @@ export interface Toast {
   detail?: string;
 }
 
-let nextId = 0;
-
 export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const addToast = useCallback((type: Toast['type'], message: string, detail?: string, duration = 4000) => {
-    const id = String(++nextId);
+    const id = crypto.randomUUID();
     setToasts(prev => [...prev, { id, type, message, detail }]);
 
     const timer = setTimeout(() => {

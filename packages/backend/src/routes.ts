@@ -82,9 +82,9 @@ export function createRoutes(
       let branchName: string | undefined;
       let parentProjectPath: string | undefined;
 
-      if (detachBranch && worktreeManager.isGitRepo(projectPath)) {
+      if (detachBranch && await worktreeManager.isGitRepo(projectPath)) {
         // Detach current branch to a worktree and reset repo to default branch
-        const result = worktreeManager.detachBranchToWorktree(projectPath);
+        const result = await worktreeManager.detachBranchToWorktree(projectPath);
         worktreePath = result.worktreePath;
         branchName = result.branchName;
         parentProjectPath = projectPath;
@@ -92,8 +92,8 @@ export function createRoutes(
         scanner.refresh().catch(err => {
           console.log('[routes] Background scanner refresh failed:', err);
         });
-      } else if (taskDescription && worktreeManager.isGitRepo(projectPath)) {
-        const result = worktreeManager.createWorktree(projectPath, taskDescription, branchPrefix);
+      } else if (taskDescription && await worktreeManager.isGitRepo(projectPath)) {
+        const result = await worktreeManager.createWorktree(projectPath, taskDescription, branchPrefix);
         worktreePath = result.worktreePath;
         branchName = result.branchName;
         parentProjectPath = projectPath;
@@ -105,7 +105,7 @@ export function createRoutes(
       } else if (worktreeManager.isWorktree(projectPath)) {
         // Launching a pre-existing worktree — populate worktree fields for context + cleanup
         worktreePath = projectPath;
-        branchName = worktreeManager.getGitBranch(projectPath) ?? undefined;
+        branchName = (await worktreeManager.getGitBranch(projectPath)) ?? undefined;
         parentProjectPath = worktreeManager.getParentProjectPath(projectPath) ?? undefined;
       }
 
@@ -133,7 +133,7 @@ export function createRoutes(
 
       if (deleteWorktree && instance?.worktreePath && instance?.parentProjectPath) {
         try {
-          worktreeManager.removeWorktree(instance.parentProjectPath, instance.worktreePath);
+          await worktreeManager.removeWorktree(instance.parentProjectPath, instance.worktreePath);
           scanner.refresh().catch(err => {
             console.log('[routes] Background scanner refresh failed:', err);
           });
@@ -165,7 +165,7 @@ export function createRoutes(
         await processManager.kill(runningInstance.id);
       }
 
-      worktreeManager.removeWorktree(projectPath, worktreePath);
+      await worktreeManager.removeWorktree(projectPath, worktreePath);
       scanner.refresh().catch(err => {
         console.log('[routes] Background scanner refresh failed:', err);
       });
@@ -178,14 +178,14 @@ export function createRoutes(
   });
 
   // Git — pull / update
-  router.post('/api/git/pull', (req, res) => {
+  router.post('/api/git/pull', async (req, res) => {
     const { projectPath } = req.body as { projectPath?: string };
     if (!projectPath) {
       res.status(400).json({ error: 'projectPath is required' });
       return;
     }
     try {
-      const result = worktreeManager.pullRepo(projectPath);
+      const result = await worktreeManager.pullRepo(projectPath);
       res.json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Pull failed';
@@ -201,11 +201,12 @@ export function createRoutes(
       const gitProjects = projects.filter(
         (p: { gitBranch: string | null; isWorktree: boolean }) => p.gitBranch !== null && !p.isWorktree,
       );
-      const results: Array<{ path: string; name: string; success: boolean; message: string }> = [];
-      for (const project of gitProjects) {
-        const result = worktreeManager.pullRepo(project.path);
-        results.push({ path: project.path, name: project.name, ...result });
-      }
+      const results = await Promise.all(
+        gitProjects.map(async (project) => {
+          const result = await worktreeManager.pullRepo(project.path);
+          return { path: project.path, name: project.name, ...result };
+        }),
+      );
       res.json(results);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Pull all failed';
@@ -215,14 +216,14 @@ export function createRoutes(
   });
 
   // Git — status and diffs
-  router.get('/api/git/status', (req, res) => {
+  router.get('/api/git/status', async (req, res) => {
     const projectPath = req.query.path as string | undefined;
     if (!projectPath) {
       res.status(400).json({ error: 'path query parameter is required' });
       return;
     }
     try {
-      const files = worktreeManager.getStatus(projectPath);
+      const files = await worktreeManager.getStatus(projectPath);
       res.json(files);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to get git status';
@@ -231,7 +232,7 @@ export function createRoutes(
     }
   });
 
-  router.get('/api/git/diff', (req, res) => {
+  router.get('/api/git/diff', async (req, res) => {
     const projectPath = req.query.path as string | undefined;
     const file = req.query.file as string | undefined;
     if (!projectPath) {
@@ -239,7 +240,7 @@ export function createRoutes(
       return;
     }
     try {
-      const diff = worktreeManager.getWorkingDiff(projectPath, file);
+      const diff = await worktreeManager.getWorkingDiff(projectPath, file);
       res.json({ diff });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to get diff';
@@ -248,7 +249,7 @@ export function createRoutes(
     }
   });
 
-  router.get('/api/git/branch-diff', (req, res) => {
+  router.get('/api/git/branch-diff', async (req, res) => {
     const projectPath = req.query.path as string | undefined;
     const target = req.query.target as string | undefined;
     if (!projectPath) {
@@ -256,7 +257,7 @@ export function createRoutes(
       return;
     }
     try {
-      const result = worktreeManager.getBranchDiff(projectPath, target);
+      const result = await worktreeManager.getBranchDiff(projectPath, target);
       res.json(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to get branch diff';

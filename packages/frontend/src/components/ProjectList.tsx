@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useContext, createContext } from 'react';
 import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star, Download } from 'lucide-react';
 import type { Project, Instance } from '../types';
 import LaunchModal from './LaunchModal';
@@ -101,6 +101,31 @@ function buildMultiRootTree(projects: Project[], roots: string[]): TreeNode[] {
   return tree;
 }
 
+// --- Context for shared tree state ---
+
+interface ProjectTreeContextValue {
+  expandedProjects: Set<string>;
+  activeProjectPaths: Set<string>;
+  launching: string | null;
+  worktreesByParent: Map<string, Project[]>;
+  favoriteProjects: Set<string>;
+  pullingProjects: Set<string>;
+  onToggleProjectWorktrees: (path: string) => void;
+  onLaunchModal: (project: Project) => void;
+  onLaunchDirect: (path: string) => void;
+  onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
+  onToggleFavorite: (projectPath: string) => void;
+  onPullProject: (projectPath: string) => void;
+}
+
+const ProjectTreeContext = createContext<ProjectTreeContextValue | null>(null);
+
+function useProjectTreeContext(): ProjectTreeContextValue {
+  const ctx = useContext(ProjectTreeContext);
+  if (!ctx) throw new Error('useProjectTreeContext must be used within ProjectTreeContext.Provider');
+  return ctx;
+}
+
 // --- Components ---
 
 interface ProjectListProps {
@@ -161,10 +186,8 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     return buildMultiRootTree(regularProjects, scanPaths);
   }, [regularProjects, scanPaths, selectedRoot]);
 
-  // Auto-expand first level only on initial mount or when selectedRoot changes
-  const prevRootRef = useRef<string | null | undefined>(undefined);
-  if (prevRootRef.current !== selectedRoot) {
-    prevRootRef.current = selectedRoot;
+  // Auto-expand first level only when selectedRoot changes
+  useEffect(() => {
     const firstLevel = new Set<string>();
     for (const node of tree) {
       if (node.type === 'folder') {
@@ -172,7 +195,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
       }
     }
     setExpanded(firstLevel);
-  }
+  }, [selectedRoot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleFolder = useCallback((path: string) => {
     setExpanded(prev => {
@@ -237,7 +260,23 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     [regularProjects, favoriteProjects],
   );
 
+  const contextValue = useMemo<ProjectTreeContextValue>(() => ({
+    expandedProjects,
+    activeProjectPaths,
+    launching,
+    worktreesByParent,
+    favoriteProjects,
+    pullingProjects,
+    onToggleProjectWorktrees: toggleProjectWorktrees,
+    onLaunchModal: setLaunchTarget,
+    onLaunchDirect: handleDirectLaunch,
+    onDeleteWorktree: requestDeleteWorktree,
+    onToggleFavorite: onToggleFavorite,
+    onPullProject: onPullProject,
+  }), [expandedProjects, activeProjectPaths, launching, worktreesByParent, favoriteProjects, pullingProjects, toggleProjectWorktrees, handleDirectLaunch, requestDeleteWorktree, onToggleFavorite, onPullProject]);
+
   return (
+    <ProjectTreeContext.Provider value={contextValue}>
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1">
         <div className="relative flex-1">
@@ -363,19 +402,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
             nodes={tree}
             depth={0}
             expanded={expanded}
-            expandedProjects={expandedProjects}
-            activeProjectPaths={activeProjectPaths}
-            launching={launching}
-            worktreesByParent={worktreesByParent}
             onToggle={toggleFolder}
-            onToggleProjectWorktrees={toggleProjectWorktrees}
-            onLaunchModal={setLaunchTarget}
-            onLaunchDirect={handleDirectLaunch}
-            onDeleteWorktree={requestDeleteWorktree}
-            favoriteProjects={favoriteProjects}
-            pullingProjects={pullingProjects}
-            onToggleFavorite={onToggleFavorite}
-            onPullProject={onPullProject}
           />
         </div>
       )}
@@ -426,6 +453,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
         </div>
       )}
     </div>
+    </ProjectTreeContext.Provider>
   );
 }
 
@@ -433,27 +461,16 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
 
 interface TreeProps {
   expanded: Set<string>;
-  expandedProjects: Set<string>;
-  activeProjectPaths: Set<string>;
-  launching: string | null;
-  worktreesByParent: Map<string, Project[]>;
-  favoriteProjects: Set<string>;
-  pullingProjects: Set<string>;
   onToggle: (path: string) => void;
-  onToggleProjectWorktrees: (path: string) => void;
-  onLaunchModal: (project: Project) => void;
-  onLaunchDirect: (path: string) => void;
-  onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
-  onToggleFavorite: (projectPath: string) => void;
-  onPullProject: (projectPath: string) => void;
 }
 
 function TreeNodeList({
   nodes,
   depth,
-  ...treeProps
+  expanded,
+  onToggle,
 }: { nodes: TreeNode[]; depth: number } & TreeProps) {
-  const { expanded, expandedProjects, activeProjectPaths, launching, worktreesByParent, favoriteProjects, pullingProjects, onToggle, onToggleProjectWorktrees, onLaunchModal, onLaunchDirect, onDeleteWorktree, onToggleFavorite, onPullProject } = treeProps;
+  const ctx = useProjectTreeContext();
 
   return (
     <>
@@ -465,30 +482,31 @@ function TreeNodeList({
               node={node}
               depth={depth}
               isExpanded={expanded.has(node.fullPath)}
-              {...treeProps}
+              expanded={expanded}
+              onToggle={onToggle}
             />
           );
         }
 
-        const worktrees = worktreesByParent.get(node.project.path) ?? [];
+        const worktrees = ctx.worktreesByParent.get(node.project.path) ?? [];
         return (
           <ProjectRow
             key={node.project.path}
             project={node.project}
             worktrees={worktrees}
-            isProjectExpanded={expandedProjects.has(node.project.path)}
-            isActive={activeProjectPaths.has(node.project.path)}
-            isLaunching={launching === node.project.path}
-            launching={launching}
+            isProjectExpanded={ctx.expandedProjects.has(node.project.path)}
+            isActive={ctx.activeProjectPaths.has(node.project.path)}
+            isLaunching={ctx.launching === node.project.path}
+            launching={ctx.launching}
             depth={depth}
-            isFavorite={favoriteProjects.has(node.project.path)}
-            isPulling={pullingProjects.has(node.project.path)}
-            onLaunch={() => onLaunchModal(node.project)}
-            onToggleWorktrees={() => onToggleProjectWorktrees(node.project.path)}
-            onLaunchDirect={onLaunchDirect}
-            onDeleteWorktree={onDeleteWorktree}
-            onToggleFavorite={() => onToggleFavorite(node.project.path)}
-            onPull={() => onPullProject(node.project.path)}
+            isFavorite={ctx.favoriteProjects.has(node.project.path)}
+            isPulling={ctx.pullingProjects.has(node.project.path)}
+            onLaunch={() => ctx.onLaunchModal(node.project)}
+            onToggleWorktrees={() => ctx.onToggleProjectWorktrees(node.project.path)}
+            onLaunchDirect={ctx.onLaunchDirect}
+            onDeleteWorktree={ctx.onDeleteWorktree}
+            onToggleFavorite={() => ctx.onToggleFavorite(node.project.path)}
+            onPull={() => ctx.onPullProject(node.project.path)}
           />
         );
       })}
@@ -500,12 +518,13 @@ function FolderRow({
   node,
   depth,
   isExpanded,
-  ...treeProps
+  expanded,
+  onToggle,
 }: { node: FolderTreeNode; depth: number; isExpanded: boolean } & TreeProps) {
   return (
     <>
       <button
-        onClick={() => treeProps.onToggle(node.fullPath)}
+        onClick={() => onToggle(node.fullPath)}
         className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-neutral-800/50"
         style={{ paddingLeft: `${depth * 12 + 6}px` }}
       >
@@ -523,7 +542,8 @@ function FolderRow({
         <TreeNodeList
           nodes={node.children}
           depth={depth + 1}
-          {...treeProps}
+          expanded={expanded}
+          onToggle={onToggle}
         />
       )}
     </>

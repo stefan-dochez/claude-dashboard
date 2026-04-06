@@ -34,6 +34,22 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **Scan paths editor** (`6de8a02`) — In-app settings modal to configure project scan paths. Auto-opens when no projects are found on first launch.
 
+### Refactoring
+
+- **Async git operations** — All `execSync` calls in the backend replaced with async `exec` (promisified). No longer blocks the event loop during git fetch, pull, diff, or worktree operations. `pull-all` now runs pulls in parallel via `Promise.all`.
+
+- **React Context for ProjectList** — Replaced 16-prop drilling through TreeNodeList/FolderRow/ProjectRow with a `ProjectTreeContext`. Reduced `TreeProps` to only folder-specific props.
+
+- **Socket reconnection** — Added automatic reconnection with infinite retries and connect/disconnect logging.
+
+- **Render-time setState fix** — Moved `setExpanded` logic from render phase into `useEffect` in ProjectList.
+
+- **Toast ID generation** — Replaced module-level increment counter with `crypto.randomUUID()` to avoid potential collisions.
+
+- **DiffViewer keys** — Replaced array index keys with `file.fileName` for stable list rendering.
+
+- **Scanner homedir** — Replaced `process.env.HOME` with `os.homedir()` for reliability.
+
 ### Fixes
 
 - **PR diff comparing against stale local branch** (`25f1f35` fix) — Branch diff now compares against `origin/<branch>` instead of the local branch to avoid showing incorrect file counts.

@@ -1,7 +1,11 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { execSync } from 'child_process';
+import os from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { ConfigService } from './config.js';
+
+const execAsync = promisify(exec);
 
 interface Project {
   name: string;
@@ -33,12 +37,12 @@ export class ProjectScanner {
 
     const resolvedMetaProjects = new Set(
       (config.metaProjects ?? []).map(p =>
-        path.resolve(p.replace(/^~/, process.env.HOME ?? '')),
+        path.resolve(p.replace(/^~/, os.homedir())),
       ),
     );
 
     for (const scanPath of config.scanPaths) {
-      const resolved = path.resolve(scanPath.replace(/^~/, process.env.HOME ?? ''));
+      const resolved = path.resolve(scanPath.replace(/^~/, os.homedir()));
       await this.scanDirectory(resolved, config.projectMarkers, config.scanDepth, projects, seen, resolvedMetaProjects);
     }
 
@@ -142,7 +146,7 @@ export class ProjectScanner {
 
   private async buildProject(projectPath: string, parentProject?: string, isMeta = false): Promise<Project> {
     const name = path.basename(projectPath);
-    const gitBranch = this.getGitBranch(projectPath);
+    const gitBranch = await this.getGitBranch(projectPath);
     const hasClaudeMd = await fs.access(path.join(projectPath, 'CLAUDE.md')).then(() => true).catch(() => false);
     const lastModified = await this.getLastModified(projectPath);
     const isWorktree = parentProject !== undefined || await this.isGitWorktree(projectPath);
@@ -159,14 +163,14 @@ export class ProjectScanner {
     };
   }
 
-  private getGitBranch(dir: string): string | null {
+  private async getGitBranch(dir: string): Promise<string | null> {
     try {
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+      const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD', {
         cwd: dir,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 5000,
-      }).trim();
+      });
+      const branch = stdout.trim();
       return branch || null;
     } catch {
       return null;

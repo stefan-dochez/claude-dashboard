@@ -1,6 +1,9 @@
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
+
+const execAsync = promisify(exec);
 
 interface WorktreeResult {
   worktreePath: string;
@@ -8,12 +11,11 @@ interface WorktreeResult {
 }
 
 export class WorktreeManager {
-  isGitRepo(projectPath: string): boolean {
+  async isGitRepo(projectPath: string): Promise<boolean> {
     try {
-      execSync('git rev-parse --is-inside-work-tree', {
+      await execAsync('git rev-parse --is-inside-work-tree', {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 5000,
       });
       return true;
@@ -30,7 +32,7 @@ export class WorktreeManager {
       .slice(0, 60);
   }
 
-  createWorktree(projectPath: string, taskDescription: string, branchPrefix?: string): WorktreeResult {
+  async createWorktree(projectPath: string, taskDescription: string, branchPrefix?: string): Promise<WorktreeResult> {
     const slug = this.slugify(taskDescription);
     if (!slug) {
       throw new Error('Task description produced an empty slug');
@@ -50,14 +52,13 @@ export class WorktreeManager {
     const finalBranch = suffix > 1 ? `${branchName}-${suffix}` : branchName;
 
     // Fetch and use latest default branch as starting point
-    const defaultBranch = this.getDefaultBranch(projectPath);
+    const defaultBranch = await this.getDefaultBranch(projectPath);
     let startPoint = '';
     if (defaultBranch) {
       try {
-        execSync('git fetch origin', {
+        await execAsync('git fetch origin', {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 30000,
         });
         startPoint = `origin/${defaultBranch}`;
@@ -70,10 +71,9 @@ export class WorktreeManager {
     console.log(`[worktree-manager] Creating worktree at ${worktreePath} (branch: ${finalBranch})`);
 
     const startArg = startPoint ? ` "${startPoint}"` : '';
-    execSync(`git worktree add -b "${finalBranch}" "${worktreePath}"${startArg}`, {
+    await execAsync(`git worktree add -b "${finalBranch}" "${worktreePath}"${startArg}`, {
       cwd: projectPath,
       encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 30000,
     });
 
@@ -82,14 +82,13 @@ export class WorktreeManager {
     return { worktreePath, branchName: finalBranch };
   }
 
-  getDefaultBranch(projectPath: string): string | null {
+  async getDefaultBranch(projectPath: string): Promise<string | null> {
     // Try common default branch names
     for (const candidate of ['main', 'master', 'develop']) {
       try {
-        execSync(`git rev-parse --verify ${candidate}`, {
+        await execAsync(`git rev-parse --verify ${candidate}`, {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 5000,
         });
         return candidate;
@@ -100,19 +99,19 @@ export class WorktreeManager {
     return null;
   }
 
-  isOnMainBranch(projectPath: string): boolean {
-    const branch = this.getGitBranch(projectPath);
+  async isOnMainBranch(projectPath: string): Promise<boolean> {
+    const branch = await this.getGitBranch(projectPath);
     if (!branch) return true;
     return ['main', 'master', 'develop'].includes(branch);
   }
 
-  detachBranchToWorktree(projectPath: string): WorktreeResult {
-    const currentBranch = this.getGitBranch(projectPath);
+  async detachBranchToWorktree(projectPath: string): Promise<WorktreeResult> {
+    const currentBranch = await this.getGitBranch(projectPath);
     if (!currentBranch) {
       throw new Error('Cannot determine current branch');
     }
 
-    const defaultBranch = this.getDefaultBranch(projectPath);
+    const defaultBranch = await this.getDefaultBranch(projectPath);
     if (!defaultBranch) {
       throw new Error('Cannot determine default branch (looked for main, master, develop)');
     }
@@ -134,12 +133,12 @@ export class WorktreeManager {
     console.log(`[worktree-manager] Detaching branch ${currentBranch} to worktree at ${worktreePath}`);
 
     // Step 1: Stash any local changes (including untracked files)
-    const stashResult = execSync('git stash push -u -m "claude-dashboard: detach branch"', {
+    const { stdout: stashOutput } = await execAsync('git stash push -u -m "claude-dashboard: detach branch"', {
       cwd: projectPath,
       encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 15000,
-    }).trim();
+    });
+    const stashResult = stashOutput.trim();
     const hasStash = !stashResult.includes('No local changes');
     if (hasStash) {
       console.log(`[worktree-manager] Stashed local changes`);
@@ -147,10 +146,9 @@ export class WorktreeManager {
 
     // Step 2: Fetch origin and switch repo to default branch
     try {
-      execSync('git fetch origin', {
+      await execAsync('git fetch origin', {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 30000,
       });
     } catch {
@@ -158,18 +156,16 @@ export class WorktreeManager {
     }
 
     try {
-      execSync(`git checkout "${defaultBranch}"`, {
+      await execAsync(`git checkout "${defaultBranch}"`, {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 15000,
       });
       // Pull latest changes on default branch
       try {
-        execSync(`git pull --ff-only origin "${defaultBranch}"`, {
+        await execAsync(`git pull --ff-only origin "${defaultBranch}"`, {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 30000,
         });
         console.log(`[worktree-manager] Updated ${defaultBranch} to latest origin`);
@@ -179,10 +175,9 @@ export class WorktreeManager {
     } catch (err) {
       // Restore stash if checkout fails
       if (hasStash) {
-        execSync('git stash pop', {
+        await execAsync('git stash pop', {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 15000,
         });
       }
@@ -191,25 +186,22 @@ export class WorktreeManager {
 
     // Step 3: Create worktree using the existing branch (no -b flag)
     try {
-      execSync(`git worktree add "${worktreePath}" "${currentBranch}"`, {
+      await execAsync(`git worktree add "${worktreePath}" "${currentBranch}"`, {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 30000,
       });
     } catch (err) {
       // Rollback: go back to original branch and restore stash
-      execSync(`git checkout "${currentBranch}"`, {
+      await execAsync(`git checkout "${currentBranch}"`, {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 15000,
       });
       if (hasStash) {
-        execSync('git stash pop', {
+        await execAsync('git stash pop', {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 15000,
         });
       }
@@ -219,10 +211,9 @@ export class WorktreeManager {
     // Step 4: Restore stashed changes in the worktree
     if (hasStash) {
       try {
-        execSync('git stash pop', {
+        await execAsync('git stash pop', {
           cwd: worktreePath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 15000,
         });
         console.log(`[worktree-manager] Restored stashed changes in worktree`);
@@ -236,18 +227,17 @@ export class WorktreeManager {
     return { worktreePath, branchName: currentBranch };
   }
 
-  removeWorktree(projectPath: string, worktreePath: string): void {
-    const branchName = this.getBranchName(worktreePath);
+  async removeWorktree(projectPath: string, worktreePath: string): Promise<void> {
+    const branchName = await this.getBranchName(worktreePath);
     const dirExists = fs.existsSync(worktreePath);
 
     console.log(`[worktree-manager] Removing worktree at ${worktreePath} (dirExists=${dirExists})`);
 
     // Prune stale worktree references first so git doesn't choke on orphaned entries
     try {
-      execSync('git worktree prune', {
+      await execAsync('git worktree prune', {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 5000,
       });
     } catch {
@@ -256,10 +246,9 @@ export class WorktreeManager {
 
     if (dirExists) {
       try {
-        execSync(`git worktree remove --force "${worktreePath}"`, {
+        await execAsync(`git worktree remove --force "${worktreePath}"`, {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 15000,
         });
       } catch {
@@ -271,10 +260,9 @@ export class WorktreeManager {
 
     if (branchName) {
       try {
-        execSync(`git branch -D "${branchName}"`, {
+        await execAsync(`git branch -D "${branchName}"`, {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 5000,
         });
         console.log(`[worktree-manager] Deleted branch ${branchName}`);
@@ -313,33 +301,32 @@ export class WorktreeManager {
     }
   }
 
-  getGitBranch(projectPath: string): string | null {
+  async getGitBranch(projectPath: string): Promise<string | null> {
     try {
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+      const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD', {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 5000,
-      }).trim();
+      });
+      const branch = stdout.trim();
       return branch || null;
     } catch {
       return null;
     }
   }
 
-  pullRepo(projectPath: string): { success: boolean; message: string } {
+  async pullRepo(projectPath: string): Promise<{ success: boolean; message: string }> {
     try {
-      const branch = this.getGitBranch(projectPath);
+      const branch = await this.getGitBranch(projectPath);
       if (!branch) {
         return { success: false, message: 'Cannot determine current branch' };
       }
 
       // Fetch first
       try {
-        execSync('git fetch origin', {
+        await execAsync('git fetch origin', {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 30000,
         });
       } catch {
@@ -347,12 +334,12 @@ export class WorktreeManager {
       }
 
       // Pull with fast-forward only to avoid merge conflicts
-      const output = execSync(`git pull --ff-only origin "${branch}"`, {
+      const { stdout } = await execAsync(`git pull --ff-only origin "${branch}"`, {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 30000,
-      }).trim();
+      });
+      const output = stdout.trim();
 
       const alreadyUpToDate = output.includes('Already up to date') || output.includes('Already up-to-date');
       return {
@@ -369,15 +356,14 @@ export class WorktreeManager {
     }
   }
 
-  getStatus(projectPath: string): Array<{ status: string; path: string }> {
-    const output = execSync('git status --porcelain=v1', {
+  async getStatus(projectPath: string): Promise<Array<{ status: string; path: string }>> {
+    const { stdout } = await execAsync('git status --porcelain=v1', {
       cwd: projectPath,
       encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 15000,
     });
 
-    return output
+    return stdout
       .split('\n')
       .filter(line => line.length > 0)
       .map(line => ({
@@ -386,65 +372,63 @@ export class WorktreeManager {
       }));
   }
 
-  getWorkingDiff(projectPath: string, filePath?: string): string {
+  async getWorkingDiff(projectPath: string, filePath?: string): Promise<string> {
     // Diff of staged + unstaged changes against HEAD
     const fileArg = filePath ? ` -- "${filePath}"` : '';
 
     let diff = '';
     try {
-      diff = execSync(`git diff HEAD${fileArg}`, {
+      const { stdout } = await execAsync(`git diff HEAD${fileArg}`, {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 30000,
         maxBuffer: 5 * 1024 * 1024,
       });
+      diff = stdout;
     } catch {
       // diff HEAD fails if there are no commits yet
-      diff = execSync(`git diff${fileArg}`, {
+      const { stdout } = await execAsync(`git diff${fileArg}`, {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 30000,
         maxBuffer: 5 * 1024 * 1024,
       });
+      diff = stdout;
     }
 
     // For untracked files, git diff HEAD won't show them — generate a diff manually
     if (!filePath) {
-      const untracked = this.getStatus(projectPath).filter(f => f.status === '??');
+      const untracked = (await this.getStatus(projectPath)).filter(f => f.status === '??');
       for (const file of untracked) {
         try {
-          const content = execSync(`git diff --no-index /dev/null "${file.path}"`, {
+          const { stdout: content } = await execAsync(`git diff --no-index /dev/null "${file.path}"`, {
             cwd: projectPath,
             encoding: 'utf-8',
-            stdio: ['pipe', 'pipe', 'pipe'],
             timeout: 10000,
             maxBuffer: 5 * 1024 * 1024,
           });
           diff += content;
-        } catch (err: unknown) {
+        } catch (err) {
           // git diff --no-index exits with code 1 when files differ — that's expected
-          if (err && typeof err === 'object' && 'stdout' in err) {
-            diff += (err as { stdout: string }).stdout;
+          if (err instanceof Error && 'stdout' in err) {
+            diff += (err as Error & { stdout: string }).stdout;
           }
         }
       }
     } else {
       // Check if this specific file is untracked
-      const status = this.getStatus(projectPath).find(f => f.path === filePath);
+      const status = (await this.getStatus(projectPath)).find(f => f.path === filePath);
       if (status?.status === '??' && !diff) {
         try {
-          execSync(`git diff --no-index /dev/null "${filePath}"`, {
+          await execAsync(`git diff --no-index /dev/null "${filePath}"`, {
             cwd: projectPath,
             encoding: 'utf-8',
-            stdio: ['pipe', 'pipe', 'pipe'],
             timeout: 10000,
             maxBuffer: 5 * 1024 * 1024,
           });
-        } catch (err: unknown) {
-          if (err && typeof err === 'object' && 'stdout' in err) {
-            diff = (err as { stdout: string }).stdout;
+        } catch (err) {
+          if (err instanceof Error && 'stdout' in err) {
+            diff = (err as Error & { stdout: string }).stdout;
           }
         }
       }
@@ -453,22 +437,21 @@ export class WorktreeManager {
     return diff;
   }
 
-  getBranchDiff(projectPath: string, targetBranch?: string): {
+  async getBranchDiff(projectPath: string, targetBranch?: string): Promise<{
     diff: string;
     baseBranch: string;
     currentBranch: string;
     stats: { filesChanged: number; additions: number; deletions: number };
     commits: Array<{ hash: string; message: string; date: string }>;
-  } {
-    const baseBranch = targetBranch ?? this.getDefaultBranch(projectPath) ?? 'main';
-    const currentBranch = this.getGitBranch(projectPath) ?? 'HEAD';
+  }> {
+    const baseBranch = targetBranch ?? await this.getDefaultBranch(projectPath) ?? 'main';
+    const currentBranch = await this.getGitBranch(projectPath) ?? 'HEAD';
 
     // Fetch origin so we compare against the latest remote state, not a stale local branch
     try {
-      execSync('git fetch origin', {
+      await execAsync('git fetch origin', {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 30000,
       });
     } catch {
@@ -478,10 +461,9 @@ export class WorktreeManager {
     // Use origin/<base> to avoid comparing against a stale local branch
     let diffRef = `origin/${baseBranch}`;
     try {
-      execSync(`git rev-parse --verify "${diffRef}"`, {
+      await execAsync(`git rev-parse --verify "${diffRef}"`, {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 5000,
       });
     } catch {
@@ -489,10 +471,9 @@ export class WorktreeManager {
       diffRef = baseBranch;
     }
 
-    const diff = execSync(`git diff "${diffRef}"...HEAD`, {
+    const { stdout: diff } = await execAsync(`git diff "${diffRef}"...HEAD`, {
       cwd: projectPath,
       encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 30000,
       maxBuffer: 5 * 1024 * 1024,
     });
@@ -502,10 +483,9 @@ export class WorktreeManager {
     let additions = 0;
     let deletions = 0;
     try {
-      const statOutput = execSync(`git diff --stat "${diffRef}"...HEAD`, {
+      const { stdout: statOutput } = await execAsync(`git diff --stat "${diffRef}"...HEAD`, {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 15000,
       });
       const summaryLine = statOutput.trim().split('\n').pop() ?? '';
@@ -522,12 +502,11 @@ export class WorktreeManager {
     // Get commits between base and HEAD
     const commits: Array<{ hash: string; message: string; date: string }> = [];
     try {
-      const logOutput = execSync(
+      const { stdout: logOutput } = await execAsync(
         `git log "${diffRef}"..HEAD --format="%H||%s||%ci" --reverse`,
         {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 15000,
         },
       );
@@ -543,14 +522,14 @@ export class WorktreeManager {
     return { diff, baseBranch, currentBranch, stats: { filesChanged, additions, deletions }, commits };
   }
 
-  private getBranchName(worktreePath: string): string | null {
+  private async getBranchName(worktreePath: string): Promise<string | null> {
     try {
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+      const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD', {
         cwd: worktreePath,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 5000,
-      }).trim();
+      });
+      const branch = stdout.trim();
       return branch || null;
     } catch {
       // Worktree may already be removed, try to infer from path
