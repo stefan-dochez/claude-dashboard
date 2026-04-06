@@ -33,11 +33,18 @@ export default function InstanceList({ instances, selectedId, queuedIds, onSelec
     .map(i => i.id);
   const [confirmKillId, setConfirmKillId] = useState<string | null>(null);
   const [deleteWorktreeChecked, setDeleteWorktreeChecked] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<InstanceStatus | 'all'>('all');
 
   // Stable order: sort by creation date only (oldest first)
   const sorted = [...instances].sort((a, b) =>
     new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
+
+  const activeInstances = sorted.filter(i => i.status !== 'exited');
+  const exitedInstances = sorted.filter(i => i.status === 'exited');
+  const filtered = statusFilter === 'all'
+    ? activeInstances
+    : activeInstances.filter(i => i.status === statusFilter);
 
   if (sorted.length === 0) {
     return (
@@ -52,7 +59,29 @@ export default function InstanceList({ instances, selectedId, queuedIds, onSelec
 
   return (
     <div className="flex flex-col gap-0.5">
-      {sorted.map(instance => {
+      {activeInstances.length >= 2 && (
+        <div className="mb-1.5 flex flex-wrap items-center gap-1">
+          {(['all', 'waiting_input', 'processing', 'launching', 'idle'] as const).map(status => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`rounded px-1.5 py-0.5 text-[12px] transition-colors ${
+                statusFilter === status
+                  ? 'bg-neutral-700 text-neutral-200'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              {status === 'all' ? 'All' : status === 'waiting_input' ? 'Waiting' : status.charAt(0).toUpperCase() + status.slice(1)}
+            </button>
+          ))}
+          {statusFilter !== 'all' && (
+            <span className="ml-auto text-[12px] text-neutral-600">
+              {filtered.length}/{activeInstances.length}
+            </span>
+          )}
+        </div>
+      )}
+      {filtered.map(instance => {
         const isSelected = instance.id === selectedId;
         const isWaiting = instance.status === 'waiting_input';
 
@@ -89,11 +118,11 @@ export default function InstanceList({ instances, selectedId, queuedIds, onSelec
                   </span>
                 )}
               </div>
-              <span className="text-[10px] text-neutral-500">
+              <span className="text-[12px] text-neutral-500">
                 {STATUS_LABELS[instance.status]}
               </span>
               {instance.taskDescription && (
-                <span className="block truncate text-[10px] text-neutral-500 italic" title={instance.taskDescription}>
+                <span className="block truncate text-[12px] text-neutral-500 italic" title={instance.taskDescription}>
                   {instance.taskDescription}
                 </span>
               )}
@@ -115,6 +144,43 @@ export default function InstanceList({ instances, selectedId, queuedIds, onSelec
           </button>
         );
       })}
+
+      {exitedInstances.length > 0 && (
+        <>
+          {filtered.length > 0 && <div className="mx-1 my-1 border-t border-neutral-800" />}
+          {exitedInstances.map(instance => {
+            const isSelected = instance.id === selectedId;
+            return (
+              <button
+                key={instance.id}
+                onClick={() => onSelect(instance.id)}
+                className={`group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${
+                  isSelected
+                    ? 'bg-neutral-800 ring-1 ring-neutral-700'
+                    : 'hover:bg-neutral-800/50'
+                }`}
+              >
+                <div className="relative shrink-0">
+                  <Terminal className="h-3.5 w-3.5 text-neutral-400" />
+                  <span
+                    className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ${STATUS_COLORS[instance.status]}`}
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-xs font-medium text-neutral-200" title={instance.projectName}>
+                      {instance.projectName}
+                    </span>
+                  </div>
+                  <span className="text-[12px] text-neutral-500">
+                    {STATUS_LABELS[instance.status]}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </>
+      )}
 
       {confirmKillId && (
         <div

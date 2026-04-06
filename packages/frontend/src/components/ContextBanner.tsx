@@ -1,4 +1,5 @@
-import { Target, GitBranch, MessageSquare } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Target, GitBranch, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ContextBannerProps {
   taskDescription: string | null;
@@ -14,6 +15,12 @@ function prettifyBranch(branch: string): string {
 }
 
 export default function ContextBanner({ taskDescription, branchName, lastUserPrompt }: ContextBannerProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [lastUserPrompt]);
+
   // Use taskDescription first, fall back to prettified branchName for pre-existing worktrees
   const label = taskDescription ?? (branchName ? prettifyBranch(branchName) : null);
 
@@ -33,11 +40,17 @@ export default function ContextBanner({ taskDescription, branchName, lastUserPro
         <div className="shrink-0 self-stretch border-l border-neutral-700" />
       )}
       {lastUserPrompt && (
-        <div className="flex min-w-0 flex-1 items-start gap-2">
+        <div
+          className="flex min-w-0 flex-1 cursor-pointer items-start gap-2"
+          onClick={() => setExpanded(prev => !prev)}
+        >
           <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-300 line-clamp-5">
+          <p className={`whitespace-pre-wrap text-sm leading-relaxed text-neutral-300 ${expanded ? '' : 'line-clamp-5'}`}>
             {lastUserPrompt}
           </p>
+          <button className="mt-0.5 shrink-0 text-neutral-500 transition-colors hover:text-neutral-300" aria-label={expanded ? 'Collapse' : 'Expand'}>
+            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
         </div>
       )}
     </div>

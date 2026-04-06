@@ -32,7 +32,7 @@ export default function AttentionQueueBanner({
             <button
               key={item.instanceId}
               onClick={() => onJump(item.instanceId)}
-              className={`group flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] transition-colors ${
+              className={`group flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[12px] transition-colors ${
                 isActive
                   ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
                   : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-300'

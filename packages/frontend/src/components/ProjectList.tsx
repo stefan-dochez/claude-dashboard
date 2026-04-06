@@ -375,7 +375,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
             <>
               <div className="flex items-center gap-1.5 px-2 pt-1 pb-0.5">
                 <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-500">Favorites</span>
+                <span className="text-[12px] font-medium uppercase tracking-wider text-neutral-500">Favorites</span>
               </div>
               {favoriteProjectsList.map(project => (
                 <ProjectRow
@@ -538,7 +538,7 @@ function FolderRow({
         )}
         <Folder className={`h-3.5 w-3.5 shrink-0 ${isExpanded ? 'text-amber-500/70' : 'text-neutral-500'}`} />
         <span className="truncate text-xs font-medium text-neutral-400" title={node.name}>{node.name}</span>
-        <span className="ml-auto shrink-0 text-[10px] text-neutral-600">{node.projectCount}</span>
+        <span className="ml-auto shrink-0 text-[12px] text-neutral-600">{node.projectCount}</span>
       </button>
 
       {isExpanded && (
@@ -643,7 +643,7 @@ function ProjectRow({
             )}
           </div>
           {project.gitBranch && (
-            <div className="flex items-center gap-1 text-[10px] text-neutral-500">
+            <div className="flex items-center gap-1 text-[12px] text-neutral-500">
               <GitBranch className="h-2.5 w-2.5" />
               <span className="truncate" title={project.gitBranch ?? undefined}>{project.gitBranch}</span>
             </div>

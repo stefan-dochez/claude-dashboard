@@ -86,7 +86,7 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
 
         {/* Scan Paths section */}
         <p className="mb-2 text-xs font-medium text-neutral-300">Scan Paths</p>
-        <p className="mb-2 text-[11px] text-neutral-500">
+        <p className="mb-2 text-[12px] text-neutral-500">
           Directories to scan for projects
         </p>
 
@@ -125,7 +125,7 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
           <Layers className="h-3.5 w-3.5 text-violet-400" />
           <p className="text-xs font-medium text-neutral-300">Meta Projects</p>
         </div>
-        <p className="mb-2 text-[11px] text-neutral-500">
+        <p className="mb-2 text-[12px] text-neutral-500">
           Projects containing sub-projects (monorepos). Their subdirectories will also be scanned.
         </p>
 

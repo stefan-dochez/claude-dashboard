@@ -140,7 +140,7 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
                 title={`${c.hash} — ${c.date}`}
               >
                 <GitCommit className="h-3 w-3 text-neutral-500" />
-                <span className="font-mono text-[10px] text-neutral-500">{c.hash}</span>
+                <span className="font-mono text-[12px] text-neutral-500">{c.hash}</span>
                 <button
                   onClick={() => navigator.clipboard.writeText(c.hash)}
                   className="hidden text-neutral-600 transition-colors hover:text-neutral-300 group-hover:block"
@@ -148,7 +148,7 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
                 >
                   <Copy className="h-2.5 w-2.5" />
                 </button>
-                <span className="max-w-[200px] truncate text-[11px] text-neutral-400">{c.message}</span>
+                <span className="max-w-[200px] truncate text-[12px] text-neutral-400">{c.message}</span>
               </div>
             ))}
           </div>

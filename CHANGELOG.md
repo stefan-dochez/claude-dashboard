@@ -34,6 +34,20 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **Scan paths editor** (`6de8a02`) — In-app settings modal to configure project scan paths. Auto-opens when no projects are found on first launch.
 
+- **Syntax highlighting in diffs** — Regex-based token coloring (keywords, strings, comments, numbers) on context lines. Zero dependencies.
+
+- **Collapsible diff sections** — Click file headers to collapse/expand hunks. Chevron + line count indicator. Collapse all / Expand all button.
+
+- **Instance status filter** — Filter buttons (All/Waiting/Processing/Launching/Idle) in the Instances section, visible when 2+ active instances.
+
+- **Undo worktree deletion** — 5-second undo banner after confirming worktree deletion. Click Undo to cancel.
+
+- **Minimum font size 12px** — All `text-[10px]` and `text-[11px]` bumped to `text-[12px]` for readability (except diffs and keyboard hints).
+
+- **Sidebar resize handle** — 8px wide hit area with a visible pill indicator on hover, replacing the invisible 1px handle.
+
+- **Expandable ContextBanner** — Click the last user prompt to expand/collapse (was clamped to 5 lines with no way to see more).
+
 ### Accessibility
 
 - **Keyboard-discoverable actions** — All hover-only buttons (favorite, pull, delete, launch) now appear on `focus-visible`, making them accessible via keyboard Tab navigation.

@@ -95,7 +95,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
               <div className="text-xs font-medium text-neutral-200">
                 Move <span className="text-amber-400">{project.gitBranch}</span> to worktree
               </div>
-              <div className="text-[10px] text-neutral-500">
+              <div className="text-[12px] text-neutral-500">
                 Creates a worktree for the current branch and resets repo to default branch
               </div>
             </div>
@@ -143,7 +143,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
                   <div className="truncate text-xs font-medium text-neutral-200" title={wt.gitBranch ?? wt.name}>
                     {wt.gitBranch ?? wt.name}
                   </div>
-                  <div className="truncate text-[10px] text-neutral-500" title={wt.name}>
+                  <div className="truncate text-[12px] text-neutral-500" title={wt.name}>
                     {wt.name}
                   </div>
                 </div>
@@ -160,7 +160,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
                   <button
                     key={value}
                     onClick={() => setBranchPrefix(value)}
-                    className={`rounded px-2 py-1 font-mono text-[11px] transition-colors ${
+                    className={`rounded px-2 py-1 font-mono text-[12px] transition-colors ${
                       branchPrefix === value
                         ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40'
                         : 'bg-neutral-800 text-neutral-500 hover:bg-neutral-700 hover:text-neutral-300'
@@ -179,7 +179,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
               placeholder="What's the task?"
               className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
-            <p className="mt-1.5 text-[11px] text-neutral-500">
+            <p className="mt-1.5 text-[12px] text-neutral-500">
               {isGit
                 ? `Branch: ${branchPrefix}/${taskDescription.trim() ? taskDescription.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) : '...'}`
                 : 'Not a git project — will launch directly'}

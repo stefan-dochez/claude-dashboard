@@ -98,8 +98,10 @@ export default function Sidebar({
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-neutral-600"
-      />
+        className="group absolute right-[-4px] top-0 z-10 flex h-full w-2 cursor-col-resize items-center justify-center"
+      >
+        <div className="h-8 w-1 rounded-full bg-neutral-700 opacity-0 transition-opacity group-hover:opacity-100" />
+      </div>
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
         <div className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-orange-500 to-amber-600">
@@ -114,17 +116,17 @@ export default function Sidebar({
         <div className="border-b border-neutral-800/50">
           <button
             onClick={() => setInstancesOpen(!instancesOpen)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 transition-colors hover:text-neutral-300"
+            className="flex w-full items-center gap-2 px-3 py-2 text-[12px] font-semibold uppercase tracking-wider text-neutral-500 transition-colors hover:text-neutral-300"
           >
             {instancesOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             <span>Instances</span>
             {activeInstances.length > 0 && (
-              <span className="ml-auto rounded-full bg-neutral-800 px-1.5 py-0.5 text-[10px] font-medium text-neutral-400">
+              <span className="ml-auto rounded-full bg-neutral-800 px-1.5 py-0.5 text-[12px] font-medium text-neutral-400">
                 {activeInstances.length}
               </span>
             )}
             {waitingCount > 0 && (
-              <span className="rounded-full bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-400">
+              <span className="rounded-full bg-green-500/10 px-1.5 py-0.5 text-[12px] font-medium text-green-400">
                 {waitingCount}
               </span>
             )}
@@ -148,12 +150,12 @@ export default function Sidebar({
           <div className="flex items-center">
             <button
               onClick={() => setProjectsOpen(!projectsOpen)}
-              className="flex flex-1 items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 transition-colors hover:text-neutral-300"
+              className="flex flex-1 items-center gap-2 px-3 py-2 text-[12px] font-semibold uppercase tracking-wider text-neutral-500 transition-colors hover:text-neutral-300"
             >
               {projectsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               <FolderOpen className="h-3 w-3" />
               <span>Projects</span>
-              <span className="ml-auto rounded-full bg-neutral-800 px-1.5 py-0.5 text-[10px] font-medium text-neutral-400">
+              <span className="ml-auto rounded-full bg-neutral-800 px-1.5 py-0.5 text-[12px] font-medium text-neutral-400">
                 {projects.length}
               </span>
             </button>
@@ -192,7 +194,7 @@ export default function Sidebar({
                   <select
                     value={selectedRoot ?? '__all__'}
                     onChange={e => setSelectedRoot(e.target.value === '__all__' ? null : e.target.value)}
-                    className="w-full cursor-pointer rounded-md border border-neutral-800 bg-neutral-900/50 px-2 py-1.5 text-[11px] text-neutral-400 outline-none transition-colors focus:border-neutral-600 focus:ring-1 focus:ring-neutral-600"
+                    className="w-full cursor-pointer rounded-md border border-neutral-800 bg-neutral-900/50 px-2 py-1.5 text-[12px] text-neutral-400 outline-none transition-colors focus:border-neutral-600 focus:ring-1 focus:ring-neutral-600"
                   >
                     {scanPaths.length > 1 && (
                       <option value="__all__">All roots</option>

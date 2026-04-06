@@ -98,7 +98,7 @@ export default function ChangesView({ projectPath }: ChangesViewProps) {
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-neutral-300">Changes</span>
             {!loading && (
-              <span className="rounded-full bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-400">
+              <span className="rounded-full bg-neutral-800 px-1.5 py-0.5 text-[12px] text-neutral-400">
                 {files.length}
               </span>
             )}
@@ -116,7 +116,7 @@ export default function ChangesView({ projectPath }: ChangesViewProps) {
 
         {/* Stats */}
         {files.length > 0 && (
-          <div className="flex gap-3 border-b border-neutral-800 px-3 py-1.5 text-[10px]">
+          <div className="flex gap-3 border-b border-neutral-800 px-3 py-1.5 text-[12px]">
             {modifications > 0 && <span className="text-yellow-400">{modifications} modified</span>}
             {additions > 0 && <span className="text-green-400">{additions} added</span>}
             {deletions > 0 && <span className="text-red-400">{deletions} deleted</span>}
@@ -165,10 +165,10 @@ export default function ChangesView({ projectPath }: ChangesViewProps) {
                   title={`${config.label}: ${file.path}`}
                 >
                   <Icon className={`h-3.5 w-3.5 flex-shrink-0 ${config.color}`} />
-                  <span className="truncate font-mono text-[11px]">
+                  <span className="truncate font-mono text-[12px]">
                     {file.path.split('/').pop()}
                   </span>
-                  <span className="ml-auto flex-shrink-0 font-mono text-[10px] text-neutral-600">
+                  <span className="ml-auto flex-shrink-0 font-mono text-[12px] text-neutral-600">
                     {file.status.trim()}
                   </span>
                 </button>

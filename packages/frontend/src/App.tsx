@@ -67,8 +67,32 @@ export default function App() {
     }
   }, [killInstance, selectedInstanceId, refreshProjects, handleSelectInstance]);
 
-  const handleDeleteWorktree = useCallback(async (projectPath: string, worktreePath: string) => {
-    await deleteWorktree(projectPath, worktreePath);
+  const [pendingDelete, setPendingDelete] = useState<{ projectPath: string; worktreePath: string; name: string; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
+  const pendingDeleteRef = useRef<{ timeoutId: ReturnType<typeof setTimeout> } | null>(null);
+
+  const handleUndoDelete = useCallback(() => {
+    if (pendingDeleteRef.current) {
+      clearTimeout(pendingDeleteRef.current.timeoutId);
+      pendingDeleteRef.current = null;
+    }
+    setPendingDelete(null);
+  }, []);
+
+  const handleDeleteWorktree = useCallback((projectPath: string, worktreePath: string) => {
+    // Cancel any existing pending delete
+    if (pendingDeleteRef.current) {
+      clearTimeout(pendingDeleteRef.current.timeoutId);
+    }
+
+    const name = worktreePath.split('/').pop() ?? worktreePath;
+    const timeoutId = setTimeout(async () => {
+      await deleteWorktree(projectPath, worktreePath);
+      pendingDeleteRef.current = null;
+      setPendingDelete(null);
+    }, 5000);
+
+    pendingDeleteRef.current = { timeoutId };
+    setPendingDelete({ projectPath, worktreePath, name, timeoutId });
   }, [deleteWorktree]);
 
   const handleSkip = useCallback((id: string) => {
@@ -266,12 +290,12 @@ export default function App() {
           </div>
           <div className="flex items-center gap-2 text-xs text-neutral-500">
             {typingLocked && (
-              <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-400" title="Queue auto-select paused while you type">
+              <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[12px] font-medium text-violet-400" title="Queue auto-select paused while you type">
                 typing
               </span>
             )}
             {queue.length > 0 && (
-              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-400">
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[12px] font-medium text-amber-400">
                 {queue.length} queued
               </span>
             )}
@@ -352,6 +376,18 @@ export default function App() {
           onSave={handleSaveScanPaths}
           onClose={() => setScanPathsOpen(false)}
         />
+      )}
+
+      {pendingDelete && (
+        <div className="fixed bottom-16 right-4 z-[100] flex items-center gap-3 rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2.5 shadow-lg">
+          <span className="text-xs text-neutral-300">Worktree <span className="font-medium text-neutral-200">{pendingDelete.name}</span> will be deleted</span>
+          <button
+            onClick={handleUndoDelete}
+            className="rounded bg-neutral-700 px-2.5 py-1 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-600"
+          >
+            Undo
+          </button>
+        </div>
       )}
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
