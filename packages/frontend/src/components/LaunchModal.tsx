@@ -4,15 +4,26 @@ import type { Project } from '../types';
 
 const MAIN_BRANCHES = ['main', 'master', 'develop'];
 
+const BRANCH_PREFIXES = [
+  { value: 'feat', label: 'feat/' },
+  { value: 'fix', label: 'fix/' },
+  { value: 'chore', label: 'chore/' },
+  { value: 'test', label: 'test/' },
+  { value: 'docs', label: 'docs/' },
+  { value: 'refactor', label: 'refactor/' },
+  { value: 'claude', label: 'claude/' },
+] as const;
+
 interface LaunchModalProps {
   project: Project;
   worktrees: Project[];
-  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean) => void;
+  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
   onClose: () => void;
 }
 
 export default function LaunchModal({ project, worktrees, onLaunch, onClose }: LaunchModalProps) {
   const [taskDescription, setTaskDescription] = useState('');
+  const [branchPrefix, setBranchPrefix] = useState('feat');
   const [mode, setMode] = useState<'new' | 'existing'>(worktrees.length > 0 ? 'existing' : 'new');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -35,7 +46,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
 
   const handleSubmitNew = () => {
     const desc = taskDescription.trim();
-    onLaunch(project.path, desc || undefined);
+    onLaunch(project.path, desc || undefined, undefined, isGit ? branchPrefix : undefined);
     onClose();
   };
 
@@ -147,6 +158,23 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
         ) : (
           /* New task form */
           <div className="mb-3">
+            {isGit && (
+              <div className="mb-2 flex flex-wrap gap-1">
+                {BRANCH_PREFIXES.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setBranchPrefix(value)}
+                    className={`rounded px-2 py-1 font-mono text-[11px] transition-colors ${
+                      branchPrefix === value
+                        ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40'
+                        : 'bg-neutral-800 text-neutral-500 hover:bg-neutral-700 hover:text-neutral-300'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             <input
               ref={inputRef}
               type="text"
@@ -158,7 +186,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
             />
             <p className="mt-1.5 text-[11px] text-neutral-500">
               {isGit
-                ? 'A worktree + branch will be created'
+                ? `Branch: ${branchPrefix}/${taskDescription.trim() ? taskDescription.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) : '...'}`
                 : 'Not a git project — will launch directly'}
             </p>
           </div>

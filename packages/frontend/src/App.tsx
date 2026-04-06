@@ -39,9 +39,9 @@ export default function App() {
     [queue],
   );
 
-  const handleLaunch = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean) => {
+  const handleLaunch = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => {
     try {
-      const instance = await spawnInstance(projectPath, taskDescription, detachBranch);
+      const instance = await spawnInstance(projectPath, taskDescription, detachBranch, branchPrefix);
       handleSelectInstance(instance.id);
       if (taskDescription || detachBranch) {
         // A worktree was created — refresh project list to show it

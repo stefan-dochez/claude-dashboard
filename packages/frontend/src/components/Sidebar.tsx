@@ -13,7 +13,7 @@ interface SidebarProps {
   scanPaths: string[];
   queuedIds: Set<string>;
   onRefreshProjects: () => void;
-  onLaunchProject: (projectPath: string, taskDescription?: string, detachBranch?: boolean) => void;
+  onLaunchProject: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
   onSelectInstance: (id: string) => void;
   onKillInstance: (id: string, deleteWorktree?: boolean) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;

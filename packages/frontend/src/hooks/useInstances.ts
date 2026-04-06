@@ -62,12 +62,12 @@ export function useInstances() {
     };
   }, [socket]);
 
-  const spawnInstance = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean) => {
+  const spawnInstance = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => {
     try {
       const res = await fetch('/api/instances', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectPath, taskDescription, detachBranch }),
+        body: JSON.stringify({ projectPath, taskDescription, detachBranch, branchPrefix }),
       });
       if (!res.ok) {
         const err = await res.json();
