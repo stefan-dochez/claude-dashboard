@@ -54,6 +54,8 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **Worktree row alignment** — Worktree sub-rows are now aligned with the parent project's branch line.
 
+- **Branch to worktree** — New "Branches" tab in the launch modal lists local branches without an existing worktree. Click a branch to create a worktree and launch Claude in it.
+
 - **Checkout default branch** — New button (↺) to switch a project back to its default branch (main/master/develop). Replaces the pull button when on a non-main branch. Checks for uncommitted changes before switching. Shared spinner for both operations.
 
 - **Sidebar polish** — Default width increased to 340px. Custom chevron on the root selector dropdown for consistent spacing.

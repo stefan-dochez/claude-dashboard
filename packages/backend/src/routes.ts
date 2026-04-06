@@ -177,6 +177,42 @@ export function createRoutes(
     }
   });
 
+  // Git — branches
+  router.get('/api/git/branches', async (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    try {
+      const branches = await worktreeManager.listBranches(projectPath);
+      res.json(branches);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to list branches';
+      console.log('[routes] Error listing branches:', err);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  router.post('/api/git/branch-to-worktree', async (req, res) => {
+    const { projectPath, branchName } = req.body as { projectPath?: string; branchName?: string };
+    if (!projectPath || !branchName) {
+      res.status(400).json({ error: 'projectPath and branchName are required' });
+      return;
+    }
+    try {
+      const result = await worktreeManager.branchToWorktree(projectPath, branchName);
+      scanner.refresh().catch(err => {
+        console.log('[routes] Background scanner refresh failed:', err);
+      });
+      res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create worktree';
+      console.log('[routes] Error creating worktree from branch:', err);
+      res.status(500).json({ error: message });
+    }
+  });
+
   // Git — checkout default branch
   router.post('/api/git/checkout-default', async (req, res) => {
     const { projectPath } = req.body as { projectPath?: string };

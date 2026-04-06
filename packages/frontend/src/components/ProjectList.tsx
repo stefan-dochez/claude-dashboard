@@ -145,9 +145,10 @@ interface ProjectListProps {
   onToggleFavorite: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
   onCheckoutDefault: (projectPath: string) => void;
+  onRefreshProjects: () => void;
 }
 
-export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, favoriteProjects, pullingProjects, checkingOutProjects, onLaunch, onDeleteWorktree, onToggleFavorite, onPullProject, onCheckoutDefault }: ProjectListProps) {
+export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, favoriteProjects, pullingProjects, checkingOutProjects, onLaunch, onDeleteWorktree, onToggleFavorite, onPullProject, onCheckoutDefault, onRefreshProjects }: ProjectListProps) {
   const [filter, setFilter] = useState('');
   const [viewMode, setViewMode] = useState<'tree' | 'flat'>('tree');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -440,6 +441,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
           worktrees={worktreesByParent.get(launchTarget.path) ?? []}
           onLaunch={handleLaunchFromModal}
           onClose={() => setLaunchTarget(null)}
+          onRefreshProjects={onRefreshProjects}
         />
       )}
 

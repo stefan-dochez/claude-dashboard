@@ -105,6 +105,53 @@ export class WorktreeManager {
     return ['main', 'master', 'develop'].includes(branch);
   }
 
+  async listBranches(projectPath: string): Promise<Array<{ name: string; isCurrent: boolean; hasWorktree: boolean }>> {
+    // List all local branches
+    const { stdout: branchOutput } = await execAsync('git branch --format="%(refname:short)||%(worktreepath)"', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+
+    const currentBranch = await this.getGitBranch(projectPath);
+
+    return branchOutput
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        const [name, worktreePath] = line.split('||');
+        return {
+          name: name.trim(),
+          isCurrent: name.trim() === currentBranch,
+          hasWorktree: !!worktreePath?.trim(),
+        };
+      });
+  }
+
+  async branchToWorktree(projectPath: string, branchName: string): Promise<WorktreeResult> {
+    const slug = this.slugify(branchName);
+    let worktreePath = `${projectPath}--${slug}`;
+
+    // Collision handling
+    let suffix = 1;
+    while (fs.existsSync(worktreePath)) {
+      suffix++;
+      worktreePath = `${projectPath}--${slug}-${suffix}`;
+    }
+
+    console.log(`[worktree-manager] Creating worktree for branch ${branchName} at ${worktreePath}`);
+
+    await execAsync(`git worktree add "${worktreePath}" "${branchName}"`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      timeout: 30000,
+    });
+
+    console.log(`[worktree-manager] Worktree created successfully`);
+
+    return { worktreePath, branchName };
+  }
+
   async checkoutDefaultBranch(projectPath: string): Promise<{ success: boolean; message: string; branch: string }> {
     const currentBranch = await this.getGitBranch(projectPath);
     const defaultBranch = await this.getDefaultBranch(projectPath);

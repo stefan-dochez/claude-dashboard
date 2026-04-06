@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Play, X, GitBranch, ArrowRightLeft } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2 } from 'lucide-react';
 import type { Project } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 
@@ -15,21 +15,52 @@ const BRANCH_PREFIXES = [
   { value: 'claude', label: 'claude/' },
 ] as const;
 
+interface BranchInfo {
+  name: string;
+  isCurrent: boolean;
+  hasWorktree: boolean;
+}
+
 interface LaunchModalProps {
   project: Project;
   worktrees: Project[];
   onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
   onClose: () => void;
+  onRefreshProjects: () => void;
 }
 
-export default function LaunchModal({ project, worktrees, onLaunch, onClose }: LaunchModalProps) {
+export default function LaunchModal({ project, worktrees, onLaunch, onClose, onRefreshProjects }: LaunchModalProps) {
   const [taskDescription, setTaskDescription] = useState('');
   const [branchPrefix, setBranchPrefix] = useState('feat');
-  const [mode, setMode] = useState<'new' | 'existing'>(worktrees.length > 0 ? 'existing' : 'new');
+  const [mode, setMode] = useState<'new' | 'existing' | 'branches'>(worktrees.length > 0 ? 'existing' : 'new');
+  const [branches, setBranches] = useState<BranchInfo[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+  const [convertingBranch, setConvertingBranch] = useState<string | null>(null);
   const modalRef = useFocusTrap<HTMLDivElement>();
 
   const isGit = project.gitBranch !== null;
   const canDetach = isGit && !project.isWorktree && project.gitBranch !== null && !MAIN_BRANCHES.includes(project.gitBranch);
+
+  const fetchBranches = useCallback(async () => {
+    setBranchesLoading(true);
+    try {
+      const res = await fetch(`/api/git/branches?path=${encodeURIComponent(project.path)}`);
+      if (!res.ok) throw new Error('Failed to fetch branches');
+      const data: BranchInfo[] = await res.json();
+      setBranches(data);
+    } catch (err) {
+      console.error('[LaunchModal] Error fetching branches:', err);
+      setBranches([]);
+    } finally {
+      setBranchesLoading(false);
+    }
+  }, [project.path]);
+
+  useEffect(() => {
+    if (mode === 'branches' && branches.length === 0) {
+      fetchBranches();
+    }
+  }, [mode, branches.length, fetchBranches]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -55,11 +86,37 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
     onClose();
   };
 
+  const handleBranchToWorktree = async (branchName: string) => {
+    setConvertingBranch(branchName);
+    try {
+      const res = await fetch('/api/git/branch-to-worktree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath: project.path, branchName }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? 'Failed');
+      }
+      const result = await res.json();
+      onRefreshProjects();
+      // Launch Claude in the new worktree
+      onLaunch(result.worktreePath);
+      onClose();
+    } catch (err) {
+      console.error('[LaunchModal] Error converting branch to worktree:', err);
+      setConvertingBranch(null);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSubmitNew();
     }
   };
+
+  // Branches available to convert: not current, not already a worktree, not default branches
+  const availableBranches = branches.filter(b => !b.isCurrent && !b.hasWorktree && !MAIN_BRANCHES.includes(b.name));
 
   return (
     <div
@@ -103,22 +160,26 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
           </button>
         )}
 
-        {/* Mode tabs when worktrees exist */}
-        {worktrees.length > 0 && (
+        {/* Mode tabs */}
+        {isGit && (
           <div className="mb-3 flex rounded-md border border-neutral-700 text-xs">
-            <button
-              onClick={() => setMode('existing')}
-              className={`flex-1 rounded-l-md px-3 py-1.5 font-medium transition-colors ${
-                mode === 'existing'
-                  ? 'bg-neutral-700 text-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-300'
-              }`}
-            >
-              Resume ({worktrees.length})
-            </button>
+            {worktrees.length > 0 && (
+              <button
+                onClick={() => setMode('existing')}
+                className={`flex-1 rounded-l-md px-3 py-1.5 font-medium transition-colors ${
+                  mode === 'existing'
+                    ? 'bg-neutral-700 text-neutral-200'
+                    : 'text-neutral-500 hover:text-neutral-300'
+                }`}
+              >
+                Resume ({worktrees.length})
+              </button>
+            )}
             <button
               onClick={() => setMode('new')}
-              className={`flex-1 rounded-r-md px-3 py-1.5 font-medium transition-colors ${
+              className={`flex-1 px-3 py-1.5 font-medium transition-colors ${
+                worktrees.length === 0 ? 'rounded-l-md' : ''
+              } ${
                 mode === 'new'
                   ? 'bg-neutral-700 text-neutral-200'
                   : 'text-neutral-500 hover:text-neutral-300'
@@ -126,12 +187,22 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
             >
               New task
             </button>
+            <button
+              onClick={() => setMode('branches')}
+              className={`flex-1 rounded-r-md px-3 py-1.5 font-medium transition-colors ${
+                mode === 'branches'
+                  ? 'bg-neutral-700 text-neutral-200'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              Branches
+            </button>
           </div>
         )}
 
         {mode === 'existing' ? (
           /* Existing worktrees list */
-          <div className="flex max-h-48 flex-col gap-1 overflow-y-auto">
+          <div className="flex max-h-48 flex-col gap-1 overflow-y-auto pr-4">
             {worktrees.map(wt => (
               <button
                 key={wt.path}
@@ -150,6 +221,38 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
                 <Play className="h-3.5 w-3.5 shrink-0 text-neutral-600 transition-colors group-hover:text-green-400" />
               </button>
             ))}
+          </div>
+        ) : mode === 'branches' ? (
+          /* Branches list */
+          <div className="flex max-h-48 flex-col gap-1 overflow-y-auto pr-4">
+            {branchesLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-4 w-4 animate-spin text-neutral-500" />
+              </div>
+            ) : availableBranches.length === 0 ? (
+              <p className="py-4 text-center text-xs text-neutral-500">
+                No branches available to convert
+              </p>
+            ) : (
+              availableBranches.map(branch => (
+                <button
+                  key={branch.name}
+                  onClick={() => handleBranchToWorktree(branch.name)}
+                  disabled={convertingBranch !== null}
+                  className="group flex items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  <GitBranch className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-neutral-200" title={branch.name}>
+                    {branch.name}
+                  </span>
+                  {convertingBranch === branch.name ? (
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-400" />
+                  ) : (
+                    <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-neutral-600 transition-colors group-hover:text-blue-400" />
+                  )}
+                </button>
+              ))
+            )}
           </div>
         ) : (
           /* New task form */

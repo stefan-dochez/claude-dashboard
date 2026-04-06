@@ -227,6 +227,7 @@ export default function Sidebar({
                 onToggleFavorite={onToggleFavorite}
                 onPullProject={onPullProject}
                 onCheckoutDefault={onCheckoutDefault}
+                onRefreshProjects={onRefreshProjects}
               />
             </div>
           )}
