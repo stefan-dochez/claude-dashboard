@@ -148,6 +148,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
   const [viewMode, setViewMode] = useState<'tree' | 'flat'>('tree');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => new Set());
+  const [expandedFavProjects, setExpandedFavProjects] = useState<Set<string>>(() => new Set());
   const [launching, setLaunching] = useState<string | null>(null);
   const [launchTarget, setLaunchTarget] = useState<Project | null>(null);
   const [confirmDeleteWt, setConfirmDeleteWt] = useState<{ projectPath: string; worktreePath: string; name: string } | null>(null);
@@ -213,6 +214,18 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
 
   const toggleProjectWorktrees = useCallback((path: string) => {
     setExpandedProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleFavProjectWorktrees = useCallback((path: string) => {
+    setExpandedFavProjects(prev => {
       const next = new Set(prev);
       if (next.has(path)) {
         next.delete(path);
@@ -382,7 +395,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   key={`fav-${project.path}`}
                   project={project}
                   worktrees={worktreesByParent.get(project.path) ?? []}
-                  isProjectExpanded={expandedProjects.has(project.path)}
+                  isProjectExpanded={expandedFavProjects.has(project.path)}
                   isActive={activeProjectPaths.has(project.path)}
                   isLaunching={launching === project.path}
                   launching={launching}
@@ -390,7 +403,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   isFavorite
                   isPulling={pullingProjects.has(project.path)}
                   onLaunch={() => setLaunchTarget(project)}
-                  onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
+                  onToggleWorktrees={() => toggleFavProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={requestDeleteWorktree}
                   onToggleFavorite={() => onToggleFavorite(project.path)}
@@ -748,7 +761,8 @@ function WorktreeRow({
   return (
     <div
       className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-neutral-800/50"
-      style={{ paddingLeft: `${depth * 12 + 6}px` }}
+      // Align with parent's text: parent padding + chevron(12) + gap(6) + repo icon(14) + gap(6)
+      style={{ paddingLeft: `${(depth - 1) * 12 + 6 + 12 + 6 + 14 + 6}px` }}
     >
       <GitBranch className="h-3 w-3 shrink-0 text-violet-400" />
       <span className="min-w-0 flex-1 truncate text-xs text-neutral-400" title={worktree.gitBranch ?? worktree.name}>

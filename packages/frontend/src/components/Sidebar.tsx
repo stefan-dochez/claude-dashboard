@@ -55,7 +55,7 @@ export default function Sidebar({
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [instancesOpen, setInstancesOpen] = useState(true);
   const [selectedRoot, setSelectedRoot] = useState<string | null>(scanPaths[0] ?? null);
-  const [width, setWidth] = useState(280);
+  const [width, setWidth] = useState(340);
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
@@ -194,7 +194,7 @@ export default function Sidebar({
                   <select
                     value={selectedRoot ?? '__all__'}
                     onChange={e => setSelectedRoot(e.target.value === '__all__' ? null : e.target.value)}
-                    className="w-full cursor-pointer rounded-md border border-neutral-800 bg-neutral-900/50 px-2 py-1.5 text-[12px] text-neutral-400 outline-none transition-colors focus:border-neutral-600 focus:ring-1 focus:ring-neutral-600"
+                    className="w-full cursor-pointer appearance-none rounded-md border border-neutral-800 bg-neutral-900/50 bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23737373%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_8px_center] bg-no-repeat py-1.5 pl-2 pr-7 text-[12px] text-neutral-400 outline-none transition-colors focus:border-neutral-600 focus:ring-1 focus:ring-neutral-600"
                   >
                     {scanPaths.length > 1 && (
                       <option value="__all__">All roots</option>

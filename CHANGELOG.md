@@ -50,6 +50,12 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **Always-visible action icons** — Favorite, pull, delete, and launch buttons are now always visible (muted color) instead of appearing only on hover. Icons aligned with the repo name line.
 
+- **Independent favorite/tree expand state** — Expanding worktrees in the favorites section no longer expands them in the tree view and vice versa.
+
+- **Worktree row alignment** — Worktree sub-rows are now aligned with the parent project's branch line.
+
+- **Sidebar polish** — Default width increased to 340px. Custom chevron on the root selector dropdown for consistent spacing.
+
 ### Accessibility
 
 - **Keyboard-discoverable actions** — All hover-only buttons (favorite, pull, delete, launch) now appear on `focus-visible`, making them accessible via keyboard Tab navigation.
