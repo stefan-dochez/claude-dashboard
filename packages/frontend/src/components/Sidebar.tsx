@@ -19,6 +19,7 @@ interface SidebarProps {
   onLaunchProject: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
   onSelectInstance: (id: string) => void;
   onKillInstance: (id: string, deleteWorktree?: boolean) => void;
+  onDismissInstance: (id: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
@@ -46,6 +47,7 @@ export default function Sidebar({
   onLaunchProject,
   onSelectInstance,
   onKillInstance,
+  onDismissInstance,
   onDeleteWorktree,
   onToggleFavorite,
   onPullProject,
@@ -140,6 +142,7 @@ export default function Sidebar({
                 queuedIds={queuedIds}
                 onSelect={onSelectInstance}
                 onKill={onKillInstance}
+                onDismiss={onDismissInstance}
               />
             </div>
           )}

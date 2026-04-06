@@ -8,6 +8,7 @@ interface InstanceListProps {
   queuedIds: Set<string>;
   onSelect: (id: string) => void;
   onKill: (id: string, deleteWorktree?: boolean) => void;
+  onDismiss: (id: string) => void;
 }
 
 const STATUS_COLORS: Record<InstanceStatus, string> = {
@@ -26,7 +27,7 @@ const STATUS_LABELS: Record<InstanceStatus, string> = {
   exited: 'Exited',
 };
 
-export default function InstanceList({ instances, selectedId, queuedIds, onSelect, onKill }: InstanceListProps) {
+export default function InstanceList({ instances, selectedId, queuedIds, onSelect, onKill, onDismiss }: InstanceListProps) {
   // Build ordered array from queuedIds for position display
   const queuedArray = instances
     .filter(i => queuedIds.has(i.id))
@@ -176,6 +177,17 @@ export default function InstanceList({ instances, selectedId, queuedIds, onSelec
                     {STATUS_LABELS[instance.status]}
                   </span>
                 </div>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onDismiss(instance.id);
+                  }}
+                  className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-red-400"
+                  title="Remove"
+                  aria-label="Remove"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </button>
             );
           })}

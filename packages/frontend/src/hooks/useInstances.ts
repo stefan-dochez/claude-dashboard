@@ -92,5 +92,9 @@ export function useInstances() {
     }
   }, []);
 
-  return { instances, loading, spawnInstance, killInstance, refetch: fetchInstances };
+  const dismissInstance = useCallback((instanceId: string) => {
+    setInstances(prev => prev.filter(i => i.id !== instanceId));
+  }, []);
+
+  return { instances, loading, spawnInstance, killInstance, dismissInstance, refetch: fetchInstances };
 }

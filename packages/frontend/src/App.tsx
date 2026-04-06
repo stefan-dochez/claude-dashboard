@@ -19,7 +19,7 @@ export default function App() {
   const socketConnected = useSocketStatus();
   const { config, updateConfig } = useConfig();
   const { projects, loading: projectsLoading, refreshing: projectsRefreshing, refreshProjects, deleteWorktree } = useProjects();
-  const { instances, spawnInstance, killInstance } = useInstances();
+  const { instances, spawnInstance, killInstance, dismissInstance } = useInstances();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'terminal' | 'changes' | 'pr'>('terminal');
   const [typingLocked, setTypingLocked] = useState(false);
@@ -235,6 +235,7 @@ export default function App() {
         onLaunchProject={handleLaunch}
         onSelectInstance={handleSelectInstance}
         onKillInstance={handleKill}
+        onDismissInstance={dismissInstance}
         onDeleteWorktree={handleDeleteWorktree}
         onToggleFavorite={handleToggleFavorite}
         onPullProject={handlePullProject}
