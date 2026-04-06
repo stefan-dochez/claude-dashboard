@@ -48,6 +48,8 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **Expandable ContextBanner** — Click the last user prompt to expand/collapse (was clamped to 5 lines with no way to see more).
 
+- **Always-visible action icons** — Favorite, pull, delete, and launch buttons are now always visible (muted color) instead of appearing only on hover. Icons aligned with the repo name line.
+
 ### Accessibility
 
 - **Keyboard-discoverable actions** — All hover-only buttons (favorite, pull, delete, launch) now appear on `focus-visible`, making them accessible via keyboard Tab navigation.

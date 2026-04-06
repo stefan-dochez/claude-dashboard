@@ -593,26 +593,26 @@ function ProjectRow({
   return (
     <>
       <div
-        className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-neutral-800/50"
+        className="group flex items-start gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-neutral-800/50"
         style={{ paddingLeft: `${depth * 12 + 6}px` }}
       >
         {hasWorktrees ? (
           <button
             onClick={e => { e.stopPropagation(); onToggleWorktrees(); }}
-            className="shrink-0 text-neutral-500 hover:text-neutral-300"
+            className="mt-1 shrink-0 text-neutral-500 hover:text-neutral-300"
           >
             {isProjectExpanded
               ? <ChevronDown className="h-3 w-3" />
               : <ChevronRight className="h-3 w-3" />}
           </button>
         ) : (
-          <span className="w-3 shrink-0" />
+          <span className="mt-1 w-3 shrink-0" />
         )}
 
         {project.isMeta ? (
-          <Layers className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+          <Layers className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-400" />
         ) : (
-          <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+          <FolderGit2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-500" />
         )}
 
         <div className="min-w-0 flex-1">
@@ -641,16 +641,8 @@ function ProjectRow({
             {isActive && (
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
             )}
-          </div>
-          {project.gitBranch && (
-            <div className="flex items-center gap-1 text-[12px] text-neutral-500">
-              <GitBranch className="h-2.5 w-2.5" />
-              <span className="truncate" title={project.gitBranch ?? undefined}>{project.gitBranch}</span>
-            </div>
-          )}
-        </div>
 
-        <div className="flex shrink-0 items-center gap-0.5">
+            <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {onToggleFavorite && !project.isWorktree && (
             <button
               onClick={e => {
@@ -660,7 +652,7 @@ function ProjectRow({
               className={`shrink-0 rounded p-1 transition-all ${
                 isFavorite
                   ? 'text-amber-400 opacity-100'
-                  : 'text-neutral-500 opacity-0 hover:bg-neutral-700 hover:text-amber-400 group-hover:opacity-100 focus-visible:opacity-100'
+                  : 'text-neutral-600 hover:bg-neutral-700 hover:text-amber-400'
               }`}
               title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
               aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
@@ -679,7 +671,7 @@ function ProjectRow({
                   e.stopPropagation();
                   onPull();
                 }}
-                className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-blue-400 group-hover:opacity-100 focus-visible:opacity-100"
+                className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-blue-400"
                 title="Pull latest"
                 aria-label="Pull latest"
               >
@@ -693,7 +685,7 @@ function ProjectRow({
                 e.stopPropagation();
                 onDeleteWorktree(project.parentProject!, project.path);
               }}
-              className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-red-400 group-hover:opacity-100 focus-visible:opacity-100"
+              className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-red-400"
               title="Delete worktree"
               aria-label="Delete worktree"
             >
@@ -703,7 +695,7 @@ function ProjectRow({
           <button
             onClick={onLaunch}
             disabled={isLaunching}
-            className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-green-400 group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-50"
+            className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-green-400 disabled:opacity-50"
             title="Launch Claude Code"
             aria-label="Launch"
           >
@@ -713,6 +705,14 @@ function ProjectRow({
               <Play className="h-3.5 w-3.5" />
             )}
           </button>
+            </div>
+          </div>
+          {project.gitBranch && (
+            <div className="flex items-center gap-1 text-[12px] text-neutral-500">
+              <GitBranch className="h-2.5 w-2.5" />
+              <span className="truncate" title={project.gitBranch ?? undefined}>{project.gitBranch}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -758,7 +758,7 @@ function WorktreeRow({
       <div className="flex shrink-0 items-center gap-0.5">
         <button
           onClick={e => { e.stopPropagation(); onDelete(); }}
-          className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-red-400 group-hover:opacity-100 focus-visible:opacity-100"
+          className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-red-400"
           title="Delete worktree"
           aria-label="Delete worktree"
         >
@@ -767,7 +767,7 @@ function WorktreeRow({
         <button
           onClick={onLaunch}
           disabled={isLaunching}
-          className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-green-400 group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-50"
+          className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-green-400 disabled:opacity-50"
           title="Launch in worktree"
           aria-label="Launch"
         >
