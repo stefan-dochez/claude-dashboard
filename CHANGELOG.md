@@ -52,6 +52,8 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Fixes
 
+- **Pull spinner flash on mouse leave** — Spinner and download button are now separate elements to prevent the download icon from briefly flashing when the pull completes and the mouse is no longer hovering.
+
 - **PR diff comparing against stale local branch** (`25f1f35` fix) — Branch diff now compares against `origin/<branch>` instead of the local branch to avoid showing incorrect file counts.
 
 - **Buffer lookup crash** (`ba46bf7`) — `getBuffer()` now returns an empty string instead of throwing when an instance is not found.

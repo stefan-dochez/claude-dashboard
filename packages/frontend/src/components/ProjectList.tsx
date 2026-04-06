@@ -665,21 +665,22 @@ function ProjectRow({
             </button>
           )}
           {onPull && project.gitBranch && !project.isWorktree && (
-            <button
-              onClick={e => {
-                e.stopPropagation();
-                onPull();
-              }}
-              disabled={isPulling}
-              className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-blue-400 group-hover:opacity-100 disabled:opacity-50"
-              title="Pull latest"
-            >
-              {isPulling ? (
+            isPulling ? (
+              <span className="shrink-0 rounded p-1 text-blue-400">
                 <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
+              </span>
+            ) : (
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onPull();
+                }}
+                className="shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-all hover:bg-neutral-700 hover:text-blue-400 group-hover:opacity-100"
+                title="Pull latest"
+              >
                 <Download className="h-3 w-3" />
-              )}
-            </button>
+              </button>
+            )
           )}
           {project.isWorktree && project.parentProject && (
             <button
