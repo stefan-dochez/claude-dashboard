@@ -68,7 +68,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose }: L
     >
       <div
         ref={modalRef}
-        className="mx-4 w-full max-w-sm rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
+        className="mx-4 w-full max-w-lg rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
