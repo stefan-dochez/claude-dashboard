@@ -40,6 +40,27 @@ export interface InstanceContext {
   lastUserPrompt: string | null;
 }
 
+export interface GitFileStatus {
+  status: string;
+  path: string;
+}
+
+export interface BranchDiffResponse {
+  diff: string;
+  baseBranch: string;
+  currentBranch: string;
+  stats: {
+    filesChanged: number;
+    additions: number;
+    deletions: number;
+  };
+  commits: Array<{
+    hash: string;
+    message: string;
+    date: string;
+  }>;
+}
+
 export interface AttentionQueueItem {
   instanceId: string;
   projectName: string;

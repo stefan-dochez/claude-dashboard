@@ -326,6 +326,180 @@ export class WorktreeManager {
     }
   }
 
+  getStatus(projectPath: string): Array<{ status: string; path: string }> {
+    const output = execSync('git status --porcelain=v1', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 15000,
+    });
+
+    return output
+      .split('\n')
+      .filter(line => line.length > 0)
+      .map(line => ({
+        status: line.slice(0, 2),
+        path: line.slice(3),
+      }));
+  }
+
+  getWorkingDiff(projectPath: string, filePath?: string): string {
+    // Diff of staged + unstaged changes against HEAD
+    const fileArg = filePath ? ` -- "${filePath}"` : '';
+
+    let diff = '';
+    try {
+      diff = execSync(`git diff HEAD${fileArg}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 30000,
+        maxBuffer: 5 * 1024 * 1024,
+      });
+    } catch {
+      // diff HEAD fails if there are no commits yet
+      diff = execSync(`git diff${fileArg}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 30000,
+        maxBuffer: 5 * 1024 * 1024,
+      });
+    }
+
+    // For untracked files, git diff HEAD won't show them — generate a diff manually
+    if (!filePath) {
+      const untracked = this.getStatus(projectPath).filter(f => f.status === '??');
+      for (const file of untracked) {
+        try {
+          const content = execSync(`git diff --no-index /dev/null "${file.path}"`, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+            timeout: 10000,
+            maxBuffer: 5 * 1024 * 1024,
+          });
+          diff += content;
+        } catch (err: unknown) {
+          // git diff --no-index exits with code 1 when files differ — that's expected
+          if (err && typeof err === 'object' && 'stdout' in err) {
+            diff += (err as { stdout: string }).stdout;
+          }
+        }
+      }
+    } else {
+      // Check if this specific file is untracked
+      const status = this.getStatus(projectPath).find(f => f.path === filePath);
+      if (status?.status === '??' && !diff) {
+        try {
+          execSync(`git diff --no-index /dev/null "${filePath}"`, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            stdio: ['pipe', 'pipe', 'pipe'],
+            timeout: 10000,
+            maxBuffer: 5 * 1024 * 1024,
+          });
+        } catch (err: unknown) {
+          if (err && typeof err === 'object' && 'stdout' in err) {
+            diff = (err as { stdout: string }).stdout;
+          }
+        }
+      }
+    }
+
+    return diff;
+  }
+
+  getBranchDiff(projectPath: string, targetBranch?: string): {
+    diff: string;
+    baseBranch: string;
+    currentBranch: string;
+    stats: { filesChanged: number; additions: number; deletions: number };
+    commits: Array<{ hash: string; message: string; date: string }>;
+  } {
+    const baseBranch = targetBranch ?? this.getDefaultBranch(projectPath) ?? 'main';
+    const currentBranch = this.getGitBranch(projectPath) ?? 'HEAD';
+
+    // Fetch origin so we compare against the latest remote state, not a stale local branch
+    try {
+      execSync('git fetch origin', {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 30000,
+      });
+    } catch {
+      console.log('[worktree-manager] Failed to fetch origin for branch diff, using local state');
+    }
+
+    // Use origin/<base> to avoid comparing against a stale local branch
+    let diffRef = `origin/${baseBranch}`;
+    try {
+      execSync(`git rev-parse --verify "${diffRef}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 5000,
+      });
+    } catch {
+      // Fallback to local branch if origin ref doesn't exist
+      diffRef = baseBranch;
+    }
+
+    const diff = execSync(`git diff "${diffRef}"...HEAD`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 30000,
+      maxBuffer: 5 * 1024 * 1024,
+    });
+
+    // Parse stats
+    let filesChanged = 0;
+    let additions = 0;
+    let deletions = 0;
+    try {
+      const statOutput = execSync(`git diff --stat "${diffRef}"...HEAD`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 15000,
+      });
+      const summaryLine = statOutput.trim().split('\n').pop() ?? '';
+      const filesMatch = summaryLine.match(/(\d+) files? changed/);
+      const addMatch = summaryLine.match(/(\d+) insertions?/);
+      const delMatch = summaryLine.match(/(\d+) deletions?/);
+      filesChanged = filesMatch ? parseInt(filesMatch[1]) : 0;
+      additions = addMatch ? parseInt(addMatch[1]) : 0;
+      deletions = delMatch ? parseInt(delMatch[1]) : 0;
+    } catch {
+      // non-fatal
+    }
+
+    // Get commits between base and HEAD
+    const commits: Array<{ hash: string; message: string; date: string }> = [];
+    try {
+      const logOutput = execSync(
+        `git log "${diffRef}"..HEAD --format="%H||%s||%ci" --reverse`,
+        {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 15000,
+        },
+      );
+      for (const line of logOutput.trim().split('\n')) {
+        if (!line) continue;
+        const [hash, message, date] = line.split('||');
+        commits.push({ hash: hash.slice(0, 8), message, date });
+      }
+    } catch {
+      // non-fatal
+    }
+
+    return { diff, baseBranch, currentBranch, stats: { filesChanged, additions, deletions }, commits };
+  }
+
   private getBranchName(worktreePath: string): string | null {
     try {
       const branch = execSync('git rev-parse --abbrev-ref HEAD', {

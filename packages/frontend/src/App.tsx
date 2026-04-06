@@ -1,7 +1,9 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Terminal } from 'lucide-react';
+import { Terminal, FileCode2, GitPullRequest } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import TerminalView from './components/TerminalView';
+import ChangesView from './components/ChangesView';
+import PullRequestView from './components/PullRequestView';
 import AttentionQueueBanner from './components/AttentionQueueBanner';
 import ContextBanner from './components/ContextBanner';
 import ScanPathsModal from './components/ScanPathsModal';
@@ -15,14 +17,20 @@ export default function App() {
   const { projects, loading: projectsLoading, refreshing: projectsRefreshing, refreshProjects, deleteWorktree } = useProjects();
   const { instances, spawnInstance, killInstance } = useInstances();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'terminal' | 'changes' | 'pr'>('terminal');
   const [typingLocked, setTypingLocked] = useState(false);
   const [scanPathsOpen, setScanPathsOpen] = useState(false);
   const autoOpenedRef = useRef(false);
 
+  const handleSelectInstance = useCallback((id: string | null) => {
+    setSelectedInstanceId(id);
+    setActiveTab('terminal');
+  }, []);
+
   const { queue, skipInstance, jumpToInstance } = useAttentionQueue({
     instances,
     selectedInstanceId,
-    onSelectInstance: setSelectedInstanceId,
+    onSelectInstance: handleSelectInstance,
     typingLocked,
   });
 
@@ -34,7 +42,7 @@ export default function App() {
   const handleLaunch = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean) => {
     try {
       const instance = await spawnInstance(projectPath, taskDescription, detachBranch);
-      setSelectedInstanceId(instance.id);
+      handleSelectInstance(instance.id);
       if (taskDescription || detachBranch) {
         // A worktree was created — refresh project list to show it
         refreshProjects();
@@ -42,17 +50,17 @@ export default function App() {
     } catch {
       // Error already logged in hook
     }
-  }, [spawnInstance, refreshProjects]);
+  }, [spawnInstance, refreshProjects, handleSelectInstance]);
 
   const handleKill = useCallback(async (id: string, deleteWt?: boolean) => {
     await killInstance(id, deleteWt);
     if (selectedInstanceId === id) {
-      setSelectedInstanceId(null);
+      handleSelectInstance(null);
     }
     if (deleteWt) {
       refreshProjects();
     }
-  }, [killInstance, selectedInstanceId, refreshProjects]);
+  }, [killInstance, selectedInstanceId, refreshProjects, handleSelectInstance]);
 
   const handleDeleteWorktree = useCallback(async (projectPath: string, worktreePath: string) => {
     await deleteWorktree(projectPath, worktreePath);
@@ -103,7 +111,7 @@ export default function App() {
         queuedIds={queuedIds}
         onRefreshProjects={refreshProjects}
         onLaunchProject={handleLaunch}
-        onSelectInstance={setSelectedInstanceId}
+        onSelectInstance={handleSelectInstance}
         onKillInstance={handleKill}
         onDeleteWorktree={handleDeleteWorktree}
         onOpenScanPaths={() => setScanPathsOpen(true)}
@@ -113,19 +121,45 @@ export default function App() {
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Topbar */}
         <div className="flex items-center justify-between border-b border-neutral-800 bg-[#0f0f0f] px-4 py-2">
-          <div className="flex items-center gap-2">
-            {selectedInstance ? (
-              <>
-                <Terminal className="h-4 w-4 text-neutral-400" />
-                <span className="text-sm font-medium text-neutral-200">
-                  {selectedInstance.projectName}
-                </span>
-                <span className="text-xs text-neutral-500">
-                  {selectedInstance.id.slice(0, 8)}
-                </span>
-              </>
-            ) : (
-              <span className="text-sm text-neutral-500">No instance selected</span>
+          <div className="flex items-center gap-4">
+            {/* Instance info */}
+            <div className="flex items-center gap-2">
+              {selectedInstance ? (
+                <>
+                  <span className="text-sm font-medium text-neutral-200">
+                    {selectedInstance.projectName}
+                  </span>
+                  <span className="text-xs text-neutral-500">
+                    {selectedInstance.id.slice(0, 8)}
+                  </span>
+                </>
+              ) : (
+                <span className="text-sm text-neutral-500">No instance selected</span>
+              )}
+            </div>
+
+            {/* Tabs */}
+            {selectedInstance && (
+              <div className="flex items-center gap-1">
+                {([
+                  { key: 'terminal' as const, label: 'Terminal', Icon: Terminal },
+                  { key: 'changes' as const, label: 'Changes', Icon: FileCode2 },
+                  { key: 'pr' as const, label: 'Pull Request', Icon: GitPullRequest },
+                ]).map(({ key, label, Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs transition-colors ${
+                      activeTab === key
+                        ? 'bg-neutral-700/50 text-neutral-200'
+                        : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-400'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2 text-xs text-neutral-500">
@@ -153,14 +187,40 @@ export default function App() {
           />
         )}
 
-        {/* Terminal area */}
+        {/* Content area */}
         <div className="flex-1 overflow-hidden">
-          {selectedInstance && selectedInstance.status !== 'exited' ? (
-            <TerminalView
-              key={selectedInstance.id}
-              instanceId={selectedInstance.id}
-              onTypingChange={handleTypingChange}
-            />
+          {selectedInstance ? (
+            <>
+              {activeTab === 'terminal' && (
+                selectedInstance.status !== 'exited' ? (
+                  <TerminalView
+                    key={selectedInstance.id}
+                    instanceId={selectedInstance.id}
+                    onTypingChange={handleTypingChange}
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center">
+                    <div className="text-center">
+                      <Terminal className="mx-auto mb-4 h-12 w-12 text-neutral-700" />
+                      <p className="text-sm text-neutral-500">Instance has exited</p>
+                    </div>
+                  </div>
+                )
+              )}
+              {activeTab === 'changes' && (
+                <ChangesView
+                  key={`changes-${selectedInstance.id}`}
+                  projectPath={selectedInstance.worktreePath ?? selectedInstance.projectPath}
+                />
+              )}
+              {activeTab === 'pr' && (
+                <PullRequestView
+                  key={`pr-${selectedInstance.id}`}
+                  projectPath={selectedInstance.worktreePath ?? selectedInstance.projectPath}
+                  branchName={selectedInstance.branchName}
+                />
+              )}
+            </>
           ) : (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">

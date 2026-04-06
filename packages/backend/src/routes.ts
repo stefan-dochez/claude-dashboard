@@ -176,5 +176,56 @@ export function createRoutes(
     }
   });
 
+  // Git — status and diffs
+  router.get('/api/git/status', (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    try {
+      const files = worktreeManager.getStatus(projectPath);
+      res.json(files);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to get git status';
+      console.log('[routes] Error getting git status:', err);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  router.get('/api/git/diff', (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    const file = req.query.file as string | undefined;
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    try {
+      const diff = worktreeManager.getWorkingDiff(projectPath, file);
+      res.json({ diff });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to get diff';
+      console.log('[routes] Error getting diff:', err);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  router.get('/api/git/branch-diff', (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    const target = req.query.target as string | undefined;
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    try {
+      const result = worktreeManager.getBranchDiff(projectPath, target);
+      res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to get branch diff';
+      console.log('[routes] Error getting branch diff:', err);
+      res.status(500).json({ error: message });
+    }
+  });
+
   return router;
 }
