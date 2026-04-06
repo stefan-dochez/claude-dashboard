@@ -105,6 +105,48 @@ export class WorktreeManager {
     return ['main', 'master', 'develop'].includes(branch);
   }
 
+  async checkoutDefaultBranch(projectPath: string): Promise<{ success: boolean; message: string; branch: string }> {
+    const currentBranch = await this.getGitBranch(projectPath);
+    const defaultBranch = await this.getDefaultBranch(projectPath);
+    if (!defaultBranch) {
+      return { success: false, message: 'Cannot determine default branch', branch: '' };
+    }
+    if (currentBranch === defaultBranch) {
+      return { success: true, message: 'Already on default branch', branch: defaultBranch };
+    }
+
+    // Check for uncommitted changes
+    const status = await this.getStatus(projectPath);
+    if (status.length > 0) {
+      return { success: false, message: 'Uncommitted changes — commit or stash first', branch: currentBranch ?? '' };
+    }
+
+    try {
+      await execAsync(`git checkout "${defaultBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 15000,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Checkout failed';
+      return { success: false, message: msg.split('\n')[0], branch: currentBranch ?? '' };
+    }
+
+    // Pull latest
+    try {
+      await execAsync(`git pull --ff-only origin "${defaultBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 30000,
+      });
+    } catch {
+      // non-fatal — checkout succeeded
+    }
+
+    console.log(`[worktree-manager] Switched ${projectPath} from ${currentBranch} to ${defaultBranch}`);
+    return { success: true, message: `Switched to ${defaultBranch}`, branch: defaultBranch };
+  }
+
   async detachBranchToWorktree(projectPath: string): Promise<WorktreeResult> {
     const currentBranch = await this.getGitBranch(projectPath);
     if (!currentBranch) {

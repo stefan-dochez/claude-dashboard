@@ -138,6 +138,7 @@ export default function App() {
 
   const [pullingProjects, setPullingProjects] = useState<Set<string>>(new Set());
   const [pullingAll, setPullingAll] = useState(false);
+  const [checkingOutProjects, setCheckingOutProjects] = useState<Set<string>>(new Set());
 
   const handlePullProject = useCallback(async (projectPath: string) => {
     setPullingProjects(prev => new Set(prev).add(projectPath));
@@ -198,6 +199,37 @@ export default function App() {
     }
   }, [refreshProjects, addToast]);
 
+  const handleCheckoutDefault = useCallback(async (projectPath: string) => {
+    setCheckingOutProjects(prev => new Set(prev).add(projectPath));
+    const name = projectPath.split('/').pop() ?? projectPath;
+    try {
+      const res = await fetch('/api/git/checkout-default', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        addToast(
+          result.message === 'Already on default branch' ? 'info' : 'success',
+          name,
+          result.message,
+        );
+      } else {
+        addToast('error', `${name}`, result.message);
+      }
+    } catch (err) {
+      addToast('error', `${name}`, err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setCheckingOutProjects(prev => {
+        const next = new Set(prev);
+        next.delete(projectPath);
+        return next;
+      });
+      refreshProjects();
+    }
+  }, [refreshProjects, addToast]);
+
   const selectedInstance = instances.find(i => i.id === selectedInstanceId);
 
   useEffect(() => {
@@ -229,6 +261,7 @@ export default function App() {
         scanPaths={config?.scanPaths ?? []}
         favoriteProjects={favoriteProjects}
         pullingProjects={pullingProjects}
+        checkingOutProjects={checkingOutProjects}
         pullingAll={pullingAll}
         queuedIds={queuedIds}
         onRefreshProjects={refreshProjects}
@@ -240,6 +273,7 @@ export default function App() {
         onToggleFavorite={handleToggleFavorite}
         onPullProject={handlePullProject}
         onPullAll={handlePullAll}
+        onCheckoutDefault={handleCheckoutDefault}
         onOpenScanPaths={() => setScanPathsOpen(true)}
       />
 

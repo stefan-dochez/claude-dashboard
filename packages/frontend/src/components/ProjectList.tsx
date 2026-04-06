@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useContext, createContext } from 'react';
-import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star, Download } from 'lucide-react';
+import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star, Download, RotateCcw } from 'lucide-react';
 import type { Project, Instance } from '../types';
 import LaunchModal from './LaunchModal';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -111,12 +111,14 @@ interface ProjectTreeContextValue {
   worktreesByParent: Map<string, Project[]>;
   favoriteProjects: Set<string>;
   pullingProjects: Set<string>;
+  checkingOutProjects: Set<string>;
   onToggleProjectWorktrees: (path: string) => void;
   onLaunchModal: (project: Project) => void;
   onLaunchDirect: (path: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
+  onCheckoutDefault: (projectPath: string) => void;
 }
 
 const ProjectTreeContext = createContext<ProjectTreeContextValue | null>(null);
@@ -137,13 +139,15 @@ interface ProjectListProps {
   selectedRoot: string | null;
   favoriteProjects: Set<string>;
   pullingProjects: Set<string>;
+  checkingOutProjects: Set<string>;
   onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
+  onCheckoutDefault: (projectPath: string) => void;
 }
 
-export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, favoriteProjects, pullingProjects, onLaunch, onDeleteWorktree, onToggleFavorite, onPullProject }: ProjectListProps) {
+export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, favoriteProjects, pullingProjects, checkingOutProjects, onLaunch, onDeleteWorktree, onToggleFavorite, onPullProject, onCheckoutDefault }: ProjectListProps) {
   const [filter, setFilter] = useState('');
   const [viewMode, setViewMode] = useState<'tree' | 'flat'>('tree');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -282,13 +286,15 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     worktreesByParent,
     favoriteProjects,
     pullingProjects,
+    checkingOutProjects,
     onToggleProjectWorktrees: toggleProjectWorktrees,
     onLaunchModal: setLaunchTarget,
     onLaunchDirect: handleDirectLaunch,
     onDeleteWorktree: requestDeleteWorktree,
     onToggleFavorite: onToggleFavorite,
     onPullProject: onPullProject,
-  }), [expandedProjects, activeProjectPaths, launching, worktreesByParent, favoriteProjects, pullingProjects, toggleProjectWorktrees, handleDirectLaunch, requestDeleteWorktree, onToggleFavorite, onPullProject]);
+    onCheckoutDefault: onCheckoutDefault,
+  }), [expandedProjects, activeProjectPaths, launching, worktreesByParent, favoriteProjects, pullingProjects, checkingOutProjects, toggleProjectWorktrees, handleDirectLaunch, requestDeleteWorktree, onToggleFavorite, onPullProject, onCheckoutDefault]);
 
   return (
     <ProjectTreeContext.Provider value={contextValue}>
@@ -337,12 +343,14 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   depth={0}
                   isFavorite={favoriteProjects.has(project.path)}
                   isPulling={pullingProjects.has(project.path)}
+                  isCheckingOut={checkingOutProjects.has(project.path)}
                   onLaunch={isNestedWt ? () => handleDirectLaunch(project.path) : () => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={requestDeleteWorktree}
                   onToggleFavorite={() => onToggleFavorite(project.path)}
                   onPull={() => onPullProject(project.path)}
+                  onCheckoutDefault={() => onCheckoutDefault(project.path)}
                 />
               );
             })}
@@ -368,12 +376,14 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   depth={0}
                   isFavorite={favoriteProjects.has(project.path)}
                   isPulling={pullingProjects.has(project.path)}
+                  isCheckingOut={checkingOutProjects.has(project.path)}
                   onLaunch={() => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={requestDeleteWorktree}
                   onToggleFavorite={() => onToggleFavorite(project.path)}
                   onPull={() => onPullProject(project.path)}
+                  onCheckoutDefault={() => onCheckoutDefault(project.path)}
                 />
               );
             })}
@@ -402,12 +412,14 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   depth={0}
                   isFavorite
                   isPulling={pullingProjects.has(project.path)}
+                  isCheckingOut={checkingOutProjects.has(project.path)}
                   onLaunch={() => setLaunchTarget(project)}
                   onToggleWorktrees={() => toggleFavProjectWorktrees(project.path)}
                   onLaunchDirect={handleDirectLaunch}
                   onDeleteWorktree={requestDeleteWorktree}
                   onToggleFavorite={() => onToggleFavorite(project.path)}
                   onPull={() => onPullProject(project.path)}
+                  onCheckoutDefault={() => onCheckoutDefault(project.path)}
                 />
               ))}
               <div className="mx-2 my-1 border-t border-neutral-800" />
@@ -517,12 +529,14 @@ function TreeNodeList({
             depth={depth}
             isFavorite={ctx.favoriteProjects.has(node.project.path)}
             isPulling={ctx.pullingProjects.has(node.project.path)}
+            isCheckingOut={ctx.checkingOutProjects.has(node.project.path)}
             onLaunch={() => ctx.onLaunchModal(node.project)}
             onToggleWorktrees={() => ctx.onToggleProjectWorktrees(node.project.path)}
             onLaunchDirect={ctx.onLaunchDirect}
             onDeleteWorktree={ctx.onDeleteWorktree}
             onToggleFavorite={() => ctx.onToggleFavorite(node.project.path)}
             onPull={() => ctx.onPullProject(node.project.path)}
+            onCheckoutDefault={() => ctx.onCheckoutDefault(node.project.path)}
           />
         );
       })}
@@ -578,12 +592,14 @@ function ProjectRow({
   depth,
   isFavorite,
   isPulling,
+  isCheckingOut,
   onLaunch,
   onToggleWorktrees,
   onLaunchDirect,
   onDeleteWorktree,
   onToggleFavorite,
   onPull,
+  onCheckoutDefault,
 }: {
   project: Project;
   worktrees: Project[];
@@ -594,13 +610,17 @@ function ProjectRow({
   depth: number;
   isFavorite?: boolean;
   isPulling?: boolean;
+  isCheckingOut?: boolean;
   onLaunch: () => void;
   onToggleWorktrees: () => void;
   onLaunchDirect: (path: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite?: () => void;
   onPull?: () => void;
+  onCheckoutDefault?: () => void;
 }) {
+  const MAIN_BRANCHES = ['main', 'master', 'develop'];
+  const isOnNonMainBranch = project.gitBranch && !project.isWorktree && !MAIN_BRANCHES.includes(project.gitBranch);
   const hasWorktrees = worktrees.length > 0;
 
   return (
@@ -673,12 +693,24 @@ function ProjectRow({
               <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
             </button>
           )}
-          {onPull && project.gitBranch && !project.isWorktree && (
-            isPulling ? (
+          {project.gitBranch && !project.isWorktree && (
+            (isPulling || isCheckingOut) ? (
               <span className="shrink-0 rounded p-1 text-blue-400">
                 <Loader2 className="h-3 w-3 animate-spin" />
               </span>
-            ) : (
+            ) : isOnNonMainBranch && onCheckoutDefault ? (
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onCheckoutDefault();
+                }}
+                className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-amber-400"
+                title="Switch to default branch"
+                aria-label="Switch to default branch"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </button>
+            ) : onPull ? (
               <button
                 onClick={e => {
                   e.stopPropagation();
@@ -690,7 +722,7 @@ function ProjectRow({
               >
                 <Download className="h-3 w-3" />
               </button>
-            )
+            ) : null
           )}
           {project.isWorktree && project.parentProject && (
             <button

@@ -177,6 +177,23 @@ export function createRoutes(
     }
   });
 
+  // Git — checkout default branch
+  router.post('/api/git/checkout-default', async (req, res) => {
+    const { projectPath } = req.body as { projectPath?: string };
+    if (!projectPath) {
+      res.status(400).json({ error: 'projectPath is required' });
+      return;
+    }
+    try {
+      const result = await worktreeManager.checkoutDefaultBranch(projectPath);
+      res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Checkout failed';
+      console.log('[routes] Error checking out default branch:', err);
+      res.status(500).json({ error: message });
+    }
+  });
+
   // Git — pull / update
   router.post('/api/git/pull', async (req, res) => {
     const { projectPath } = req.body as { projectPath?: string };

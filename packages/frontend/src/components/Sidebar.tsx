@@ -13,6 +13,7 @@ interface SidebarProps {
   scanPaths: string[];
   favoriteProjects: Set<string>;
   pullingProjects: Set<string>;
+  checkingOutProjects: Set<string>;
   pullingAll: boolean;
   queuedIds: Set<string>;
   onRefreshProjects: () => void;
@@ -24,6 +25,7 @@ interface SidebarProps {
   onToggleFavorite: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
   onPullAll: () => void;
+  onCheckoutDefault: (projectPath: string) => void;
   onOpenScanPaths: () => void;
 }
 
@@ -41,6 +43,7 @@ export default function Sidebar({
   scanPaths,
   favoriteProjects,
   pullingProjects,
+  checkingOutProjects,
   pullingAll,
   queuedIds,
   onRefreshProjects,
@@ -52,6 +55,7 @@ export default function Sidebar({
   onToggleFavorite,
   onPullProject,
   onPullAll,
+  onCheckoutDefault,
   onOpenScanPaths,
 }: SidebarProps) {
   const [projectsOpen, setProjectsOpen] = useState(true);
@@ -217,10 +221,12 @@ export default function Sidebar({
                 selectedRoot={selectedRoot}
                 favoriteProjects={favoriteProjects}
                 pullingProjects={pullingProjects}
+                checkingOutProjects={checkingOutProjects}
                 onLaunch={onLaunchProject}
                 onDeleteWorktree={onDeleteWorktree}
                 onToggleFavorite={onToggleFavorite}
                 onPullProject={onPullProject}
+                onCheckoutDefault={onCheckoutDefault}
               />
             </div>
           )}
