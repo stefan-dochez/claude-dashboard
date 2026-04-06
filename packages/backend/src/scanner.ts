@@ -5,7 +5,10 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { ConfigService } from './config.js';
 
-const execAsync = promisify(exec);
+const execPromise = promisify(exec);
+function execAsync(cmd: string, opts: { encoding: BufferEncoding; cwd?: string; timeout?: number }) {
+  return execPromise(cmd, { ...opts, shell: process.platform === 'win32' ? true as unknown as string : undefined });
+}
 
 interface Project {
   name: string;

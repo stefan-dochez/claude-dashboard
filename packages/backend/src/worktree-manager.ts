@@ -3,7 +3,13 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 
-const execAsync = promisify(exec);
+const execPromise = promisify(exec);
+
+// Wrap execPromise to inject shell: true — required on Windows where cmd.exe
+// may fail with ENOENT for git commands without an explicit shell.
+function execAsync(cmd: string, opts: { encoding: BufferEncoding; cwd?: string; timeout?: number; maxBuffer?: number }) {
+  return execPromise(cmd, { ...opts, shell: process.platform === 'win32' ? true as unknown as string : undefined });
+}
 
 interface WorktreeResult {
   worktreePath: string;
@@ -333,17 +339,52 @@ export class WorktreeManager {
       // non-fatal
     }
 
+    let dirRemoved = false;
     if (dirExists) {
+      // Retry loop: on Windows, processes may hold file locks briefly after exit (EBUSY)
+      const maxAttempts = process.platform === 'win32' ? 5 : 1;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          await execAsync(`git worktree remove --force "${worktreePath}"`, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            timeout: 15000,
+          });
+          dirRemoved = true;
+          break;
+        } catch {
+          // git doesn't know about this worktree anymore — remove the directory manually
+          console.log(`[worktree-manager] git worktree remove failed, removing directory manually (attempt ${attempt}/${maxAttempts})`);
+          try {
+            fs.rmSync(worktreePath, { recursive: true, force: true });
+            dirRemoved = true;
+            break;
+          } catch (rmErr) {
+            const isBusy = rmErr instanceof Error && 'code' in rmErr && (rmErr as NodeJS.ErrnoException).code === 'EBUSY';
+            if (isBusy && attempt < maxAttempts) {
+              console.log(`[worktree-manager] EBUSY, retrying in ${attempt}s...`);
+              await new Promise(r => setTimeout(r, attempt * 1000));
+            } else {
+              console.log(`[worktree-manager] Failed to remove directory after ${maxAttempts} attempts`);
+              // Don't throw — still try to clean up branch and git references below
+            }
+          }
+        }
+      }
+    } else {
+      dirRemoved = true;
+    }
+
+    // Prune again so git forgets the worktree even if the dir removal failed
+    if (!dirRemoved) {
       try {
-        await execAsync(`git worktree remove --force "${worktreePath}"`, {
+        await execAsync('git worktree prune', {
           cwd: projectPath,
           encoding: 'utf-8',
-          timeout: 15000,
+          timeout: 5000,
         });
       } catch {
-        // git doesn't know about this worktree anymore — remove the directory manually
-        console.log(`[worktree-manager] git worktree remove failed, removing directory manually`);
-        fs.rmSync(worktreePath, { recursive: true, force: true });
+        // non-fatal
       }
     }
 

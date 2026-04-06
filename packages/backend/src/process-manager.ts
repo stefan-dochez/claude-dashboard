@@ -1,5 +1,6 @@
 import * as pty from 'node-pty';
 import { randomUUID } from 'crypto';
+import { exec } from 'child_process';
 import path from 'path';
 import os from 'os';
 import { EventEmitter } from 'events';
@@ -7,34 +8,44 @@ import type { AppConfig } from './config.js';
 
 function resolveClaudeBinary(): string {
   const fs = require('fs') as typeof import('fs');
+  const isWindows = process.platform === 'win32';
+  const pathSep = isWindows ? ';' : ':';
+  const exeNames = isWindows ? ['claude.exe', 'claude.cmd', 'claude'] : ['claude'];
 
   // Check well-known locations directly (no shell, no output pollution)
-  const candidates = [
-    path.join(os.homedir(), '.local', 'bin', 'claude'),
-    '/usr/local/bin/claude',
-    '/opt/homebrew/bin/claude',
-  ];
+  const candidateDirs = isWindows
+    ? [path.join(os.homedir(), '.local', 'bin')]
+    : [
+        path.join(os.homedir(), '.local', 'bin'),
+        '/usr/local/bin',
+        '/opt/homebrew/bin',
+      ];
 
-  for (const candidate of candidates) {
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      console.log(`[process-manager] Resolved claude binary: ${candidate}`);
-      return candidate;
-    } catch {
-      // Not found or not executable
+  for (const dir of candidateDirs) {
+    for (const exe of exeNames) {
+      const candidate = path.join(dir, exe);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        console.log(`[process-manager] Resolved claude binary: ${candidate}`);
+        return candidate;
+      } catch {
+        // Not found or not executable
+      }
     }
   }
 
   // Last resort: check PATH entries
-  const pathDirs = (process.env.PATH ?? '').split(':');
+  const pathDirs = (process.env.PATH ?? '').split(pathSep);
   for (const dir of pathDirs) {
-    const candidate = path.join(dir, 'claude');
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      console.log(`[process-manager] Resolved claude binary from PATH: ${candidate}`);
-      return candidate;
-    } catch {
-      // Not found
+    for (const exe of exeNames) {
+      const candidate = path.join(dir, exe);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        console.log(`[process-manager] Resolved claude binary from PATH: ${candidate}`);
+        return candidate;
+      } catch {
+        // Not found
+      }
     }
   }
 
@@ -44,20 +55,24 @@ function resolveClaudeBinary(): string {
 
 function buildPtyEnv(): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
+  const isWindows = process.platform === 'win32';
+  const pathSep = isWindows ? ';' : ':';
   // Ensure common user binary paths are in PATH
-  const extraPaths = [
-    path.join(os.homedir(), '.local', 'bin'),
-    '/usr/local/bin',
-    '/opt/homebrew/bin',
-  ];
+  const extraPaths = isWindows
+    ? [path.join(os.homedir(), '.local', 'bin')]
+    : [
+        path.join(os.homedir(), '.local', 'bin'),
+        '/usr/local/bin',
+        '/opt/homebrew/bin',
+      ];
   const currentPath = env.PATH ?? '';
-  const pathParts = currentPath.split(':');
+  const pathParts = currentPath.split(pathSep);
   for (const p of extraPaths) {
     if (!pathParts.includes(p)) {
       pathParts.unshift(p);
     }
   }
-  env.PATH = pathParts.join(':');
+  env.PATH = pathParts.join(pathSep);
 
   // Remove all Claude Code env vars so spawned instances
   // don't think they're nested inside another session
@@ -206,10 +221,13 @@ export class ProcessManager extends EventEmitter {
       return;
     }
 
-    console.log(`[process-manager] Killing instance ${instanceId}`);
+    const pid = handle.instance.pid;
+    console.log(`[process-manager] Killing instance ${instanceId} (pid ${pid})`);
 
     return new Promise<void>((resolve) => {
       let resolved = false;
+      let forceKillTimeout: ReturnType<typeof setTimeout> | undefined;
+      let giveUpTimeout: ReturnType<typeof setTimeout> | undefined;
       const done = () => {
         if (resolved) return;
         resolved = true;
@@ -222,28 +240,38 @@ export class ProcessManager extends EventEmitter {
       // Listen for exit (only once)
       handle.process.onExit(() => done());
 
-      // Send SIGTERM
-      try {
-        handle.process.kill('SIGTERM');
-      } catch {
-        done();
-        return;
+      if (process.platform === 'win32') {
+        // On Windows, SIGTERM/SIGKILL via node-pty only kills the shell, not
+        // child processes.  taskkill /F /T kills the entire process tree.
+        exec(`taskkill /F /T /PID ${pid}`, (err) => {
+          if (err) {
+            console.log(`[process-manager] taskkill failed for pid ${pid}: ${err.message}`);
+          }
+        });
+      } else {
+        // Send SIGTERM
+        try {
+          handle.process.kill('SIGTERM');
+        } catch {
+          done();
+          return;
+        }
+
+        // SIGKILL after 3s if SIGTERM didn't work
+        forceKillTimeout = setTimeout(() => {
+          try {
+            handle.process.kill('SIGKILL');
+          } catch {
+            // Already dead
+          }
+        }, 3000);
       }
 
-      // SIGKILL after 3s if SIGTERM didn't work
-      const forceKillTimeout = setTimeout(() => {
-        try {
-          handle.process.kill('SIGKILL');
-        } catch {
-          // Already dead
-        }
-      }, 3000);
-
       // Give up after 5s no matter what — clean up and move on
-      const giveUpTimeout = setTimeout(() => {
+      giveUpTimeout = setTimeout(() => {
         console.log(`[process-manager] Instance ${instanceId} did not exit in 5s, force cleaning up`);
         try {
-          process.kill(handle.instance.pid, 'SIGKILL');
+          process.kill(pid, 'SIGKILL');
         } catch {
           // pid might already be gone
         }

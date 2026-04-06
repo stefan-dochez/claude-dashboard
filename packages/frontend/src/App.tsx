@@ -19,7 +19,7 @@ export default function App() {
   const socketConnected = useSocketStatus();
   const { config, updateConfig } = useConfig();
   const { projects, loading: projectsLoading, refreshing: projectsRefreshing, refreshProjects, deleteWorktree } = useProjects();
-  const { instances, spawnInstance, killInstance, dismissInstance } = useInstances();
+  const { instances, spawnInstance, killInstance, dismissInstance, refetch: refetchInstances } = useInstances();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'terminal' | 'changes' | 'pr'>('terminal');
   const [typingLocked, setTypingLocked] = useState(false);
@@ -87,13 +87,14 @@ export default function App() {
     const name = worktreePath.split('/').pop() ?? worktreePath;
     const timeoutId = setTimeout(async () => {
       await deleteWorktree(projectPath, worktreePath);
+      refetchInstances();
       pendingDeleteRef.current = null;
       setPendingDelete(null);
     }, 5000);
 
     pendingDeleteRef.current = { timeoutId };
     setPendingDelete({ projectPath, worktreePath, name, timeoutId });
-  }, [deleteWorktree]);
+  }, [deleteWorktree, refetchInstances]);
 
   const handleSkip = useCallback((id: string) => {
     setTypingLocked(false);
@@ -317,7 +318,7 @@ export default function App() {
                   >
                     <Icon className="h-3.5 w-3.5" />
                     {label}
-                    <span className="ml-1 hidden text-[9px] text-neutral-600 lg:inline">⌘{index + 1}</span>
+                    <span className="ml-1 hidden text-[9px] text-neutral-600 lg:inline">{navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl+'}{index + 1}</span>
                   </button>
                 ))}
               </div>

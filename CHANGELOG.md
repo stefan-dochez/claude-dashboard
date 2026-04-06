@@ -6,6 +6,8 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Features
 
+- **Windows support** — Fixed binary resolution (`claude.exe`), PATH separator (`;` vs `:`), process tree killing (`taskkill /F /T`), and worktree removal retry on EBUSY. Platform-adaptive keyboard shortcut hints (`Ctrl+` on Windows, `⌘` on macOS).
+
 - **Pull / update repos** — Pull latest changes for a single repo (download icon on each project row) or all repos at once (download icon in the Projects header). Uses `git pull --ff-only` to avoid merge conflicts. Spinner feedback during pull.
 
 - **Favorite projects** — Star projects to pin them at the top of the sidebar. Favorites are persisted in config and appear in a dedicated section above the tree view. In flat and search views, favorites are sorted first.
@@ -101,6 +103,10 @@ All notable changes to Claude Dashboard since the initial commit.
 - **Scanner homedir** — Replaced `process.env.HOME` with `os.homedir()` for reliability.
 
 ### Fixes
+
+- **Worktree deletion resilience** — Branch cleanup (`git branch -D`) now runs even if directory removal fails. Frontend instance list is re-synced after worktree deletion.
+
+- **Kill TDZ crash** — Fixed `ReferenceError: Cannot access 'forceKillTimeout' before initialization` when killing an already-exited process.
 
 - **Dismiss exited instances** — Exited instances now have a remove button to clear them from the list (client-side only, no backend call).
 
