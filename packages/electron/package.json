@@ -2,6 +2,8 @@
   "name": "@claude-dashboard/electron",
   "version": "0.1.0",
   "private": true,
+  "description": "Desktop app for Claude Dashboard",
+  "author": "Claude Dashboard",
   "main": "dist/main.js",
   "scripts": {
     "dev": "tsc && electron dist/main.js --dev",
@@ -11,7 +13,8 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "electron": "^33.0.0",
+    "app-builder-bin": "^5.0.0-alpha.10",
+    "electron": "33.4.11",
     "electron-builder": "^25.1.8",
     "typescript": "^5.7.3"
   },
@@ -26,27 +29,36 @@
     ],
     "extraResources": [
       {
-        "from": "../backend",
-        "to": "backend",
-        "filter": ["dist/**/*", "package.json", "node_modules/**/*"]
+        "from": "../backend/dist",
+        "to": "backend/dist"
+      },
+      {
+        "from": "../backend/package.json",
+        "to": "backend/package.json"
+      },
+      {
+        "from": "../backend/_pkg/node_modules",
+        "to": "backend/node_modules"
       },
       {
         "from": "../frontend/dist",
         "to": "frontend"
-      }
-    ],
-    "extraResources": [
+      },
       {
         "from": "assets",
         "to": "icon"
       }
     ],
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "assets/icon.icns"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/icon.png"
     }
   }

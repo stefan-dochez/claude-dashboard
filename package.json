@@ -16,9 +16,10 @@
     "typecheck": "npm run typecheck -w packages/backend && npm run typecheck -w packages/frontend",
     "electron:dev": "bash scripts/electron-dev.sh",
     "electron:dev:app": "npm run dev -w packages/electron",
-    "electron:build": "npm run build && npm run build -w packages/electron && npm run package -w packages/electron"
+    "electron:build": "npm run build && bash scripts/prepare-backend.sh && npm run build -w packages/electron && npm run package -w packages/electron"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "typescript": "^6.0.2"
   }
 }

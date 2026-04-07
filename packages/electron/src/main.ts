@@ -10,6 +10,7 @@ const FRONTEND_PORT = 5173;
 let backendProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 
+
 // --------------- Backend lifecycle ---------------
 
 function getBackendCwd(): string {
@@ -20,21 +21,55 @@ function getBackendCwd(): string {
   return path.join(process.resourcesPath, 'backend');
 }
 
+function getEnv(): Record<string, string> {
+  const env = { ...process.env } as Record<string, string>;
+  // macOS apps don't inherit shell PATH — inject common binary locations
+  const extraPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin'];
+  const currentPath = env.PATH ?? '';
+  const parts = currentPath.split(':');
+  for (const p of extraPaths) {
+    if (!parts.includes(p)) parts.unshift(p);
+  }
+  env.PATH = parts.join(':');
+  return env;
+}
+
+function findNode(): string {
+  // Try common locations explicitly
+  const fs = require('fs') as typeof import('fs');
+  const candidates = ['/opt/homebrew/bin/node', '/usr/local/bin/node', '/usr/bin/node'];
+  for (const c of candidates) {
+    try {
+      fs.accessSync(c, fs.constants.X_OK);
+      return c;
+    } catch { /* not found */ }
+  }
+  return 'node';
+}
+
 function startBackend(): ChildProcess {
   const cwd = getBackendCwd();
-  const env = {
-    ...process.env,
-    NODE_ENV: isDev ? 'development' : 'production',
-    PORT: String(BACKEND_PORT),
-  };
+  const baseEnv = getEnv();
 
   if (isDev) {
-    // Dev: use tsx watch
     const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    return spawn(npmCmd, ['run', 'dev'], { cwd, env, stdio: 'pipe' });
+    return spawn(npmCmd, ['run', 'dev'], {
+      cwd,
+      env: { ...baseEnv, NODE_ENV: 'development', PORT: String(BACKEND_PORT) },
+      stdio: 'pipe',
+    });
   } else {
-    // Prod: run compiled backend
-    return spawn('node', ['dist/index.js'], { cwd, env, stdio: 'pipe' });
+    const nodeBin = findNode();
+    return spawn(nodeBin, ['dist/index.js'], {
+      cwd,
+      env: {
+        ...baseEnv,
+        NODE_ENV: 'production',
+        PORT: String(BACKEND_PORT),
+        FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
+      },
+      stdio: 'pipe',
+    });
   }
 }
 

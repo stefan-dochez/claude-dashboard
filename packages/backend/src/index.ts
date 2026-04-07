@@ -51,7 +51,7 @@ async function main(): Promise<void> {
 
   // In production, serve the frontend static files
   if (process.env.NODE_ENV === 'production') {
-    const frontendPath = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
+    const frontendPath = process.env.FRONTEND_PATH ?? path.resolve(__dirname, '..', '..', 'frontend', 'dist');
     app.use(express.static(frontendPath));
     // SPA fallback — serve index.html for any non-API route
     app.get('*', (_req, res) => {

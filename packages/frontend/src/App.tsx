@@ -61,9 +61,14 @@ export default function App() {
   const [openedFile, setOpenedFile] = useState<string | null>(null);
 
   const handleSelectInstance = useCallback((id: string | null) => {
-    setSelectedInstanceId(id);
-    setActiveTab('main');
-    setOpenedFile(null);
+    setSelectedInstanceId(prev => {
+      // Only reset tab when switching to a different instance
+      if (prev !== id) {
+        setActiveTab('main');
+        setOpenedFile(null);
+      }
+      return id;
+    });
   }, []);
 
   const handleOpenFile = useCallback((filePath: string) => {
