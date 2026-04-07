@@ -31,18 +31,19 @@ function parseDiff(raw: string): DiffFile[] {
     const lines = chunk.split('\n');
     const header = `diff --git ${lines[0]}`;
 
-    // Extract file name from +++ line or header
+    // Extract file name from +++ or --- lines
     let fileName = '';
+    let aName = '';
+    let bName = '';
     for (const line of lines) {
-      if (line.startsWith('+++ b/')) {
-        fileName = line.slice(6);
-        break;
-      }
-      if (line.startsWith('+++ /')) {
-        fileName = line.slice(4);
-        break;
+      if (line.startsWith('--- a/')) {
+        aName = line.slice(6);
+      } else if (line.startsWith('+++ b/')) {
+        bName = line.slice(6);
       }
     }
+    // For deleted files, +++ is /dev/null — use the --- name
+    fileName = bName || aName;
     if (!fileName) {
       const match = header.match(/b\/(.+)$/);
       fileName = match ? match[1] : 'unknown';

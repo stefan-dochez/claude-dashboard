@@ -1,8 +1,12 @@
 import { Router } from 'express';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import type { ConfigService } from './config.js';
 import type { ProjectScanner } from './scanner.js';
 import type { ProcessManager } from './process-manager.js';
 import type { WorktreeManager } from './worktree-manager.js';
+
+const execAsync = promisify(exec);
 
 export function createRoutes(
   configService: ConfigService,
@@ -316,6 +320,26 @@ export function createRoutes(
       const message = err instanceof Error ? err.message : 'Failed to get branch diff';
       console.log('[routes] Error getting branch diff:', err);
       res.status(500).json({ error: message });
+    }
+  });
+
+  // Git — PR info
+  router.get('/api/git/pr-url', async (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    try {
+      const { stdout } = await execAsync('gh pr view --json url -q .url', {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
+      res.json({ url: stdout.trim() || null });
+    } catch {
+      // No PR exists for this branch
+      res.json({ url: null });
     }
   });
 

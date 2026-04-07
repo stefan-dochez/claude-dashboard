@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy } from 'lucide-react';
+import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy, ExternalLink } from 'lucide-react';
 import DiffViewer from './DiffViewer';
 import type { BranchDiffResponse } from '../types';
 
@@ -14,8 +14,22 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
   const [data, setData] = useState<BranchDiffResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [prUrl, setPrUrl] = useState<string | null>(null);
 
   const isDefaultBranch = !branchName || DEFAULT_BRANCHES.includes(branchName);
+
+  const fetchPrUrl = useCallback(async () => {
+    if (isDefaultBranch) return;
+    try {
+      const res = await fetch(`/api/git/pr-url?path=${encodeURIComponent(projectPath)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPrUrl(data.url);
+      }
+    } catch {
+      setPrUrl(null);
+    }
+  }, [projectPath, isDefaultBranch]);
 
   const fetchBranchDiff = useCallback(async () => {
     if (isDefaultBranch) {
@@ -42,7 +56,8 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
 
   useEffect(() => {
     fetchBranchDiff();
-  }, [fetchBranchDiff]);
+    fetchPrUrl();
+  }, [fetchBranchDiff, fetchPrUrl]);
 
   if (isDefaultBranch) {
     return (
@@ -119,15 +134,32 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
             </span>
           </div>
 
-          {/* Refresh */}
-          <button
-            onClick={fetchBranchDiff}
-            className="ml-auto rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
-            title="Refresh"
-            aria-label="Refresh"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
+          {/* PR link + Refresh */}
+          <div className="ml-auto flex items-center gap-2">
+            {prUrl && (
+              <a
+                href={prUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/25"
+                title={prUrl}
+              >
+                <ExternalLink className="h-3 w-3" />
+                PR #{prUrl.split('/').pop()}
+              </a>
+            )}
+            {!prUrl && !loading && (
+              <span className="text-[12px] text-neutral-600">No PR</span>
+            )}
+            <button
+              onClick={() => { fetchBranchDiff(); fetchPrUrl(); }}
+              className="rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
+              title="Refresh"
+              aria-label="Refresh"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Commits */}
