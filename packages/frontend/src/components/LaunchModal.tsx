@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2 } from 'lucide-react';
+import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap } from 'lucide-react';
 import type { Project } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 
@@ -86,6 +86,11 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
     onClose();
   };
 
+  const handleLaunchDirect = () => {
+    onLaunch(project.path);
+    onClose();
+  };
+
   const handleBranchToWorktree = async (branchName: string) => {
     setConvertingBranch(branchName);
     try {
@@ -157,6 +162,25 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
               </div>
             </div>
             <Play className="h-3.5 w-3.5 shrink-0 text-amber-400/60" />
+          </button>
+        )}
+
+        {/* Quick launch on current branch */}
+        {isGit && (
+          <button
+            onClick={handleLaunchDirect}
+            className="mb-3 flex w-full items-center gap-2.5 rounded-md border border-green-500/20 bg-green-500/5 px-3 py-2.5 text-left transition-colors hover:border-green-500/40 hover:bg-green-500/10"
+          >
+            <Zap className="h-4 w-4 shrink-0 text-green-400" />
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-neutral-200">
+                Launch on <span className="text-green-400">{project.gitBranch}</span>
+              </div>
+              <div className="text-[12px] text-neutral-500">
+                Run Claude directly on the current branch, no worktree
+              </div>
+            </div>
+            <Play className="h-3.5 w-3.5 shrink-0 text-green-400/60" />
           </button>
         )}
 

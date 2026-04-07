@@ -111,6 +111,9 @@ export function createRoutes(
         worktreePath = projectPath;
         branchName = (await worktreeManager.getGitBranch(projectPath)) ?? undefined;
         parentProjectPath = worktreeManager.getParentProjectPath(projectPath) ?? undefined;
+      } else if (await worktreeManager.isGitRepo(projectPath)) {
+        // Launching directly on current branch — no worktree, just populate branch info
+        branchName = (await worktreeManager.getGitBranch(projectPath)) ?? undefined;
       }
 
       const instance = await processManager.spawn({
