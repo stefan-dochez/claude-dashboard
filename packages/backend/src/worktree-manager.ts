@@ -487,7 +487,7 @@ export class WorktreeManager {
   }
 
   async getStatus(projectPath: string): Promise<Array<{ status: string; path: string }>> {
-    const { stdout } = await execAsync('git status --porcelain=v1', {
+    const { stdout } = await execAsync('git status --porcelain=v1 -u', {
       cwd: projectPath,
       encoding: 'utf-8',
       timeout: 15000,
