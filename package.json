@@ -4,7 +4,8 @@
   "private": true,
   "workspaces": [
     "packages/backend",
-    "packages/frontend"
+    "packages/frontend",
+    "packages/electron"
   ],
   "scripts": {
     "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
@@ -12,7 +13,10 @@
     "dev:frontend": "npm run dev -w packages/frontend",
     "build": "npm run build -w packages/backend && npm run build -w packages/frontend",
     "lint": "eslint 'packages/*/src/**/*.{ts,tsx}'",
-    "typecheck": "npm run typecheck -w packages/backend && npm run typecheck -w packages/frontend"
+    "typecheck": "npm run typecheck -w packages/backend && npm run typecheck -w packages/frontend",
+    "electron:dev": "bash scripts/electron-dev.sh",
+    "electron:dev:app": "npm run dev -w packages/electron",
+    "electron:build": "npm run build && npm run build -w packages/electron && npm run package -w packages/electron"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

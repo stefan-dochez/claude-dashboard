@@ -1,0 +1,47 @@
+{
+  "name": "@claude-dashboard/electron",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsc && electron dist/main.js --dev",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "package": "electron-builder"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.3"
+  },
+  "build": {
+    "appId": "com.claude-dashboard.app",
+    "productName": "Claude Dashboard",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": ["dist/**/*", "package.json", "node_modules/**/*"]
+      },
+      {
+        "from": "../frontend/dist",
+        "to": "frontend"
+      }
+    ],
+    "mac": {
+      "target": ["dmg"],
+      "icon": "../frontend/public/favicon.svg"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "../frontend/public/favicon.svg"
+    }
+  }
+}

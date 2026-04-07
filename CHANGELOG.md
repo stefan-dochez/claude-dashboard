@@ -6,6 +6,8 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Features
 
+- **Electron app** — Desktop app via Electron. Single command `npm run electron:dev` launches backend, frontend, and Electron window. macOS traffic lights support with draggable titlebar. Auto-detects if servers are already running. Closes all processes on window close. Production build support with `npm run electron:build` (dmg/exe).
+
 - **Unified sidebar** — Projects, instances, and worktrees merged into a single view. Active projects (with running instances or worktrees) float to the top and auto-expand. Instances and worktrees shown inline under their parent project. Click a project to launch, click an active project to expand/collapse. Worktrees clickable to resume. Workspace selector prominent at the top. Duplicate project names show their workspace origin. Favorite/play buttons hidden on active projects.
 
 - **Instance status indicator** — Topbar shows a single `● N instances` with a color dot reflecting the highest-priority status (blue animated = processing, green = waiting, grey = idle).

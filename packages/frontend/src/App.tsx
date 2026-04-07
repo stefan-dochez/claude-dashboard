@@ -267,8 +267,8 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col bg-root">
-      {/* Topbar */}
-      <div className="flex h-10 shrink-0 items-center px-4">
+      {/* Topbar — extra left padding for macOS traffic lights in Electron */}
+      <div className="flex h-10 shrink-0 items-center px-4 pl-20" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
         {/* Left: project + branch */}
         <div className="flex shrink-0 items-center gap-3">
           <span className="text-[13px] font-medium text-secondary">
@@ -299,7 +299,7 @@ export default function App() {
         )}
 
         {/* Right: indicators + sidebar toggle */}
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           {typingLocked && (
             <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-400">typing</span>
           )}
