@@ -7,8 +7,10 @@ import { ProjectScanner } from './scanner.js';
 import { ProcessManager } from './process-manager.js';
 import { StatusMonitor } from './status-monitor.js';
 import { WorktreeManager } from './worktree-manager.js';
+import { StreamProcessManager } from './stream-process.js';
 import { createRoutes } from './routes.js';
 import { setupSocketHandlers } from './socket.js';
+import { setupStreamSocketHandlers } from './stream-socket.js';
 
 async function main(): Promise<void> {
   // Init services
@@ -21,6 +23,7 @@ async function main(): Promise<void> {
   const processManager = new ProcessManager(config);
   const statusMonitor = new StatusMonitor(processManager, config);
   const worktreeManager = new WorktreeManager();
+  const streamProcess = new StreamProcessManager(config);
 
   // Express + Socket.io setup
   const app = express();
@@ -38,11 +41,12 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Routes
-  const routes = createRoutes(configService, scanner, processManager, worktreeManager);
+  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager);
   app.use(routes);
 
   // WebSocket
   setupSocketHandlers(io, processManager);
+  setupStreamSocketHandlers(io, streamProcess);
 
   // Start status monitoring
   statusMonitor.start();
@@ -63,6 +67,7 @@ async function main(): Promise<void> {
     console.log('[server] Shutting down...');
     statusMonitor.stop();
     await processManager.killAll();
+    await streamProcess.killAll();
     httpServer.close();
     process.exit(0);
   };
@@ -71,7 +76,7 @@ async function main(): Promise<void> {
   process.on('SIGTERM', shutdown);
 
   httpServer.listen(PORT, () => {
-    console.log(`[server] Claude Dashboard backend running on http://localhost:${PORT}`);
+    console.log(`[server] Claude Dashboard backend on http://localhost:${PORT}`);
   });
 }
 

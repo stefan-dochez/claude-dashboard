@@ -32,6 +32,12 @@ export interface Instance {
   parentProjectPath: string | null;
   branchName: string | null;
   lastUserPrompt: string | null;
+  mode?: 'terminal' | 'chat';
+  sessionId?: string | null;
+  model?: string | null;
+  totalCostUsd?: number;
+  totalInputTokens?: number;
+  totalOutputTokens?: number;
 }
 
 export interface InstanceContext {
@@ -59,6 +65,33 @@ export interface BranchDiffResponse {
     message: string;
     date: string;
   }>;
+}
+
+export interface ContentBlock {
+  type: 'text' | 'tool_use' | 'tool_result' | 'thinking';
+  text?: string;
+  thinking?: string;
+  name?: string;
+  input?: unknown;
+  tool_use_id?: string;
+  content?: string;
+  is_error?: boolean;
+  stdout?: string;
+  stderr?: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: ContentBlock[];
+  timestamp: string;
+}
+
+export interface SessionInfo {
+  sessionId: string | null;
+  model: string | null;
+  tools?: string[];
+  mcpServers?: { name: string; status: string }[];
+  permissionMode?: string;
 }
 
 export interface AttentionQueueItem {

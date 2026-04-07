@@ -97,11 +97,23 @@ export class StatusMonitor {
     // Take the tail, strip ANSI escapes, then test patterns against clean text
     const tail = stripAnsi(buffer.slice(-4000));
 
+    // Check compiled config patterns
     for (const pattern of this.compiledPatterns) {
       if (pattern.test(tail)) {
         return true;
       }
     }
+
+    // Hardcoded heuristics for Claude Code TUI prompt detection:
+    // The TUI redraws the screen constantly via cursor-positioning sequences.
+    // After stripping ANSI, the buffer is a mix of partial redraws.
+    // We search for known idle markers anywhere in the tail.
+    if (tail.includes('for shortcuts')) return true;
+    if (tail.includes('? for help')) return true;
+    // Claude Code shows the Jamber cactus + prompt "❯" or ">" when idle
+    if (/[❯›>]\s{0,5}$/.test(tail)) return true;
+    // The status bar shows tool counts and model info when idle
+    if (/Jamber/.test(tail)) return true;
 
     return false;
   }

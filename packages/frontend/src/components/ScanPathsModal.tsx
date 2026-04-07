@@ -68,25 +68,25 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
     >
       <div
         ref={modalRef}
-        className="mx-4 w-full max-w-sm rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
+        className="mx-4 w-full max-w-sm rounded-lg border border-border-input bg-surface p-4 shadow-lg"
         onClick={e => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-neutral-200">
-            <Settings className="h-4 w-4 text-neutral-400" />
+          <div className="flex items-center gap-2 text-primary">
+            <Settings className="h-4 w-4 text-tertiary" />
             <span className="text-sm font-semibold">Settings</span>
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
+            className="rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-secondary"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Scan Paths section */}
-        <p className="mb-2 text-xs font-medium text-neutral-300">Scan Paths</p>
-        <p className="mb-2 text-[12px] text-neutral-500">
+        <p className="mb-2 text-xs font-medium text-secondary">Scan Paths</p>
+        <p className="mb-2 text-[12px] text-muted">
           Directories to scan for projects
         </p>
 
@@ -99,11 +99,11 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
                 value={path}
                 onChange={e => handleChange(index, e.target.value)}
                 placeholder="~/projects"
-                className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 placeholder-neutral-600 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+                className="flex-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
               />
               <button
                 onClick={() => handleRemove(index)}
-                className="shrink-0 rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-red-400"
+                className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-red-400"
                 title="Remove path"
               >
                 <X className="h-3.5 w-3.5" />
@@ -114,7 +114,7 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
 
         <button
           onClick={handleAdd}
-          className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-neutral-700 py-1.5 text-xs text-neutral-500 transition-colors hover:border-neutral-500 hover:text-neutral-300"
+          className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border-input py-1.5 text-xs text-muted transition-colors hover:border-border-focus hover:text-secondary"
         >
           <Plus className="h-3 w-3" />
           Add path
@@ -123,9 +123,9 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
         {/* Meta Projects section */}
         <div className="mb-2 flex items-center gap-1.5">
           <Layers className="h-3.5 w-3.5 text-violet-400" />
-          <p className="text-xs font-medium text-neutral-300">Meta Projects</p>
+          <p className="text-xs font-medium text-secondary">Meta Projects</p>
         </div>
-        <p className="mb-2 text-[12px] text-neutral-500">
+        <p className="mb-2 text-[12px] text-muted">
           Projects containing sub-projects (monorepos). Their subdirectories will also be scanned.
         </p>
 
@@ -138,11 +138,11 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
                 value={meta}
                 onChange={e => handleChangeMeta(index, e.target.value)}
                 placeholder="~/dev/my-monorepo"
-                className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 placeholder-neutral-600 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                className="flex-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
               />
               <button
                 onClick={() => handleRemoveMeta(index)}
-                className="shrink-0 rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-red-400"
+                className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-red-400"
                 title="Remove meta project"
               >
                 <X className="h-3.5 w-3.5" />
@@ -153,7 +153,7 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
 
         <button
           onClick={handleAddMeta}
-          className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-violet-800/50 py-1.5 text-xs text-neutral-500 transition-colors hover:border-violet-600 hover:text-neutral-300"
+          className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-violet-800/50 py-1.5 text-xs text-muted transition-colors hover:border-violet-600 hover:text-secondary"
         >
           <Plus className="h-3 w-3" />
           Add meta project
@@ -162,7 +162,7 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded px-3 py-1.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-200"
+            className="rounded px-3 py-1.5 text-xs text-tertiary transition-colors hover:bg-elevated hover:text-primary"
           >
             Cancel
           </button>

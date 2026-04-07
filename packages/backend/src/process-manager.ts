@@ -1,4 +1,5 @@
 import * as pty from 'node-pty';
+import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { exec } from 'child_process';
 import path from 'path';
@@ -7,7 +8,6 @@ import { EventEmitter } from 'events';
 import type { AppConfig } from './config.js';
 
 function resolveClaudeBinary(): string {
-  const fs = require('fs') as typeof import('fs');
   const isWindows = process.platform === 'win32';
   const pathSep = isWindows ? ';' : ':';
   const exeNames = isWindows ? ['claude.exe', 'claude.cmd', 'claude'] : ['claude'];

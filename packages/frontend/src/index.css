@@ -1,5 +1,142 @@
 @import "tailwindcss";
 
+/* ── Semantic design tokens ─────────────────────────────────────────── */
+
+@theme {
+  /* Backgrounds */
+  --color-root: var(--bg-root);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-hover: var(--bg-hover);
+  --color-modal: var(--bg-modal);
+  --color-input: var(--bg-input);
+  --color-popover: var(--bg-popover);
+  --color-codeblock: var(--bg-codeblock);
+  --color-badge: var(--bg-badge);
+
+  /* Borders */
+  --color-border-default: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-input: var(--border-input);
+  --color-border-focus: var(--border-focus);
+
+  /* Text */
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-placeholder: var(--text-placeholder);
+
+  /* Scrollbar */
+  --color-scrollbar-thumb: var(--scrollbar-thumb);
+  --color-scrollbar-hover: var(--scrollbar-hover);
+  --color-scrollbar-active: var(--scrollbar-active);
+}
+
+/* ── Dark theme (default) ───────────────────────────────────────────── */
+
+[data-theme="dark"] {
+  --bg-root: #0d0d0d;
+  --bg-codeblock: #0a0a0a;
+  --bg-modal: #111111;
+  --bg-popover: #141414;
+  --bg-surface: #161616;
+  --bg-hover: #1a1a1a;
+  --bg-elevated: #1e1e1e;
+  --bg-badge: #222222;
+  --bg-input: #2a2a2a;
+
+  --border-default: #1e1e1e;
+  --border-subtle: #1a1a1a;
+  --border-input: #2a2a2a;
+  --border-focus: #333333;
+
+  --text-primary: #e5e5e5;
+  --text-secondary: #d4d4d4;
+  --text-tertiary: #a3a3a3;
+  --text-muted: #737373;
+  --text-faint: #525252;
+  --text-placeholder: #525252;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-hover: rgba(255, 255, 255, 0.18);
+  --scrollbar-active: rgba(255, 255, 255, 0.25);
+
+  color-scheme: dark;
+}
+
+/* ── Light theme ────────────────────────────────────────────────────── */
+
+[data-theme="light"] {
+  --bg-root: #f5f5f5;
+  --bg-codeblock: #e8e8e8;
+  --bg-modal: #ffffff;
+  --bg-popover: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-hover: #ebebeb;
+  --bg-elevated: #f0f0f0;
+  --bg-badge: #e5e5e5;
+  --bg-input: #ffffff;
+
+  --border-default: #e0e0e0;
+  --border-subtle: #ebebeb;
+  --border-input: #d4d4d4;
+  --border-focus: #a3a3a3;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #333333;
+  --text-tertiary: #555555;
+  --text-muted: #777777;
+  --text-faint: #999999;
+  --text-placeholder: #999999;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+  --scrollbar-hover: rgba(0, 0, 0, 0.22);
+  --scrollbar-active: rgba(0, 0, 0, 0.30);
+
+  color-scheme: light;
+}
+
+/* ── Scrollbar styling ──────────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+*:hover {
+  scrollbar-color: var(--scrollbar-hover) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-active);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── Existing animations ────────────────────────────────────────────── */
+
 @keyframes toast-in {
   from {
     opacity: 0;

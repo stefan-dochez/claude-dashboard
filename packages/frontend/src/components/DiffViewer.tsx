@@ -128,7 +128,7 @@ function tokenize(text: string): Token[] {
       matchText.startsWith('//') || matchText.startsWith('/*') ||
       matchText.startsWith('#') || matchText.startsWith('<!--')
     ) {
-      className = 'text-neutral-500 italic';
+      className = 'text-muted italic';
     } else if (
       matchText.startsWith('"') || matchText.startsWith("'") || matchText.startsWith('`')
     ) {
@@ -137,7 +137,7 @@ function tokenize(text: string): Token[] {
       matchText === '=>' || matchText === '===' || matchText === '!==' ||
       matchText === '&&' || matchText === '||'
     ) {
-      className = 'text-neutral-400';
+      className = 'text-tertiary';
     } else if (/^\d/.test(matchText)) {
       className = 'text-blue-300';
     } else if (KEYWORDS.has(matchText)) {
@@ -192,7 +192,7 @@ export default function DiffViewer({ diff }: DiffViewerProps) {
 
   if (!diff.trim()) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-neutral-500">
+      <div className="flex h-full items-center justify-center text-sm text-muted">
         No diff to display
       </div>
     );
@@ -204,7 +204,7 @@ export default function DiffViewer({ diff }: DiffViewerProps) {
         <div className="flex justify-end px-4 py-1">
           <button
             onClick={toggleAll}
-            className="text-[10px] text-neutral-500 transition-colors duration-150 hover:text-neutral-300"
+            className="text-[10px] text-muted transition-colors duration-150 hover:text-secondary"
           >
             {allCollapsed ? 'Expand all' : 'Collapse all'}
           </button>
@@ -217,18 +217,18 @@ export default function DiffViewer({ diff }: DiffViewerProps) {
             {/* File header */}
             <button
               onClick={() => toggleFile(file.fileName)}
-              className="sticky top-0 z-10 flex w-full items-center gap-1.5 border-b border-neutral-800 bg-[#1a1a2e] px-4 py-1.5 text-left"
+              className="sticky top-0 z-10 flex w-full items-center gap-1.5 border-b border-border-default bg-[#1a1a2e] px-4 py-1.5 text-left"
             >
-              {collapsed ? <ChevronRight className="h-3 w-3 text-neutral-500" /> : <ChevronDown className="h-3 w-3 text-neutral-500" />}
+              {collapsed ? <ChevronRight className="h-3 w-3 text-muted" /> : <ChevronDown className="h-3 w-3 text-muted" />}
               <span className="font-mono text-xs font-medium text-blue-300">{file.fileName}</span>
-              <span className="ml-auto text-[10px] text-neutral-600">{file.hunks.reduce((n, h) => n + h.lines.length, 0)} lines</span>
+              <span className="ml-auto text-[10px] text-faint">{file.hunks.reduce((n, h) => n + h.lines.length, 0)} lines</span>
             </button>
 
             {/* Hunks */}
             {!collapsed && file.hunks.map((hunk, hi) => (
               <div key={hi}>
                 {hunk.header && (
-                  <div className="bg-[#1a1a2e]/50 px-4 py-0.5 font-mono text-xs text-neutral-500">
+                  <div className="bg-[#1a1a2e]/50 px-4 py-0.5 font-mono text-xs text-muted">
                     {hunk.header}
                   </div>
                 )}
@@ -243,14 +243,14 @@ export default function DiffViewer({ diff }: DiffViewerProps) {
                             : line.type === 'del'
                               ? 'bg-red-900/20'
                               : line.type === 'info'
-                                ? 'bg-neutral-800/30'
+                                ? 'bg-elevated/30'
                                 : ''
                         }
                       >
-                        <td className="w-[1px] select-none whitespace-nowrap px-2 text-right text-xs text-neutral-600">
+                        <td className="w-[1px] select-none whitespace-nowrap px-2 text-right text-xs text-faint">
                           {line.oldNum ?? ''}
                         </td>
-                        <td className="w-[1px] select-none whitespace-nowrap px-2 text-right text-xs text-neutral-600">
+                        <td className="w-[1px] select-none whitespace-nowrap px-2 text-right text-xs text-faint">
                           {line.newNum ?? ''}
                         </td>
                         <td className="w-[1px] select-none px-1">
@@ -274,8 +274,8 @@ export default function DiffViewer({ diff }: DiffViewerProps) {
                                 : line.type === 'del'
                                   ? 'text-red-300'
                                   : line.type === 'info'
-                                    ? 'italic text-neutral-500'
-                                    : 'text-neutral-300'
+                                    ? 'italic text-muted'
+                                    : 'text-secondary'
                             }
                           >
                             {line.type === 'ctx' ? renderHighlightedLine(line.content) : line.content}

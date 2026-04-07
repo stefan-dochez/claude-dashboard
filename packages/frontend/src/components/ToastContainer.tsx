@@ -36,14 +36,14 @@ export default function ToastContainer({ toasts, onRemove }: ToastContainerProps
           >
             <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${ICON_COLOR_MAP[toast.type]}`} />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-neutral-200">{toast.message}</p>
+              <p className="text-xs font-medium text-primary">{toast.message}</p>
               {toast.detail && (
-                <p className="mt-0.5 whitespace-pre-line text-[12px] text-neutral-400">{toast.detail}</p>
+                <p className="mt-0.5 whitespace-pre-line text-[12px] text-tertiary">{toast.detail}</p>
               )}
             </div>
             <button
               onClick={() => onRemove(toast.id)}
-              className="shrink-0 rounded p-0.5 text-neutral-500 transition-colors hover:text-neutral-300"
+              className="shrink-0 rounded p-0.5 text-muted transition-colors hover:text-secondary"
               aria-label="Close notification"
             >
               <X className="h-3 w-3" />

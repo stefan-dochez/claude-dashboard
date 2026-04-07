@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap } from 'lucide-react';
+import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap, MessageSquare, Terminal } from 'lucide-react';
 import type { Project } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 
@@ -24,7 +24,7 @@ interface BranchInfo {
 interface LaunchModalProps {
   project: Project;
   worktrees: Project[];
-  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
+  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => void;
   onClose: () => void;
   onRefreshProjects: () => void;
 }
@@ -32,6 +32,7 @@ interface LaunchModalProps {
 export default function LaunchModal({ project, worktrees, onLaunch, onClose, onRefreshProjects }: LaunchModalProps) {
   const [taskDescription, setTaskDescription] = useState('');
   const [branchPrefix, setBranchPrefix] = useState('feat');
+  const [launchMode, setLaunchMode] = useState<'terminal' | 'chat'>('terminal');
   const [mode, setMode] = useState<'new' | 'existing' | 'branches'>(worktrees.length > 0 ? 'existing' : 'new');
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
@@ -72,22 +73,22 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
 
   const handleSubmitNew = () => {
     const desc = taskDescription.trim();
-    onLaunch(project.path, desc || undefined, undefined, isGit ? branchPrefix : undefined);
+    onLaunch(project.path, desc || undefined, undefined, isGit ? branchPrefix : undefined, launchMode);
     onClose();
   };
 
   const handleResumeWorktree = (worktreePath: string) => {
-    onLaunch(worktreePath);
+    onLaunch(worktreePath, undefined, undefined, undefined, launchMode);
     onClose();
   };
 
   const handleDetachBranch = () => {
-    onLaunch(project.path, undefined, true);
+    onLaunch(project.path, undefined, true, undefined, launchMode);
     onClose();
   };
 
   const handleLaunchDirect = () => {
-    onLaunch(project.path);
+    onLaunch(project.path, undefined, undefined, undefined, launchMode);
     onClose();
   };
 
@@ -106,7 +107,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
       const result = await res.json();
       onRefreshProjects();
       // Launch Claude in the new worktree
-      onLaunch(result.worktreePath);
+      onLaunch(result.worktreePath, undefined, undefined, undefined, launchMode);
       onClose();
     } catch (err) {
       console.error('[LaunchModal] Error converting branch to worktree:', err);
@@ -130,19 +131,45 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
     >
       <div
         ref={modalRef}
-        className="mx-4 w-full max-w-lg rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
+        className="mx-4 w-full max-w-lg rounded-lg border border-border-input bg-surface p-4 shadow-xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-neutral-200">
+          <div className="flex items-center gap-2 text-primary">
             <Play className="h-4 w-4 text-green-400" />
             <span className="text-sm font-semibold">Launch {project.name}</span>
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
+            className="rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-secondary"
           >
             <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Terminal / Chat mode toggle */}
+        <div className="mb-3 flex rounded-md border border-border-input text-xs">
+          <button
+            onClick={() => setLaunchMode('terminal')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-l-md px-3 py-1.5 font-medium transition-colors ${
+              launchMode === 'terminal'
+                ? 'bg-hover text-primary'
+                : 'text-muted hover:text-secondary'
+            }`}
+          >
+            <Terminal className="h-3 w-3" />
+            Terminal
+          </button>
+          <button
+            onClick={() => setLaunchMode('chat')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-r-md px-3 py-1.5 font-medium transition-colors ${
+              launchMode === 'chat'
+                ? 'bg-hover text-primary'
+                : 'text-muted hover:text-secondary'
+            }`}
+          >
+            <MessageSquare className="h-3 w-3" />
+            Chat
           </button>
         </div>
 
@@ -154,10 +181,10 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
           >
             <ArrowRightLeft className="h-4 w-4 shrink-0 text-amber-400" />
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-neutral-200">
+              <div className="text-xs font-medium text-primary">
                 Move <span className="text-amber-400">{project.gitBranch}</span> to worktree
               </div>
-              <div className="text-[12px] text-neutral-500">
+              <div className="text-[12px] text-muted">
                 Creates a worktree for the current branch and resets repo to default branch
               </div>
             </div>
@@ -173,10 +200,10 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
           >
             <Zap className="h-4 w-4 shrink-0 text-green-400" />
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-neutral-200">
+              <div className="text-xs font-medium text-primary">
                 Launch on <span className="text-green-400">{project.gitBranch}</span>
               </div>
-              <div className="text-[12px] text-neutral-500">
+              <div className="text-[12px] text-muted">
                 Run Claude directly on the current branch, no worktree
               </div>
             </div>
@@ -186,14 +213,14 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
 
         {/* Mode tabs */}
         {isGit && (
-          <div className="mb-3 flex rounded-md border border-neutral-700 text-xs">
+          <div className="mb-3 flex rounded-md border border-border-input text-xs">
             {worktrees.length > 0 && (
               <button
                 onClick={() => setMode('existing')}
                 className={`flex-1 rounded-l-md px-3 py-1.5 font-medium transition-colors ${
                   mode === 'existing'
-                    ? 'bg-neutral-700 text-neutral-200'
-                    : 'text-neutral-500 hover:text-neutral-300'
+                    ? 'bg-hover text-primary'
+                    : 'text-muted hover:text-secondary'
                 }`}
               >
                 Resume ({worktrees.length})
@@ -205,8 +232,8 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
                 worktrees.length === 0 ? 'rounded-l-md' : ''
               } ${
                 mode === 'new'
-                  ? 'bg-neutral-700 text-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-300'
+                  ? 'bg-hover text-primary'
+                  : 'text-muted hover:text-secondary'
               }`}
             >
               New task
@@ -215,8 +242,8 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
               onClick={() => setMode('branches')}
               className={`flex-1 rounded-r-md px-3 py-1.5 font-medium transition-colors ${
                 mode === 'branches'
-                  ? 'bg-neutral-700 text-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-300'
+                  ? 'bg-hover text-primary'
+                  : 'text-muted hover:text-secondary'
               }`}
             >
               Branches
@@ -231,18 +258,18 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
               <button
                 key={wt.path}
                 onClick={() => handleResumeWorktree(wt.path)}
-                className="group flex items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-neutral-800"
+                className="group flex items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-elevated"
               >
                 <GitBranch className="h-3.5 w-3.5 shrink-0 text-violet-400" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-medium text-neutral-200" title={wt.gitBranch ?? wt.name}>
+                  <div className="truncate text-xs font-medium text-primary" title={wt.gitBranch ?? wt.name}>
                     {wt.gitBranch ?? wt.name}
                   </div>
-                  <div className="truncate text-[12px] text-neutral-500" title={wt.name}>
+                  <div className="truncate text-[12px] text-muted" title={wt.name}>
                     {wt.name}
                   </div>
                 </div>
-                <Play className="h-3.5 w-3.5 shrink-0 text-neutral-600 transition-colors group-hover:text-green-400" />
+                <Play className="h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-green-400" />
               </button>
             ))}
           </div>
@@ -251,10 +278,10 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
           <div className="flex max-h-48 flex-col gap-1 overflow-y-auto pr-4">
             {branchesLoading ? (
               <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-4 w-4 animate-spin text-neutral-500" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted" />
               </div>
             ) : availableBranches.length === 0 ? (
-              <p className="py-4 text-center text-xs text-neutral-500">
+              <p className="py-4 text-center text-xs text-muted">
                 No branches available to convert
               </p>
             ) : (
@@ -263,16 +290,16 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
                   key={branch.name}
                   onClick={() => handleBranchToWorktree(branch.name)}
                   disabled={convertingBranch !== null}
-                  className="group flex items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-neutral-800 disabled:opacity-50"
+                  className="group flex items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-elevated disabled:opacity-50"
                 >
                   <GitBranch className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-neutral-200" title={branch.name}>
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-primary" title={branch.name}>
                     {branch.name}
                   </span>
                   {convertingBranch === branch.name ? (
                     <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-400" />
                   ) : (
-                    <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-neutral-600 transition-colors group-hover:text-blue-400" />
+                    <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-blue-400" />
                   )}
                 </button>
               ))
@@ -290,7 +317,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
                     className={`rounded px-2 py-1 font-mono text-[12px] transition-colors ${
                       branchPrefix === value
                         ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40'
-                        : 'bg-neutral-800 text-neutral-500 hover:bg-neutral-700 hover:text-neutral-300'
+                        : 'bg-elevated text-muted hover:bg-hover hover:text-secondary'
                     }`}
                   >
                     {label}
@@ -304,9 +331,9 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
               onChange={e => setTaskDescription(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="What's the task?"
-              className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+              className="w-full rounded-md border border-border-input bg-elevated px-3 py-2 text-sm text-primary placeholder-placeholder outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
             />
-            <p className="mt-1.5 text-[12px] text-neutral-500">
+            <p className="mt-1.5 text-[12px] text-muted">
               {isGit
                 ? `Branch: ${branchPrefix}/${taskDescription.trim() ? taskDescription.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) : '...'}`
                 : 'Not a git project — will launch directly'}
@@ -318,7 +345,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
           <div className="flex justify-end gap-2">
             <button
               onClick={onClose}
-              className="rounded px-3 py-1.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-200"
+              className="rounded px-3 py-1.5 text-xs text-tertiary transition-colors hover:bg-elevated hover:text-primary"
             >
               Cancel
             </button>

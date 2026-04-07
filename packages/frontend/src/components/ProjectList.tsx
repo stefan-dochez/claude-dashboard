@@ -140,7 +140,7 @@ interface ProjectListProps {
   favoriteProjects: Set<string>;
   pullingProjects: Set<string>;
   checkingOutProjects: Set<string>;
-  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => void;
+  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
@@ -241,9 +241,9 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     });
   }, []);
 
-  const handleLaunchFromModal = (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => {
+  const handleLaunchFromModal = (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => {
     setLaunching(projectPath);
-    onLaunch(projectPath, taskDescription, detachBranch, branchPrefix);
+    onLaunch(projectPath, taskDescription, detachBranch, branchPrefix, mode);
     setTimeout(() => setLaunching(null), 1000);
   };
 
@@ -302,18 +302,18 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-neutral-500" />
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted" />
           <input
             type="text"
             placeholder="Filter projects..."
             value={filter}
             onChange={e => setFilter(e.target.value)}
-            className="w-full rounded-md border border-neutral-800 bg-neutral-900/50 py-2 pl-8 pr-3 text-xs text-neutral-300 placeholder-neutral-600 outline-none focus:border-neutral-600 focus:ring-1 focus:ring-neutral-600"
+            className="w-full rounded-md border border-border-default bg-surface/50 py-2 pl-8 pr-3 text-xs text-secondary placeholder-faint outline-none focus:border-faint focus:ring-1 focus:ring-faint"
           />
         </div>
         <button
           onClick={() => setViewMode(viewMode === 'tree' ? 'flat' : 'tree')}
-          className="shrink-0 rounded-md border border-neutral-800 bg-neutral-900/50 p-2 text-neutral-500 transition-colors hover:border-neutral-600 hover:text-neutral-300"
+          className="shrink-0 rounded-md border border-border-default bg-surface/50 p-2 text-muted transition-colors hover:border-faint hover:text-secondary"
           title={viewMode === 'tree' ? 'Switch to flat list' : 'Switch to tree view'}
         >
           {viewMode === 'tree' ? <List className="h-3.5 w-3.5" /> : <FolderTree className="h-3.5 w-3.5" />}
@@ -321,13 +321,13 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-6 text-neutral-500">
+        <div className="flex items-center justify-center py-6 text-muted">
           <Loader2 className="h-4 w-4 animate-spin" />
         </div>
       ) : filtered ? (
         // Flat search results
         filtered.length === 0 ? (
-          <p className="py-4 text-center text-xs text-neutral-600">No projects match</p>
+          <p className="py-4 text-center text-xs text-faint">No projects match</p>
         ) : (
           <div className="flex flex-col gap-0.5">
             {filtered.map(project => {
@@ -360,7 +360,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
       ) : viewMode === 'flat' ? (
         // Flat alphabetical list
         sortedFlatProjects.length === 0 ? (
-          <p className="py-4 text-center text-xs text-neutral-600">No projects found</p>
+          <p className="py-4 text-center text-xs text-faint">No projects found</p>
         ) : (
           <div className="flex flex-col gap-0.5">
             {sortedFlatProjects.map(project => {
@@ -391,7 +391,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
           </div>
         )
       ) : tree.length === 0 ? (
-        <p className="py-4 text-center text-xs text-neutral-600">No projects found</p>
+        <p className="py-4 text-center text-xs text-faint">No projects found</p>
       ) : (
         // Tree view
         <div className="flex flex-col gap-0.5">
@@ -399,7 +399,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
             <>
               <div className="flex items-center gap-1.5 px-2 pt-1 pb-0.5">
                 <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                <span className="text-[12px] font-medium uppercase tracking-wider text-neutral-500">Favorites</span>
+                <span className="text-[12px] font-medium uppercase tracking-wider text-muted">Favorites</span>
               </div>
               {favoriteProjectsList.map(project => (
                 <ProjectRow
@@ -423,7 +423,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   onCheckoutDefault={() => onCheckoutDefault(project.path)}
                 />
               ))}
-              <div className="mx-2 my-1 border-t border-neutral-800" />
+              <div className="mx-2 my-1 border-t border-border-default" />
             </>
           )}
           <TreeNodeList
@@ -452,20 +452,20 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
         >
           <div
             ref={deleteModalRef}
-            className="mx-4 w-full max-w-xs rounded-lg border border-neutral-700 bg-neutral-900 p-4 shadow-xl"
+            className="mx-4 w-full max-w-xs rounded-lg border border-border-input bg-surface p-4 shadow-xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center gap-2 text-red-400">
               <Trash2 className="h-4 w-4" />
               <span className="text-sm font-semibold">Delete worktree</span>
             </div>
-            <p className="mb-3 text-xs text-neutral-400">
-              Delete <span className="font-medium text-neutral-200">{confirmDeleteWt.name}</span>? The worktree directory and its branch will be removed.
+            <p className="mb-3 text-xs text-tertiary">
+              Delete <span className="font-medium text-primary">{confirmDeleteWt.name}</span>? The worktree directory and its branch will be removed.
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDeleteWt(null)}
-                className="rounded px-3 py-1.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-200"
+                className="rounded px-3 py-1.5 text-xs text-tertiary transition-colors hover:bg-elevated hover:text-primary"
               >
                 Cancel
               </button>
@@ -557,17 +557,17 @@ function FolderRow({
     <>
       <button
         onClick={() => onToggle(node.fullPath)}
-        className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-neutral-800/50"
+        className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-elevated/50"
         style={{ paddingLeft: `${depth * 12 + 6}px` }}
       >
         {isExpanded ? (
-          <ChevronDown className="h-3 w-3 shrink-0 text-neutral-500" />
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted" />
         ) : (
-          <ChevronRight className="h-3 w-3 shrink-0 text-neutral-500" />
+          <ChevronRight className="h-3 w-3 shrink-0 text-muted" />
         )}
-        <Folder className={`h-3.5 w-3.5 shrink-0 ${isExpanded ? 'text-amber-500/70' : 'text-neutral-500'}`} />
-        <span className="truncate text-xs font-medium text-neutral-400" title={node.name}>{node.name}</span>
-        <span className="ml-auto shrink-0 text-[12px] text-neutral-600">{node.projectCount}</span>
+        <Folder className={`h-3.5 w-3.5 shrink-0 ${isExpanded ? 'text-amber-500/70' : 'text-muted'}`} />
+        <span className="truncate text-xs font-medium text-tertiary" title={node.name}>{node.name}</span>
+        <span className="ml-auto shrink-0 text-[12px] text-faint">{node.projectCount}</span>
       </button>
 
       {isExpanded && (
@@ -628,13 +628,13 @@ function ProjectRow({
   return (
     <>
       <div
-        className="group flex items-start gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-neutral-800/50"
+        className="group flex items-start gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-elevated/50"
         style={{ paddingLeft: `${depth * 12 + 6}px` }}
       >
         {hasWorktrees ? (
           <button
             onClick={e => { e.stopPropagation(); onToggleWorktrees(); }}
-            className="mt-1 shrink-0 text-neutral-500 hover:text-neutral-300"
+            className="mt-1 shrink-0 text-muted hover:text-secondary"
           >
             {isProjectExpanded
               ? <ChevronDown className="h-3 w-3" />
@@ -647,12 +647,12 @@ function ProjectRow({
         {project.isMeta ? (
           <Layers className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-400" />
         ) : (
-          <FolderGit2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-500" />
+          <FolderGit2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
         )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="truncate text-xs font-medium text-neutral-200" title={project.name}>
+            <span className="truncate text-xs font-medium text-primary" title={project.name}>
               {project.name}
             </span>
             {project.hasClaudeMd && (
@@ -687,7 +687,7 @@ function ProjectRow({
               className={`shrink-0 rounded p-1 transition-all ${
                 isFavorite
                   ? 'text-amber-400 opacity-100'
-                  : 'text-neutral-600 hover:bg-neutral-700 hover:text-amber-400'
+                  : 'text-faint hover:bg-hover hover:text-amber-400'
               }`}
               title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
               aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
@@ -706,7 +706,7 @@ function ProjectRow({
                   e.stopPropagation();
                   onCheckoutDefault();
                 }}
-                className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-amber-400"
+                className="shrink-0 rounded p-1 text-faint transition-colors hover:bg-hover hover:text-amber-400"
                 title="Switch to default branch"
                 aria-label="Switch to default branch"
               >
@@ -718,7 +718,7 @@ function ProjectRow({
                   e.stopPropagation();
                   onPull();
                 }}
-                className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-blue-400"
+                className="shrink-0 rounded p-1 text-faint transition-colors hover:bg-hover hover:text-blue-400"
                 title="Pull latest"
                 aria-label="Pull latest"
               >
@@ -732,7 +732,7 @@ function ProjectRow({
                 e.stopPropagation();
                 onDeleteWorktree(project.parentProject!, project.path);
               }}
-              className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-red-400"
+              className="shrink-0 rounded p-1 text-faint transition-colors hover:bg-hover hover:text-red-400"
               title="Delete worktree"
               aria-label="Delete worktree"
             >
@@ -742,7 +742,7 @@ function ProjectRow({
           <button
             onClick={onLaunch}
             disabled={isLaunching}
-            className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-green-400 disabled:opacity-50"
+            className="shrink-0 rounded p-1 text-faint transition-colors hover:bg-hover hover:text-green-400 disabled:opacity-50"
             title="Launch Claude Code"
             aria-label="Launch"
           >
@@ -755,7 +755,7 @@ function ProjectRow({
             </div>
           </div>
           {project.gitBranch && (
-            <div className="flex items-center gap-1 text-[12px] text-neutral-500">
+            <div className="flex items-center gap-1 text-[12px] text-muted">
               <GitBranch className="h-2.5 w-2.5" />
               <span className="truncate" title={project.gitBranch ?? undefined}>{project.gitBranch}</span>
             </div>
@@ -794,19 +794,19 @@ function WorktreeRow({
 }) {
   return (
     <div
-      className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-neutral-800/50"
+      className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-elevated/50"
       // Align with parent's text: parent padding + chevron(12) + gap(6) + repo icon(14) + gap(6)
       style={{ paddingLeft: `${(depth - 1) * 12 + 6 + 12 + 6 + 14 + 6}px` }}
     >
       <GitBranch className="h-3 w-3 shrink-0 text-violet-400" />
-      <span className="min-w-0 flex-1 truncate text-xs text-neutral-400" title={worktree.gitBranch ?? worktree.name}>
+      <span className="min-w-0 flex-1 truncate text-xs text-tertiary" title={worktree.gitBranch ?? worktree.name}>
         {worktree.gitBranch ?? worktree.name}
       </span>
 
       <div className="flex shrink-0 items-center gap-0.5">
         <button
           onClick={e => { e.stopPropagation(); onDelete(); }}
-          className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-red-400"
+          className="shrink-0 rounded p-1 text-faint transition-colors hover:bg-hover hover:text-red-400"
           title="Delete worktree"
           aria-label="Delete worktree"
         >
@@ -815,7 +815,7 @@ function WorktreeRow({
         <button
           onClick={onLaunch}
           disabled={isLaunching}
-          className="shrink-0 rounded p-1 text-neutral-600 transition-colors hover:bg-neutral-700 hover:text-green-400 disabled:opacity-50"
+          className="shrink-0 rounded p-1 text-faint transition-colors hover:bg-hover hover:text-green-400 disabled:opacity-50"
           title="Launch in worktree"
           aria-label="Launch"
         >

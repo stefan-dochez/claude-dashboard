@@ -6,6 +6,26 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Features
 
+- **Chat mode (Agent SDK)** — New instance mode using the Claude Agent SDK instead of PTY. Supports structured message streaming, markdown rendering (react-markdown + Prism syntax highlighting), thinking blocks, tool use/result grouping, tool progress ring, and permission/question prompts. Model (Opus/Sonnet/Haiku), permission mode (Ask/Plan/Auto-Edit/Full Access), and effort level (High/Medium/Low) selectable from the input bar.
+
+- **Terminal / Chat toggle** — Launch modal now has a Terminal/Chat mode toggle. Terminal uses PTY as before, Chat uses the Agent SDK.
+
+- **Design token system** — Complete visual overhaul with semantic CSS tokens (`bg-root`, `bg-surface`, `text-primary`, `text-muted`, `border-border-default`, etc.) via `@theme` blocks. Dark theme by default, light theme ready. Custom thin scrollbars (6px, themed). All 25+ frontend components migrated from hardcoded Tailwind colors to tokens.
+
+- **2-column layout** — Sidebar (instances + projects) on the left, main content (Chat/Terminal + Changes/PR tabs) in the center. Sidebar collapsible with animation (⌘B).
+
+- **Context panel** — Toggleable right panel (⌘I) showing instance context: branch, path, model, cost, token usage, modified files list, and collapsible CLAUDE.md preview. Auto-refreshes every 10s.
+
+- **File explorer** — Toggleable right panel (⌘E) with a tree view of the project files. Lazy-loaded directory expansion, file type icons (color-coded by extension), search bar with debounced fuzzy find. Clicking a file opens it in the center column with syntax highlighting and line numbers.
+
+- **File viewer** — New center tab for viewing file contents with Prism syntax highlighting, line numbers, and a close button. Opened from the file explorer or modified files list.
+
+- **Claude AI favicon** — Favicon updated to the Anthropic star/sun logo in black on white.
+
+- **Compact views for panels** — ChangesView and PullRequestView redesigned with vertical layout (file list on top, diff below) to work in narrow panels. PR header stacks vertically with compact commit chips.
+
+- **Status monitor fix** — Improved Claude Code TUI prompt detection with heuristics for "for shortcuts" text and Jamber cactus marker, fixing the infinite spinner issue for terminal instances.
+
 - **Windows support** — Fixed binary resolution (`claude.exe`), PATH separator (`;` vs `:`), process tree killing (`taskkill /F /T`), and worktree removal retry on EBUSY. Platform-adaptive keyboard shortcut hints (`Ctrl+` on Windows, `⌘` on macOS).
 
 - **Pull / update repos** — Pull latest changes for a single repo (download icon on each project row) or all repos at once (download icon in the Projects header). Uses `git pull --ff-only` to avoid merge conflicts. Spinner feedback during pull.

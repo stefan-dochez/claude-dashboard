@@ -1,11 +1,16 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Terminal, FileCode2, GitPullRequest } from 'lucide-react';
+import {
+  Terminal, MessageSquare, GitBranch, PanelLeft, Loader2,
+  FileCode2, GitPullRequest, FolderOpen, Info,
+} from 'lucide-react';
 import Sidebar from './components/Sidebar';
+import ContextPanel from './components/ContextPanel';
+import FileExplorer from './components/FileExplorer';
 import TerminalView from './components/TerminalView';
+import ChatView from './components/ChatView';
 import ChangesView from './components/ChangesView';
 import PullRequestView from './components/PullRequestView';
-import AttentionQueueBanner from './components/AttentionQueueBanner';
-import ContextBanner from './components/ContextBanner';
+import FileViewer from './components/FileViewer';
 import ScanPathsModal from './components/ScanPathsModal';
 import ToastContainer from './components/ToastContainer';
 import { useProjects } from './hooks/useProjects';
@@ -15,21 +20,55 @@ import { useAttentionQueue } from './hooks/useAttentionQueue';
 import { useSocketStatus } from './hooks/useSocket';
 import { useToasts } from './hooks/useToasts';
 
+// --------------- Status Icon ---------------
+
+function StatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case 'processing':
+      return <Loader2 className="h-3 w-3 animate-spin text-blue-400" />;
+    case 'waiting_input':
+      return <div className="h-2 w-2 rounded-full bg-green-500" />;
+    case 'idle':
+      return <div className="h-2 w-2 rounded-full bg-muted" />;
+    case 'launching':
+      return <Loader2 className="h-3 w-3 animate-spin text-amber-400" />;
+    case 'exited':
+      return <div className="h-2 w-2 rounded-full bg-faint" />;
+    default:
+      return null;
+  }
+}
+
+// --------------- App ---------------
+
 export default function App() {
   const socketConnected = useSocketStatus();
   const { config, updateConfig } = useConfig();
   const { projects, loading: projectsLoading, refreshing: projectsRefreshing, refreshProjects, deleteWorktree } = useProjects();
   const { instances, spawnInstance, killInstance, dismissInstance, refetch: refetchInstances } = useInstances();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'terminal' | 'changes' | 'pr'>('terminal');
   const [typingLocked, setTypingLocked] = useState(false);
   const { toasts, addToast, removeToast } = useToasts();
   const [scanPathsOpen, setScanPathsOpen] = useState(false);
   const autoOpenedRef = useRef(false);
 
+  // Panel visibility
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [rightPanel, setRightPanel] = useState<'files' | 'context' | null>(null);
+
+  // Center tabs
+  const [activeTab, setActiveTab] = useState<'main' | 'changes' | 'pr' | 'file'>('main');
+  const [openedFile, setOpenedFile] = useState<string | null>(null);
+
   const handleSelectInstance = useCallback((id: string | null) => {
     setSelectedInstanceId(id);
-    setActiveTab('terminal');
+    setActiveTab('main');
+    setOpenedFile(null);
+  }, []);
+
+  const handleOpenFile = useCallback((filePath: string) => {
+    setOpenedFile(filePath);
+    setActiveTab('file');
   }, []);
 
   const { queue, skipInstance, jumpToInstance } = useAttentionQueue({
@@ -44,12 +83,11 @@ export default function App() {
     [queue],
   );
 
-  const handleLaunch = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string) => {
+  const handleLaunch = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => {
     try {
-      const instance = await spawnInstance(projectPath, taskDescription, detachBranch, branchPrefix);
+      const instance = await spawnInstance(projectPath, taskDescription, detachBranch, branchPrefix, mode);
       handleSelectInstance(instance.id);
       if (taskDescription || detachBranch) {
-        // A worktree was created — refresh project list to show it
         refreshProjects();
       }
     } catch {
@@ -79,11 +117,9 @@ export default function App() {
   }, []);
 
   const handleDeleteWorktree = useCallback((projectPath: string, worktreePath: string) => {
-    // Cancel any existing pending delete
     if (pendingDeleteRef.current) {
       clearTimeout(pendingDeleteRef.current.timeoutId);
     }
-
     const name = worktreePath.split('/').pop() ?? worktreePath;
     const timeoutId = setTimeout(async () => {
       await deleteWorktree(projectPath, worktreePath);
@@ -91,7 +127,6 @@ export default function App() {
       pendingDeleteRef.current = null;
       setPendingDelete(null);
     }, 5000);
-
     pendingDeleteRef.current = { timeoutId };
     setPendingDelete({ projectPath, worktreePath, name, timeoutId });
   }, [deleteWorktree, refetchInstances]);
@@ -116,7 +151,7 @@ export default function App() {
       refreshProjects();
       setScanPathsOpen(false);
     } catch {
-      // Error already logged in hook
+      // Error already logged
     }
   }, [updateConfig, refreshProjects]);
 
@@ -152,22 +187,14 @@ export default function App() {
       });
       const result = await res.json();
       if (result.success) {
-        addToast(
-          result.message === 'Already up to date' ? 'info' : 'success',
-          `${name}`,
-          result.message,
-        );
+        addToast(result.message === 'Already up to date' ? 'info' : 'success', name, result.message);
       } else {
         addToast('error', `${name} — pull failed`, result.message);
       }
     } catch (err) {
       addToast('error', `${name} — pull failed`, err instanceof Error ? err.message : 'Network error');
     } finally {
-      setPullingProjects(prev => {
-        const next = new Set(prev);
-        next.delete(projectPath);
-        return next;
-      });
+      setPullingProjects(prev => { const next = new Set(prev); next.delete(projectPath); return next; });
       refreshProjects();
     }
   }, [refreshProjects, addToast]);
@@ -179,18 +206,13 @@ export default function App() {
       const results: Array<{ name: string; success: boolean; message: string }> = await res.json();
       const updated = results.filter(r => r.success && r.message !== 'Already up to date');
       const failed = results.filter(r => !r.success);
-
       if (failed.length === 0 && updated.length === 0) {
         addToast('info', 'All repos up to date');
       } else if (failed.length === 0) {
         addToast('success', `${updated.length} repo${updated.length > 1 ? 's' : ''} updated`);
       } else {
         const detail = failed.map(r => `${r.name}: ${r.message}`).join('\n');
-        if (updated.length > 0) {
-          addToast('error', `${updated.length} updated, ${failed.length} failed`, detail, 8000);
-        } else {
-          addToast('error', `${failed.length} repo${failed.length > 1 ? 's' : ''} failed to update`, detail, 8000);
-        }
+        addToast('error', `${failed.length} repo${failed.length > 1 ? 's' : ''} failed`, detail, 8000);
       }
     } catch (err) {
       addToast('error', 'Pull all failed', err instanceof Error ? err.message : 'Network error');
@@ -211,200 +233,261 @@ export default function App() {
       });
       const result = await res.json();
       if (result.success) {
-        addToast(
-          result.message === 'Already on default branch' ? 'info' : 'success',
-          name,
-          result.message,
-        );
+        addToast(result.message === 'Already on default branch' ? 'info' : 'success', name, result.message);
       } else {
-        addToast('error', `${name}`, result.message);
+        addToast('error', name, result.message);
       }
     } catch (err) {
-      addToast('error', `${name}`, err instanceof Error ? err.message : 'Network error');
+      addToast('error', name, err instanceof Error ? err.message : 'Network error');
     } finally {
-      setCheckingOutProjects(prev => {
-        const next = new Set(prev);
-        next.delete(projectPath);
-        return next;
-      });
+      setCheckingOutProjects(prev => { const next = new Set(prev); next.delete(projectPath); return next; });
       refreshProjects();
     }
   }, [refreshProjects, addToast]);
 
   const selectedInstance = instances.find(i => i.id === selectedInstanceId);
 
+  const instanceProjectPath = selectedInstance
+    ? (selectedInstance.worktreePath ?? selectedInstance.projectPath)
+    : null;
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture shortcuts when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      if (!selectedInstance) return;
-
-      // Ctrl/Cmd + 1/2/3 for tabs
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-        if (e.key === '1') { e.preventDefault(); setActiveTab('terminal'); }
-        if (e.key === '2') { e.preventDefault(); setActiveTab('changes'); }
-        if (e.key === '3') { e.preventDefault(); setActiveTab('pr'); }
+        if (e.key === 'b') { e.preventDefault(); setSidebarOpen(prev => !prev); }
+        if (e.key === 'e') { e.preventDefault(); setRightPanel(prev => prev === 'files' ? null : 'files'); }
+        if (e.key === 'i') { e.preventDefault(); setRightPanel(prev => prev === 'context' ? null : 'context'); }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedInstance]);
+  }, []);
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a]">
-      <Sidebar
-        projects={projects}
-        projectsLoading={projectsLoading}
-        projectsRefreshing={projectsRefreshing}
-        instances={instances}
-        selectedInstanceId={selectedInstanceId}
-        scanPaths={config?.scanPaths ?? []}
-        favoriteProjects={favoriteProjects}
-        pullingProjects={pullingProjects}
-        checkingOutProjects={checkingOutProjects}
-        pullingAll={pullingAll}
-        queuedIds={queuedIds}
-        onRefreshProjects={refreshProjects}
-        onLaunchProject={handleLaunch}
-        onSelectInstance={handleSelectInstance}
-        onKillInstance={handleKill}
-        onDismissInstance={dismissInstance}
-        onDeleteWorktree={handleDeleteWorktree}
-        onToggleFavorite={handleToggleFavorite}
-        onPullProject={handlePullProject}
-        onPullAll={handlePullAll}
-        onCheckoutDefault={handleCheckoutDefault}
-        onOpenScanPaths={() => setScanPathsOpen(true)}
-      />
-
-      {/* Main content */}
-      <main className="flex flex-1 flex-col overflow-hidden">
-        {/* Topbar */}
-        <div className="flex items-center justify-between border-b border-neutral-800 bg-[#0f0f0f] px-4 py-2">
-          <div className="flex items-center gap-4">
-            {/* Instance info */}
-            <div className="flex items-center gap-2">
-              {selectedInstance ? (
-                <>
-                  <span className="text-sm font-medium text-neutral-200">
-                    {selectedInstance.projectName}
-                  </span>
-                  <span className="text-xs text-neutral-500">
-                    {selectedInstance.id.slice(0, 8)}
-                  </span>
-                </>
-              ) : (
-                <span className="text-sm text-neutral-500">No instance selected</span>
-              )}
-            </div>
-
-            {/* Tabs */}
-            {selectedInstance && (
-              <div className="flex items-center gap-1">
-                {([
-                  { key: 'terminal' as const, label: 'Terminal', Icon: Terminal },
-                  { key: 'changes' as const, label: 'Changes', Icon: FileCode2 },
-                  { key: 'pr' as const, label: 'Pull Request', Icon: GitPullRequest },
-                ]).map(({ key, label, Icon }, index) => (
-                  <button
-                    key={key}
-                    onClick={() => setActiveTab(key)}
-                    className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs transition-colors ${
-                      activeTab === key
-                        ? 'bg-neutral-700/50 text-neutral-200'
-                        : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-400'
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {label}
-                    <span className="ml-1 hidden text-[9px] text-neutral-600 lg:inline">{navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl+'}{index + 1}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-neutral-500">
-            {typingLocked && (
-              <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[12px] font-medium text-violet-400" title="Queue auto-select paused while you type">
-                typing
-              </span>
-            )}
-            {queue.length > 0 && (
-              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[12px] font-medium text-amber-400">
-                {queue.length} queued
-              </span>
-            )}
-            <span>{instances.filter(i => i.status !== 'exited').length} active</span>
-            <span className={`h-2 w-2 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} title={socketConnected ? 'Connected' : 'Disconnected'} />
-          </div>
+    <div className="flex h-screen flex-col bg-root">
+      {/* Topbar */}
+      <div className="flex h-10 shrink-0 items-center px-4">
+        {/* Left: project + branch */}
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="text-[13px] font-medium text-secondary">
+            {selectedInstance ? selectedInstance.projectName : 'Claude Dashboard'}
+          </span>
+          {selectedInstance?.branchName && (
+            <>
+              <GitBranch className="h-3 w-3 text-faint" />
+              <span className="text-[12px] text-muted">{selectedInstance.branchName}</span>
+            </>
+          )}
         </div>
 
-        <AttentionQueueBanner
-          queue={queue}
-          selectedInstanceId={selectedInstanceId}
-          onSkip={handleSkip}
-          onJump={handleJump}
-        />
-
+        {/* Center: status + task description */}
         {selectedInstance && (
-          <ContextBanner
-            taskDescription={selectedInstance.taskDescription}
-            branchName={selectedInstance.branchName}
-            lastUserPrompt={selectedInstance.lastUserPrompt}
-          />
+          <>
+            <span className="mx-3 text-faint">|</span>
+            <StatusIcon status={selectedInstance.status} />
+            {selectedInstance.mode === 'chat' && (
+              <span className="ml-2 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">Chat</span>
+            )}
+            {selectedInstance.taskDescription && (
+              <div className="mx-3 min-w-0 flex-1">
+                <span className="block truncate text-[12px] text-muted">{selectedInstance.taskDescription}</span>
+              </div>
+            )}
+          </>
         )}
 
-        {/* Content area */}
-        <div className="flex-1 overflow-hidden">
-          {selectedInstance ? (
-            <>
-              {activeTab === 'terminal' && (
+        {/* Right: indicators + sidebar toggle */}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {typingLocked && (
+            <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-400">typing</span>
+          )}
+          {queue.length > 0 && (
+            <span className="text-[11px] text-muted">{queue.length} waiting</span>
+          )}
+          <span className="text-[11px] text-faint">{instances.filter(i => i.status !== 'exited').length} active</span>
+          <span className={`h-2 w-2 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
+          <button
+            onClick={() => setSidebarOpen(prev => !prev)}
+            className={`rounded p-1 transition-colors hover:text-secondary ${sidebarOpen ? 'text-tertiary' : 'text-faint'}`}
+            title="Toggle sidebar (⌘B)"
+          >
+            <PanelLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setRightPanel(prev => prev === 'files' ? null : 'files')}
+            className={`rounded p-1 transition-colors hover:text-secondary ${rightPanel === 'files' ? 'text-tertiary' : 'text-faint'}`}
+            title="File explorer (⌘E)"
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setRightPanel(prev => prev === 'context' ? null : 'context')}
+            className={`rounded p-1 transition-colors hover:text-secondary ${rightPanel === 'context' ? 'text-tertiary' : 'text-faint'}`}
+            title="Context info (⌘I)"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Body — 2-column layout */}
+      <div className="flex min-h-0 flex-1 gap-2 px-2 pb-2">
+        {/* Left — Sidebar (instances + projects) */}
+        <Sidebar
+          projects={projects}
+          projectsLoading={projectsLoading}
+          projectsRefreshing={projectsRefreshing}
+          instances={instances}
+          selectedInstanceId={selectedInstanceId}
+          scanPaths={config?.scanPaths ?? []}
+          favoriteProjects={favoriteProjects}
+          pullingProjects={pullingProjects}
+          checkingOutProjects={checkingOutProjects}
+          pullingAll={pullingAll}
+          queuedIds={queuedIds}
+          onRefreshProjects={refreshProjects}
+          onLaunchProject={handleLaunch}
+          onSelectInstance={handleSelectInstance}
+          onKillInstance={handleKill}
+          onDismissInstance={dismissInstance}
+          onDeleteWorktree={handleDeleteWorktree}
+          onToggleFavorite={handleToggleFavorite}
+          onPullProject={handlePullProject}
+          onPullAll={handlePullAll}
+          onCheckoutDefault={handleCheckoutDefault}
+          onOpenScanPaths={() => setScanPathsOpen(true)}
+          collapsed={!sidebarOpen}
+          onExpand={() => setSidebarOpen(true)}
+        />
+
+        {/* Center — main content */}
+        <main className="flex flex-1 flex-col overflow-hidden rounded-xl bg-surface">
+          {/* Tabs (only when instance selected) */}
+          {selectedInstance && (
+            <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border-default px-3">
+              {([
+                {
+                  key: 'main' as const,
+                  label: selectedInstance.mode === 'chat' ? 'Chat' : 'Terminal',
+                  Icon: selectedInstance.mode === 'chat' ? MessageSquare : Terminal,
+                },
+                { key: 'changes' as const, label: 'Changes', Icon: FileCode2 },
+                { key: 'pr' as const, label: 'PR', Icon: GitPullRequest },
+                ...(openedFile ? [{
+                  key: 'file' as const,
+                  label: openedFile.split('/').pop() ?? 'File',
+                  Icon: FileCode2,
+                }] : []),
+              ]).map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    activeTab === key
+                      ? 'bg-elevated/50 text-primary'
+                      : 'text-muted hover:text-secondary'
+                  }`}
+                >
+                  <Icon className="h-3 w-3" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 overflow-hidden">
+            {selectedInstance ? (
+              activeTab === 'main' ? (
                 selectedInstance.status !== 'exited' ? (
-                  <TerminalView
-                    key={selectedInstance.id}
-                    instanceId={selectedInstance.id}
-                    onTypingChange={handleTypingChange}
-                  />
+                  selectedInstance.mode === 'chat' ? (
+                    <ChatView
+                      key={selectedInstance.id}
+                      instanceId={selectedInstance.id}
+                      status={selectedInstance.status}
+                      onTypingChange={handleTypingChange}
+                      initialModel={selectedInstance.model}
+                      initialPermissionMode={null}
+                      initialEffort={null}
+                    />
+                  ) : (
+                    <TerminalView
+                      key={selectedInstance.id}
+                      instanceId={selectedInstance.id}
+                      onTypingChange={handleTypingChange}
+                    />
+                  )
                 ) : (
                   <div className="flex h-full items-center justify-center">
-                    <div className="text-center">
-                      <Terminal className="mx-auto mb-4 h-12 w-12 text-neutral-700" />
-                      <p className="text-sm text-neutral-500">Instance has exited</p>
+                    <div className="max-w-xs text-center">
+                      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-elevated">
+                        <Terminal className="h-7 w-7 text-faint" />
+                      </div>
+                      <p className="text-[15px] font-medium text-tertiary">Instance has exited</p>
                     </div>
                   </div>
                 )
-              )}
-              {activeTab === 'changes' && (
+              ) : activeTab === 'file' && openedFile ? (
+                <FileViewer
+                  key={openedFile}
+                  filePath={openedFile}
+                  onClose={() => { setOpenedFile(null); setActiveTab('main'); }}
+                />
+              ) : activeTab === 'changes' ? (
                 <ChangesView
                   key={`changes-${selectedInstance.id}`}
-                  projectPath={selectedInstance.worktreePath ?? selectedInstance.projectPath}
+                  projectPath={instanceProjectPath!}
                 />
-              )}
-              {activeTab === 'pr' && (
+              ) : (
                 <PullRequestView
                   key={`pr-${selectedInstance.id}`}
-                  projectPath={selectedInstance.worktreePath ?? selectedInstance.projectPath}
+                  projectPath={instanceProjectPath!}
                   branchName={selectedInstance.branchName}
                 />
-              )}
-            </>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <Terminal className="mx-auto mb-4 h-12 w-12 text-neutral-700" />
-                <p className="text-sm text-neutral-500">
-                  Select an instance or launch a project
-                </p>
-                <p className="mt-1 text-xs text-neutral-600">
-                  Choose a project from the sidebar to get started
-                </p>
+              )
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <div className="max-w-xs text-center">
+                  <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-elevated">
+                    <MessageSquare className="h-7 w-7 text-faint" />
+                  </div>
+                  <p className="text-[15px] font-medium text-tertiary">No task selected</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-faint">
+                    Select a project from the sidebar to get started
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </main>
+            )}
+          </div>
+        </main>
 
+        {/* Right panel — animated toggle */}
+        {selectedInstance && instanceProjectPath && (
+          <div
+            className="shrink-0 overflow-hidden transition-all duration-200 ease-in-out"
+            style={{ width: rightPanel ? 280 : 0, opacity: rightPanel ? 1 : 0 }}
+          >
+            {rightPanel === 'files' && (
+              <FileExplorer
+                key={`files-${selectedInstance.id}`}
+                projectPath={instanceProjectPath}
+                onOpenFile={handleOpenFile}
+              />
+            )}
+            {rightPanel === 'context' && (
+              <ContextPanel
+                key={`ctx-${selectedInstance.id}`}
+                instanceId={selectedInstance.id}
+                onOpenFile={handleOpenFile}
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
       {scanPathsOpen && (
         <ScanPathsModal
           scanPaths={config?.scanPaths ?? []}
@@ -415,11 +498,11 @@ export default function App() {
       )}
 
       {pendingDelete && (
-        <div className="fixed bottom-16 right-4 z-[100] flex items-center gap-3 rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2.5 shadow-lg">
-          <span className="text-xs text-neutral-300">Worktree <span className="font-medium text-neutral-200">{pendingDelete.name}</span> will be deleted</span>
+        <div className="fixed bottom-16 right-4 z-[100] flex items-center gap-3 rounded-lg border border-border-default bg-surface px-4 py-2.5 shadow-lg">
+          <span className="text-xs text-secondary">Worktree <span className="font-medium text-primary">{pendingDelete.name}</span> will be deleted</span>
           <button
             onClick={handleUndoDelete}
-            className="rounded bg-neutral-700 px-2.5 py-1 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-600"
+            className="rounded bg-elevated px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-hover"
           >
             Undo
           </button>
