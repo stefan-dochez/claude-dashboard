@@ -35,13 +35,19 @@
         "to": "frontend"
       }
     ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "icon"
+      }
+    ],
     "mac": {
       "target": ["dmg"],
-      "icon": "../frontend/public/favicon.svg"
+      "icon": "assets/icon.icns"
     },
     "win": {
       "target": ["nsis"],
-      "icon": "../frontend/public/favicon.svg"
+      "icon": "assets/icon.png"
     }
   }
 }

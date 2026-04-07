@@ -83,12 +83,17 @@ function killBackend() {
 // --------------- Window ---------------
 
 function createWindow() {
+  const iconPath = isDev
+    ? path.resolve(__dirname, '..', 'assets', process.platform === 'darwin' ? 'icon.icns' : 'icon.png')
+    : path.join(process.resourcesPath, 'icon', process.platform === 'darwin' ? 'icon.icns' : 'icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 800,
     minHeight: 600,
     title: 'Claude Dashboard',
+    icon: iconPath,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 12, y: 12 },
     backgroundColor: '#0d0d0d',
