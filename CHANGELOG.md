@@ -60,6 +60,10 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **Checkout default branch** — New button (↺) to switch a project back to its default branch (main/master/develop). Replaces the pull button when on a non-main branch. Checks for uncommitted changes before switching. Shared spinner for both operations.
 
+- **Launch on current branch** — New "Launch on {branch}" button in the launch modal to run Claude directly on the current branch without creating a worktree.
+
+- **PR link in branch diff view** — The Pull Request tab now shows a clickable link to the GitHub PR when one exists for the current branch (via `gh pr view`).
+
 - **Sidebar polish** — Default width increased to 340px. Custom chevron on the root selector dropdown for consistent spacing.
 
 ### Accessibility
