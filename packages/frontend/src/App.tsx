@@ -303,10 +303,23 @@ export default function App() {
           {typingLocked && (
             <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-400">typing</span>
           )}
-          {queue.length > 0 && (
-            <span className="text-[11px] text-muted">{queue.length} waiting</span>
-          )}
-          <span className="text-[11px] text-faint">{instances.filter(i => i.status !== 'exited').length} active</span>
+          {(() => {
+            const alive = instances.filter(i => i.status !== 'exited');
+            if (alive.length === 0) return null;
+            const hasProcessing = alive.some(i => i.status === 'processing' || i.status === 'launching');
+            const hasWaiting = alive.some(i => i.status === 'waiting_input');
+            const dotClass = hasProcessing
+              ? 'bg-blue-500 animate-pulse'
+              : hasWaiting
+                ? 'bg-green-500'
+                : 'bg-muted';
+            return (
+              <span className="flex items-center gap-1.5 text-[11px] text-faint">
+                <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+                {alive.length} instance{alive.length > 1 ? 's' : ''}
+              </span>
+            );
+          })()}
           <span className={`h-2 w-2 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
           <button
             onClick={() => setSidebarOpen(prev => !prev)}

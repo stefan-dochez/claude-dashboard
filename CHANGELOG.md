@@ -6,6 +6,10 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Features
 
+- **Unified sidebar** — Projects, instances, and worktrees merged into a single view. Active projects (with running instances or worktrees) float to the top and auto-expand. Instances and worktrees shown inline under their parent project. Click a project to launch, click an active project to expand/collapse. Worktrees clickable to resume. Workspace selector prominent at the top. Duplicate project names show their workspace origin. Favorite/play buttons hidden on active projects.
+
+- **Instance status indicator** — Topbar shows a single `● N instances` with a color dot reflecting the highest-priority status (blue animated = processing, green = waiting, grey = idle).
+
 - **Chat mode (Agent SDK)** — New instance mode using the Claude Agent SDK instead of PTY. Supports structured message streaming, markdown rendering (react-markdown + Prism syntax highlighting), thinking blocks, tool use/result grouping, tool progress ring, and permission/question prompts. Model (Opus/Sonnet/Haiku), permission mode (Ask/Plan/Auto-Edit/Full Access), and effort level (High/Medium/Low) selectable from the input bar.
 
 - **Terminal / Chat toggle** — Launch modal now has a Terminal/Chat mode toggle. Terminal uses PTY as before, Chat uses the Agent SDK.
