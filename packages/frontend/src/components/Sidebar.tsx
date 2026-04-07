@@ -68,8 +68,12 @@ export default function Sidebar({
 
   return (
     <aside
-      className="shrink-0 overflow-hidden rounded-xl bg-surface transition-all duration-200 ease-in-out"
-      style={{ width: collapsed ? 0 : 320, opacity: collapsed ? 0 : 1 }}
+      style={{
+        width: collapsed ? 0 : 320,
+        opacity: collapsed ? 0 : 1,
+        transition: 'width 200ms ease-in-out, opacity 200ms ease-in-out',
+      }}
+      className="shrink-0 overflow-hidden rounded-xl bg-surface"
     >
       <div className="flex h-full w-[320px] flex-col">
       {/* Content */}

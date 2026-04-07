@@ -466,8 +466,12 @@ export default function App() {
         {/* Right panel — animated toggle */}
         {selectedInstance && instanceProjectPath && (
           <div
-            className="shrink-0 overflow-hidden transition-all duration-200 ease-in-out"
-            style={{ width: rightPanel ? 280 : 0, opacity: rightPanel ? 1 : 0 }}
+            style={{
+              width: rightPanel ? 280 : 0,
+              opacity: rightPanel ? 1 : 0,
+              transition: 'width 200ms ease-in-out, opacity 200ms ease-in-out',
+            }}
+            className="shrink-0 overflow-hidden"
           >
             {rightPanel === 'files' && (
               <FileExplorer
