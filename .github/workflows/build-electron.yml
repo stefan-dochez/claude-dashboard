@@ -30,6 +30,21 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Sync version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "Setting version to $VERSION"
+          node -e "
+            const fs = require('fs');
+            for (const p of ['package.json', 'packages/electron/package.json', 'packages/backend/package.json', 'packages/frontend/package.json']) {
+              const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
+              pkg.version = '$VERSION';
+              fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + '\n');
+            }
+          "
+
       - name: Install dependencies
         run: npm ci
 
