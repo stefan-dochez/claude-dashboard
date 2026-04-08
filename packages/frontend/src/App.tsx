@@ -177,6 +177,15 @@ export default function App() {
     await updateConfig({ favoriteProjects: next });
   }, [config?.favoriteProjects, updateConfig]);
 
+  const handleToggleMeta = useCallback(async (projectPath: string) => {
+    const current = config?.metaProjects ?? [];
+    const next = current.includes(projectPath)
+      ? current.filter(p => p !== projectPath)
+      : [...current, projectPath];
+    await updateConfig({ metaProjects: next });
+    refreshProjects();
+  }, [config?.metaProjects, updateConfig, refreshProjects]);
+
   const [pullingProjects, setPullingProjects] = useState<Set<string>>(new Set());
   const [pullingAll, setPullingAll] = useState(false);
   const [checkingOutProjects, setCheckingOutProjects] = useState<Set<string>>(new Set());
@@ -378,6 +387,7 @@ export default function App() {
           onDismissInstance={dismissInstance}
           onDeleteWorktree={handleDeleteWorktree}
           onToggleFavorite={handleToggleFavorite}
+          onToggleMeta={handleToggleMeta}
           onPullProject={handlePullProject}
           onPullAll={handlePullAll}
           onCheckoutDefault={handleCheckoutDefault}
