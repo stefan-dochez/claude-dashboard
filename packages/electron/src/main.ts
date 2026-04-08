@@ -120,31 +120,14 @@ function startBackend(): ChildProcess {
     const nodeBin = findNode();
     log(`Using node: ${nodeBin}`);
     const indexJs = path.join(cwd, 'dist', 'index.js');
-    if (isWin) {
-      const comspec = process.env.ComSpec ?? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe');
-      return spawn(comspec, ['/c', `"${nodeBin}" "${indexJs}"`], {
-        cwd,
-        env: {
-          ...baseEnv,
-          NODE_ENV: 'production',
-          PORT: String(BACKEND_PORT),
-          FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
-        },
-        stdio: 'pipe',
-        windowsVerbatimArguments: true,
-      });
-    } else {
-      return spawn(nodeBin, [path.join('dist', 'index.js')], {
-        cwd,
-        env: {
-          ...baseEnv,
-          NODE_ENV: 'production',
-          PORT: String(BACKEND_PORT),
-          FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
-        },
-        stdio: 'pipe',
-      });
-    }
+    const prodEnv = {
+      ...baseEnv,
+      NODE_ENV: 'production',
+      PORT: String(BACKEND_PORT),
+      FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
+    };
+    // spawn with absolute path, no shell — avoids "Program Files" space issue
+    return spawn(nodeBin, [indexJs], { cwd, env: prodEnv, stdio: 'pipe' });
   }
 }
 
