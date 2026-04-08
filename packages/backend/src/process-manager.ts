@@ -243,7 +243,8 @@ export class ProcessManager extends EventEmitter {
       if (process.platform === 'win32') {
         // On Windows, SIGTERM/SIGKILL via node-pty only kills the shell, not
         // child processes.  taskkill /F /T kills the entire process tree.
-        exec(`taskkill /F /T /PID ${pid}`, (err) => {
+        const taskkillPath = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe');
+        exec(`"${taskkillPath}" /F /T /PID ${pid}`, (err) => {
           if (err) {
             console.log(`[process-manager] taskkill failed for pid ${pid}: ${err.message}`);
           }

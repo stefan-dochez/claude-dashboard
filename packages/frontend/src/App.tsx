@@ -273,7 +273,13 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col bg-root">
       {/* Topbar — extra left padding for macOS traffic lights in Electron */}
-      <div className="flex h-10 shrink-0 items-center px-4 pl-20" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+      <div
+        className="flex h-10 shrink-0 items-center px-4"
+        style={{
+          WebkitAppRegion: 'drag',
+          paddingLeft: navigator.userAgent.includes('Electron') && navigator.platform.startsWith('Mac') ? 80 : undefined,
+        } as React.CSSProperties}
+      >
         {/* Left: project + branch */}
         <div className="flex shrink-0 items-center gap-3">
           <span className="text-[13px] font-medium text-secondary">
