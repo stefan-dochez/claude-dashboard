@@ -18,6 +18,7 @@ export interface StoredTask {
   totalInputTokens: number;
   totalOutputTokens: number;
   mode: 'terminal' | 'chat';
+  firstPrompt: string | null;
   createdAt: string;
   endedAt: string | null;
 }
@@ -46,9 +47,12 @@ export class TaskStore {
   }
 
   async addTask(task: StoredTask): Promise<void> {
-    // Replace existing with same id, or add new
-    const idx = this.tasks.findIndex(t => t.id === task.id);
+    // Replace existing with same id or same sessionId (resume case)
+    const idx = this.tasks.findIndex(t =>
+      t.id === task.id || (task.sessionId && t.sessionId === task.sessionId),
+    );
     if (idx >= 0) {
+      task.createdAt = this.tasks[idx].createdAt; // keep original creation date
       this.tasks[idx] = task;
     } else {
       this.tasks.unshift(task);

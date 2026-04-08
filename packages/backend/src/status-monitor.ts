@@ -2,8 +2,15 @@ import type { ProcessManager } from './process-manager.js';
 import { INSTANCE_STATUS } from './process-manager.js';
 import type { AppConfig } from './config.js';
 
-// Strip ANSI escape sequences so prompt patterns can match clean text
-// Covers: CSI sequences, OSC sequences, simple escapes (colors, cursor, etc.)
+// Strip ANSI escape sequences so prompt patterns can match clean text.
+// The regex handles several distinct escape families commonly emitted by
+// terminal applications like Claude Code:
+//
+//   \x1b\[[0-9;]*[A-Za-z]              — CSI (Control Sequence Introducer): colors, cursor movement, erase
+//   \x1b\][^\x07\x1b]*(?:\x07|\x1b\\)  — OSC (Operating System Command): window title, hyperlinks
+//   \x1b[()][0-9A-Za-z]                — Character set selection (G0/G1)
+//   \x1b[=>NOM78cDHZ#]                 — Simple one-char escapes (keypad mode, cursor save, etc.)
+//   \x1b\[[\?]?[0-9;]*[hlsr]           — Private/DEC mode set/reset (e.g. ?25h for cursor visibility)
 const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-Za-z]|\x1b[=>NOM78cDHZ#]|\x1b\[[\?]?[0-9;]*[hlsr]/g;
 
 function stripAnsi(s: string): string {
@@ -72,6 +79,13 @@ export class StatusMonitor {
       // Always check buffer for prompt patterns, regardless of recent activity.
       // Claude Code's status line continuously emits output even when waiting
       // for input, so we can't rely on activity silence to trigger pattern checks.
+      //
+      // State machine for active instances:
+      //   PROCESSING  — no prompt detected, Claude is working
+      //   WAITING_INPUT — prompt detected AND recent PTY activity (< IDLE_THRESHOLD)
+      //   IDLE — prompt detected BUT no activity for a while; the instance is
+      //          likely forgotten by the user and can be visually de-emphasised
+      //          in the dashboard UI to reduce cognitive noise.
       try {
         const buffer = this.processManager.getBuffer(instance.id);
         const isWaiting = this.checkForPrompt(buffer);

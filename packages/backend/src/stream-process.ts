@@ -1,7 +1,7 @@
 import path from 'path';
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
-import { query } from '@anthropic-ai/claude-agent-sdk';
+import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type {
   Query,
   SDKMessage,
@@ -10,6 +10,7 @@ import type {
   PermissionResult,
   PermissionMode,
   EffortLevel,
+  SessionMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 import type { AppConfig } from './config.js';
 
@@ -55,6 +56,7 @@ export interface StreamInstance {
   parentProjectPath: string | null;
   branchName: string | null;
   sessionId: string | null;
+  firstPrompt: string | null;
   messages: ChatMessage[];
   model: string | null;
   totalCostUsd: number;
@@ -73,6 +75,7 @@ export interface StreamSpawnOptions {
   model?: string;
   effort?: string;
   permissionMode?: string;
+  sessionId?: string;
 }
 
 interface PendingPermission {
@@ -177,7 +180,8 @@ export class StreamProcessManager extends EventEmitter {
       worktreePath: options.worktreePath ?? null,
       parentProjectPath: options.parentProjectPath ?? null,
       branchName: options.branchName ?? null,
-      sessionId: null,
+      sessionId: options.sessionId ?? null,
+      firstPrompt: null,
       messages: [],
       model: options.model ?? null,
       totalCostUsd: 0,
@@ -199,6 +203,18 @@ export class StreamProcessManager extends EventEmitter {
 
     this.handles.set(id, handle);
     this.emit('status', id, INSTANCE_STATUS.WAITING_INPUT);
+
+    // Load previous conversation if resuming a session
+    if (options.sessionId) {
+      try {
+        const cwd = instance.worktreePath ?? instance.projectPath;
+        const sdkMessages = await getSessionMessages(options.sessionId, { dir: cwd });
+        instance.messages = this.mapSessionMessages(sdkMessages);
+        console.log(`[stream-process] Loaded ${instance.messages.length} messages from session ${options.sessionId}`);
+      } catch (err) {
+        console.log(`[stream-process] Failed to load session history:`, err);
+      }
+    }
 
     console.log(`[stream-process] Created instance ${id} for ${options.worktreePath ?? options.projectPath}`);
     return instance;
@@ -232,6 +248,9 @@ export class StreamProcessManager extends EventEmitter {
       timestamp: new Date().toISOString(),
     };
     instance.messages.push(userMessage);
+    if (!instance.firstPrompt) {
+      instance.firstPrompt = prompt.length > 100 ? prompt.slice(0, 100) + '...' : prompt;
+    }
     this.emit('message', instanceId, userMessage);
 
     // Update status
@@ -393,6 +412,9 @@ export class StreamProcessManager extends EventEmitter {
       } else {
         const errorMsg = err instanceof Error ? err.message : String(err);
         console.log(`[stream-process] Conversation error for ${instanceId}:`, errorMsg);
+        if (err instanceof Error && err.stack) {
+          console.log(`[stream-process] Stack:`, err.stack);
+        }
         this.emit('error', instanceId, errorMsg);
       }
     }
@@ -631,6 +653,64 @@ export class StreamProcessManager extends EventEmitter {
       case 'high': return 'high';
       default: return undefined;
     }
+  }
+
+  private mapSessionMessages(sdkMessages: SessionMessage[]): ChatMessage[] {
+    const messages: ChatMessage[] = [];
+
+    for (const msg of sdkMessages) {
+      if (msg.type === 'user') {
+        const content = (msg.message as Record<string, unknown>)?.content;
+        const text = typeof content === 'string'
+          ? content
+          : Array.isArray(content)
+            ? content.filter((b: Record<string, unknown>) => b.type === 'text').map((b: Record<string, unknown>) => b.text).join('\n')
+            : '';
+        if (text) {
+          messages.push({
+            role: 'user',
+            content: [{ type: 'text', text }],
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } else if (msg.type === 'assistant') {
+        const blocks: ContentBlock[] = [];
+        const msgContent = (msg.message as Record<string, unknown>)?.content;
+        if (Array.isArray(msgContent)) {
+          for (const block of msgContent) {
+            const b = block as Record<string, unknown>;
+            if (b.type === 'text' && b.text) {
+              blocks.push({ type: 'text', text: b.text as string });
+            } else if (b.type === 'thinking' && b.thinking) {
+              blocks.push({ type: 'thinking', thinking: b.thinking as string });
+            } else if (b.type === 'tool_use') {
+              blocks.push({
+                type: 'tool_use',
+                name: b.name as string,
+                input: b.input as unknown,
+                tool_use_id: b.id as string,
+              });
+            } else if (b.type === 'tool_result') {
+              blocks.push({
+                type: 'tool_result',
+                tool_use_id: b.tool_use_id as string,
+                content: typeof b.content === 'string' ? b.content : JSON.stringify(b.content),
+                is_error: b.is_error as boolean ?? false,
+              });
+            }
+          }
+        }
+        if (blocks.length > 0) {
+          messages.push({
+            role: 'assistant',
+            content: blocks,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    return messages;
   }
 }
 

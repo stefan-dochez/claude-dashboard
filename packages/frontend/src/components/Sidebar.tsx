@@ -1,7 +1,24 @@
-import { RefreshCw, FolderOpen, Settings, Download, ChevronDown, ChevronRight, Search, Loader2, Terminal, MessageSquare, Trash2, GitBranch, Play, Star } from 'lucide-react';
-import { useState, useMemo, useCallback } from 'react';
+import { RefreshCw, FolderOpen, Settings, Download, ChevronDown, ChevronRight, Search, Loader2, Terminal, MessageSquare, Trash2, GitBranch, Play, Star, Clock, X } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import LaunchModal from './LaunchModal';
+import { useSocket } from '../hooks/useSocket';
 import type { Project, Instance, InstanceStatus } from '../types';
+
+interface HistoryTask {
+  id: string;
+  projectPath: string;
+  projectName: string;
+  worktreePath: string | null;
+  branchName: string | null;
+  taskDescription: string | null;
+  sessionId: string | null;
+  model: string | null;
+  totalCostUsd: number;
+  mode: 'terminal' | 'chat';
+  firstPrompt: string | null;
+  createdAt: string;
+  endedAt: string | null;
+}
 
 interface SidebarProps {
   projects: Project[];
@@ -16,7 +33,7 @@ interface SidebarProps {
   pullingAll: boolean;
   queuedIds: Set<string>;
   onRefreshProjects: () => void;
-  onLaunchProject: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => void;
+  onLaunchProject: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string) => void;
   onSelectInstance: (id: string) => void;
   onKillInstance: (id: string, deleteWorktree?: boolean) => void;
   onDismissInstance: (id: string) => void;
@@ -158,7 +175,10 @@ function ProjectRow({
                 <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[inst.status]}`} />
                 <ModeIcon className="h-3 w-3 shrink-0 text-faint" />
                 <span className={`min-w-0 flex-1 truncate text-[11px] ${isSelected ? 'text-primary' : 'text-tertiary'}`}>
-                  {inst.branchName ?? inst.taskDescription ?? STATUS_LABEL[inst.status]}
+                  {inst.taskDescription ?? inst.branchName ?? STATUS_LABEL[inst.status]}
+                </span>
+                <span className="shrink-0 text-[9px] text-faint">
+                  {new Date(inst.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 {inst.status !== 'exited' ? (
                   <button
@@ -238,6 +258,39 @@ export default function Sidebar({
 }: SidebarProps) {
   const [filter, setFilter] = useState('');
   const [selectedRoot, setSelectedRoot] = useState<string | null>(scanPaths[0] ?? null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryTask[]>([]);
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tasks/history');
+      if (res.ok) setHistory(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
+  const socket = useSocket();
+
+  useEffect(() => {
+    fetchHistory();
+    // Refresh history when an instance exits
+    const onExited = () => { setTimeout(fetchHistory, 500); };
+    socket.on('instance:exited', onExited);
+    return () => { socket.off('instance:exited', onExited); };
+  }, [fetchHistory, socket]);
+
+  const handleResume = useCallback(async (task: HistoryTask) => {
+    // Use worktreePath if available (avoid creating a new worktree)
+    const targetPath = task.worktreePath ?? task.projectPath;
+    // Don't pass taskDescription — that would create a new worktree
+    onLaunchProject(targetPath, undefined, undefined, undefined, task.mode, task.mode === 'chat' ? task.sessionId ?? undefined : undefined);
+  }, [onLaunchProject]);
+
+  const handleRemoveHistory = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      setHistory(prev => prev.filter(t => t.id !== id));
+    } catch { /* ignore */ }
+  }, []);
 
   // Build maps
   const worktreesByParent = useMemo(() => {
@@ -424,6 +477,58 @@ export default function Sidebar({
             </>
           )}
         </div>
+
+        {/* History section */}
+        {history.length > 0 && (
+          <div className="shrink-0 border-t border-border-default">
+            <button
+              onClick={() => { setHistoryOpen(!historyOpen); if (!historyOpen) fetchHistory(); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted transition-colors hover:text-secondary"
+            >
+              {historyOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <Clock className="h-3 w-3" />
+              <span>Chat History</span>
+              <span className="ml-auto text-[10px] text-faint">{history.length}</span>
+            </button>
+            {historyOpen && (
+              <div className="max-h-48 overflow-y-auto px-2 pb-2">
+                {history.map(task => (
+                  <div
+                    key={task.id}
+                    className="group/hist flex cursor-default items-start gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-elevated/30"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate text-[12px] text-tertiary">
+                        {task.firstPrompt ?? task.taskDescription ?? task.projectName}
+                      </span>
+                      <div className="flex items-center gap-2 text-[10px] text-faint">
+                        <span className="truncate">{task.projectName}</span>
+                        {task.totalCostUsd > 0 && <span>${task.totalCostUsd.toFixed(4)}</span>}
+                        {task.endedAt && <span>{new Date(task.endedAt).toLocaleDateString()}</span>}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/hist:opacity-100">
+                      <span
+                        onClick={() => handleResume(task)}
+                        className="rounded p-0.5 text-faint transition-colors hover:text-green-400"
+                        title={task.mode === 'chat' && task.sessionId ? 'Resume conversation' : 'Relaunch'}
+                      >
+                        <Play className="h-3 w-3" />
+                      </span>
+                      <span
+                        onClick={() => handleRemoveHistory(task.id)}
+                        className="rounded p-0.5 text-faint transition-colors hover:text-rose-300"
+                        title="Remove"
+                      >
+                        <X className="h-3 w-3" />
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   );

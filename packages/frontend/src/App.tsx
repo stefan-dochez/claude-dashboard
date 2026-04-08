@@ -88,9 +88,9 @@ export default function App() {
     [queue],
   );
 
-  const handleLaunch = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => {
+  const handleLaunch = useCallback(async (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string) => {
     try {
-      const instance = await spawnInstance(projectPath, taskDescription, detachBranch, branchPrefix, mode);
+      const instance = await spawnInstance(projectPath, taskDescription, detachBranch, branchPrefix, mode, sessionId);
       handleSelectInstance(instance.id);
       if (taskDescription || detachBranch) {
         refreshProjects();

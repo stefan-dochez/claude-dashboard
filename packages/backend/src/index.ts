@@ -64,7 +64,7 @@ async function main(): Promise<void> {
 
   // WebSocket
   setupSocketHandlers(io, processManager);
-  setupStreamSocketHandlers(io, streamProcess);
+  setupStreamSocketHandlers(io, streamProcess, taskStore);
 
   // Start status monitoring
   statusMonitor.start();

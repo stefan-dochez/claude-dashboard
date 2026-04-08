@@ -426,7 +426,7 @@ function PermissionPrompt({ permission, onResolve, onApproveAll }: {
           <span className="mr-1 text-[10px] text-white/50">1</span> Yes
         </button>
         <button
-          onClick={() => { onApproveAll(permission.toolName); onResolve(permission.toolUseId, true); }}
+          onClick={() => onApproveAll(permission.toolName)}
           className="rounded bg-blue-600/80 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-600"
         >
           <span className="mr-1 text-[10px] text-white/50">2</span> Always

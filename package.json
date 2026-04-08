@@ -1,4 +1,5 @@
 {
+  "//": "Claude Dashboard — monorepo workspace for backend, frontend, and electron packages",
   "name": "claude-dashboard",
   "version": "0.1.0",
   "private": true,

@@ -1,11 +1,12 @@
 import type { Server, Socket } from 'socket.io';
 import type { StreamProcessManager, ChatMessage, ContentBlock } from './stream-process.js';
+import type { TaskStore } from './task-store.js';
 
 function instanceRoom(instanceId: string): string {
   return `stream:${instanceId}`;
 }
 
-export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProcessManager): void {
+export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProcessManager, taskStore?: TaskStore): void {
 
   // --- Instance-scoped events (only clients in the room) ---
 
@@ -35,6 +36,30 @@ export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProce
 
   streamProcess.on('session', (instanceId: string, info: unknown) => {
     io.to(instanceRoom(instanceId)).emit('chat:session', { instanceId, ...info as Record<string, unknown> });
+    // Persist sessionId and model to task store
+    if (taskStore) {
+      const rec = info as Record<string, unknown>;
+      const instance = streamProcess.get(instanceId);
+      if (instance) {
+        taskStore.addTask({
+          id: instanceId,
+          projectPath: instance.projectPath,
+          projectName: instance.projectName,
+          worktreePath: instance.worktreePath,
+          branchName: instance.branchName,
+          taskDescription: instance.taskDescription,
+          sessionId: (rec.sessionId as string) ?? null,
+          model: (rec.model as string) ?? null,
+          totalCostUsd: instance.totalCostUsd,
+          totalInputTokens: instance.totalInputTokens,
+          totalOutputTokens: instance.totalOutputTokens,
+          mode: 'chat',
+          firstPrompt: instance.firstPrompt,
+          createdAt: instance.createdAt.toISOString(),
+          endedAt: null,
+        });
+      }
+    }
   });
 
   streamProcess.on('error', (instanceId: string, error: string) => {

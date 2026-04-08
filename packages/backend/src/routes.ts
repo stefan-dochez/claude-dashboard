@@ -75,12 +75,13 @@ export function createRoutes(
   });
 
   router.post('/api/instances', async (req, res) => {
-    const { projectPath, taskDescription, detachBranch, branchPrefix, mode } = req.body as {
+    const { projectPath, taskDescription, detachBranch, branchPrefix, mode, sessionId: resumeSessionId } = req.body as {
       projectPath?: string;
       taskDescription?: string;
       detachBranch?: boolean;
       branchPrefix?: string;
       mode?: 'terminal' | 'chat';
+      sessionId?: string;
     };
     if (!projectPath) {
       res.status(400).json({ error: 'projectPath is required' });
@@ -126,14 +127,9 @@ export function createRoutes(
           worktreePath,
           parentProjectPath,
           branchName,
+          sessionId: resumeSessionId,
         });
-        taskStore.addTask({
-          id: instance.id, projectPath, projectName: instance.projectName,
-          worktreePath: worktreePath ?? null, branchName: branchName ?? null,
-          taskDescription: taskDescription ?? null, sessionId: null,
-          model: null, totalCostUsd: 0, totalInputTokens: 0, totalOutputTokens: 0,
-          mode: 'chat', createdAt: new Date().toISOString(), endedAt: null,
-        });
+        // Chat tasks are persisted when the SDK session initializes (stream-socket.ts)
         res.status(201).json({ ...instance, mode: 'chat', pid: 0 });
       } else {
         // Terminal mode — uses PTY
@@ -144,13 +140,7 @@ export function createRoutes(
           parentProjectPath,
           branchName,
         });
-        taskStore.addTask({
-          id: instance.id, projectPath, projectName: instance.projectName,
-          worktreePath: worktreePath ?? null, branchName: branchName ?? null,
-          taskDescription: taskDescription ?? null, sessionId: null,
-          model: null, totalCostUsd: 0, totalInputTokens: 0, totalOutputTokens: 0,
-          mode: 'terminal', createdAt: new Date().toISOString(), endedAt: null,
-        });
+        // Terminal sessions are not persisted to history
         res.status(201).json({ ...instance, mode: 'terminal' });
       }
     } catch (err) {
