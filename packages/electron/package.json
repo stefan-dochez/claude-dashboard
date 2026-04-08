@@ -4,6 +4,7 @@
   "private": true,
   "description": "Desktop app for Claude Dashboard",
   "author": "Claude Dashboard",
+  "repository": "github:stefan-dochez/claude-dashboard",
   "main": "dist/main.js",
   "scripts": {
     "dev": "tsc && electron dist/main.js --dev",
