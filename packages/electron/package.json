@@ -50,16 +50,17 @@
       }
     ],
     "mac": {
-      "target": [
-        "dmg"
-      ],
-      "icon": "assets/icon.icns"
+      "target": "dmg",
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools"
     },
     "win": {
-      "target": [
-        "nsis"
-      ],
+      "target": "nsis",
       "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }
