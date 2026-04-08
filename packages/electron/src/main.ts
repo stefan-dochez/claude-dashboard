@@ -119,17 +119,33 @@ function startBackend(): ChildProcess {
   } else {
     const nodeBin = findNode();
     log(`Using node: ${nodeBin}`);
-    return spawn(nodeBin, [path.join('dist', 'index.js')], {
-      cwd,
-      env: {
-        ...baseEnv,
-        NODE_ENV: 'production',
-        PORT: String(BACKEND_PORT),
-        FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
-      },
-      stdio: 'pipe',
-      shell: isWin,
-    });
+    const indexJs = path.join(cwd, 'dist', 'index.js');
+    if (isWin) {
+      // Use cmd /c with quoted paths to handle spaces in "C:\Program Files\..."
+      return spawn('cmd', ['/c', `"${nodeBin}" "${indexJs}"`], {
+        cwd,
+        env: {
+          ...baseEnv,
+          NODE_ENV: 'production',
+          PORT: String(BACKEND_PORT),
+          FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
+        },
+        stdio: 'pipe',
+        shell: false,
+        windowsVerbatimArguments: true,
+      });
+    } else {
+      return spawn(nodeBin, [path.join('dist', 'index.js')], {
+        cwd,
+        env: {
+          ...baseEnv,
+          NODE_ENV: 'production',
+          PORT: String(BACKEND_PORT),
+          FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
+        },
+        stdio: 'pipe',
+      });
+    }
   }
 }
 
