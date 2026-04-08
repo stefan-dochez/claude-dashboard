@@ -1,15 +1,31 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell, dialog } from 'electron';
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as http from 'http';
+import * as os from 'os';
 
 const isDev = process.argv.includes('--dev');
 const BACKEND_PORT = 3200;
 const FRONTEND_PORT = 5173;
+const isWin = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
 
 let backendProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 
+// --------------- Logging ---------------
+
+const logDir = path.join(os.homedir(), '.claude-dashboard', 'logs');
+try { fs.mkdirSync(logDir, { recursive: true }); } catch { /* ignore */ }
+const logFile = path.join(logDir, 'electron.log');
+const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
+function log(msg: string) {
+  const line = `[${new Date().toISOString()}] ${msg}`;
+  logStream.write(line + '\n');
+  process.stdout.write(line + '\n');
+}
 
 // --------------- Backend lifecycle ---------------
 
@@ -17,50 +33,84 @@ function getBackendCwd(): string {
   if (isDev) {
     return path.resolve(__dirname, '..', '..', 'backend');
   }
-  // In production, backend is in resources/backend
   return path.join(process.resourcesPath, 'backend');
 }
 
 function getEnv(): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
-  // macOS apps don't inherit shell PATH — inject common binary locations
-  const extraPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin'];
+  const sep = isWin ? ';' : ':';
   const currentPath = env.PATH ?? '';
-  const parts = currentPath.split(':');
-  for (const p of extraPaths) {
-    if (!parts.includes(p)) parts.unshift(p);
+  const parts = currentPath.split(sep);
+
+  if (isWin) {
+    // Windows: add common Node.js install locations
+    const programFiles = env.ProgramFiles ?? 'C:\\Program Files';
+    const appData = env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming');
+    const extraPaths = [
+      path.join(programFiles, 'nodejs'),
+      path.join(appData, 'npm'),
+      path.join(os.homedir(), '.local', 'bin'),
+      path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'nodejs'),
+    ];
+    for (const p of extraPaths) {
+      if (!parts.includes(p)) parts.push(p);
+    }
+  } else {
+    // macOS/Linux
+    const extraPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin'];
+    for (const p of extraPaths) {
+      if (!parts.includes(p)) parts.unshift(p);
+    }
   }
-  env.PATH = parts.join(':');
+
+  env.PATH = parts.join(sep);
   return env;
 }
 
 function findNode(): string {
-  // Try common locations explicitly
-  const fs = require('fs') as typeof import('fs');
-  const candidates = ['/opt/homebrew/bin/node', '/usr/local/bin/node', '/usr/bin/node'];
+  const candidates = isWin
+    ? [
+        path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'nodejs', 'node.exe'),
+        path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'nodejs', 'node.exe'),
+      ]
+    : [
+        '/opt/homebrew/bin/node',
+        '/usr/local/bin/node',
+        '/usr/bin/node',
+      ];
+
   for (const c of candidates) {
     try {
       fs.accessSync(c, fs.constants.X_OK);
+      log(`Found node at: ${c}`);
       return c;
     } catch { /* not found */ }
   }
-  return 'node';
+
+  // Fallback: rely on PATH
+  log('Node not found at known locations, falling back to PATH');
+  return isWin ? 'node.exe' : 'node';
 }
 
 function startBackend(): ChildProcess {
   const cwd = getBackendCwd();
   const baseEnv = getEnv();
 
+  log(`Starting backend in: ${cwd}`);
+  log(`isDev: ${isDev}, platform: ${process.platform}`);
+
   if (isDev) {
-    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const npmCmd = isWin ? 'npm.cmd' : 'npm';
     return spawn(npmCmd, ['run', 'dev'], {
       cwd,
       env: { ...baseEnv, NODE_ENV: 'development', PORT: String(BACKEND_PORT) },
       stdio: 'pipe',
+      shell: isWin,
     });
   } else {
     const nodeBin = findNode();
-    return spawn(nodeBin, ['dist/index.js'], {
+    log(`Using node: ${nodeBin}`);
+    return spawn(nodeBin, [path.join('dist', 'index.js')], {
       cwd,
       env: {
         ...baseEnv,
@@ -69,6 +119,7 @@ function startBackend(): ChildProcess {
         FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
       },
       stdio: 'pipe',
+      shell: isWin,
     });
   }
 }
@@ -80,18 +131,19 @@ function waitForBackend(port: number, maxAttempts = 30): Promise<void> {
       attempts++;
       const req = http.get(`http://localhost:${port}/api/health`, (res) => {
         if (res.statusCode === 200) {
+          log(`Backend ready on port ${port} after ${attempts} attempts`);
           resolve();
         } else if (attempts < maxAttempts) {
           setTimeout(check, 1000);
         } else {
-          reject(new Error('Backend did not start'));
+          reject(new Error(`Backend did not start on port ${port}`));
         }
       });
       req.on('error', () => {
         if (attempts < maxAttempts) {
           setTimeout(check, 1000);
         } else {
-          reject(new Error('Backend did not start'));
+          reject(new Error(`Backend did not start on port ${port}`));
         }
       });
       req.end();
@@ -102,8 +154,9 @@ function waitForBackend(port: number, maxAttempts = 30): Promise<void> {
 
 function killBackend() {
   if (!backendProcess) return;
-  if (process.platform === 'win32') {
-    spawn('taskkill', ['/F', '/T', '/PID', String(backendProcess.pid)]);
+  log('Killing backend...');
+  if (isWin) {
+    spawn('taskkill', ['/F', '/T', '/PID', String(backendProcess.pid)], { shell: true });
   } else {
     backendProcess.kill('SIGTERM');
     setTimeout(() => {
@@ -119,8 +172,8 @@ function killBackend() {
 
 function createWindow() {
   const iconPath = isDev
-    ? path.resolve(__dirname, '..', 'assets', process.platform === 'darwin' ? 'icon.icns' : 'icon.png')
-    : path.join(process.resourcesPath, 'icon', process.platform === 'darwin' ? 'icon.icns' : 'icon.png');
+    ? path.resolve(__dirname, '..', 'assets', isMac ? 'icon.icns' : 'icon.png')
+    : path.join(process.resourcesPath, 'icon', isMac ? 'icon.icns' : 'icon.png');
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -129,8 +182,8 @@ function createWindow() {
     minHeight: 600,
     title: 'Claude Dashboard',
     icon: iconPath,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    trafficLightPosition: { x: 12, y: 12 },
+    titleBarStyle: isMac ? 'hiddenInset' : 'default',
+    trafficLightPosition: isMac ? { x: 12, y: 12 } : undefined,
     backgroundColor: '#0d0d0d',
     webPreferences: {
       nodeIntegration: false,
@@ -138,18 +191,16 @@ function createWindow() {
     },
   });
 
-  // Load the app
-  if (isDev) {
-    mainWindow.loadURL(`http://localhost:${FRONTEND_PORT}`);
-  } else {
-    // In production, backend serves the frontend
-    mainWindow.loadURL(`http://localhost:${BACKEND_PORT}`);
-  }
+  const url = isDev
+    ? `http://localhost:${FRONTEND_PORT}`
+    : `http://localhost:${BACKEND_PORT}`;
 
-  // Open external links in default browser
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://localhost')) return { action: 'allow' };
-    shell.openExternal(url);
+  log(`Loading: ${url}`);
+  mainWindow.loadURL(url);
+
+  mainWindow.webContents.setWindowOpenHandler(({ url: linkUrl }) => {
+    if (linkUrl.startsWith('http://localhost')) return { action: 'allow' };
+    shell.openExternal(linkUrl);
     return { action: 'deny' };
   });
 
@@ -171,22 +222,33 @@ function isPortInUse(port: number): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
-  // Check if backend is already running (dev servers started separately)
+  log(`App starting — version ${app.getVersion()}, platform ${process.platform}, arch ${process.arch}`);
+  log(`resourcesPath: ${process.resourcesPath}`);
+
   const backendAlreadyRunning = await isPortInUse(BACKEND_PORT);
+  log(`Backend already running: ${backendAlreadyRunning}`);
 
   if (!backendAlreadyRunning) {
-    // Start backend
     backendProcess = startBackend();
 
     backendProcess.stdout?.on('data', (data: Buffer) => {
-      process.stdout.write(`[backend] ${data}`);
+      log(`[backend:out] ${data.toString().trim()}`);
     });
     backendProcess.stderr?.on('data', (data: Buffer) => {
-      process.stderr.write(`[backend] ${data}`);
+      log(`[backend:err] ${data.toString().trim()}`);
+    });
+    backendProcess.on('error', (err) => {
+      log(`[backend:error] ${err.message}`);
+      dialog.showErrorBox('Backend Error', `Failed to start backend: ${err.message}\n\nCheck logs at: ${logFile}`);
+    });
+    backendProcess.on('exit', (code) => {
+      log(`[backend:exit] code=${code}`);
+      if (code !== 0 && code !== null) {
+        dialog.showErrorBox('Backend Crashed', `Backend exited with code ${code}\n\nCheck logs at: ${logFile}`);
+      }
     });
   }
 
-  // Wait for servers to be ready
   try {
     if (isDev) {
       await Promise.all([
@@ -197,7 +259,9 @@ app.whenReady().then(async () => {
       await waitForBackend(BACKEND_PORT);
     }
   } catch (err) {
-    console.error('Failed to start servers:', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`Failed to start: ${msg}`);
+    dialog.showErrorBox('Startup Error', `${msg}\n\nCheck logs at: ${logFile}`);
     app.quit();
     return;
   }
@@ -215,7 +279,6 @@ app.on('before-quit', () => {
 });
 
 app.on('activate', () => {
-  // macOS: re-create window when dock icon is clicked
   if (mainWindow === null) {
     createWindow();
   }
