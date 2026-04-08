@@ -84,16 +84,29 @@ jobs:
           path: |
             packages/electron/release/*.dmg
             packages/electron/release/*.exe
-            packages/electron/release/*.blockmap
-            packages/electron/release/latest*.yml
           if-no-files-found: warn
 
-      - name: Upload to release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Find installers
+        id: find
+        shell: bash
+        run: |
+          DMG=$(ls packages/electron/release/*.dmg 2>/dev/null | head -1)
+          EXE=$(ls packages/electron/release/*.exe 2>/dev/null | head -1)
+          echo "dmg=$DMG" >> $GITHUB_OUTPUT
+          echo "exe=$EXE" >> $GITHUB_OUTPUT
+
+      - name: Upload to release (macOS)
+        if: startsWith(github.ref, 'refs/tags/') && matrix.platform == 'mac'
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            packages/electron/release/*.dmg
-            packages/electron/release/*.exe
+          files: ${{ steps.find.outputs.dmg }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to release (Windows)
+        if: startsWith(github.ref, 'refs/tags/') && matrix.platform == 'win'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.find.outputs.exe }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
