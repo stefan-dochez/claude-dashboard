@@ -1,4 +1,4 @@
-import { RefreshCw, FolderOpen, Settings, Download, ChevronDown, ChevronRight, Search, Loader2, Terminal, MessageSquare, Trash2, GitBranch, Play, Star, Clock, X } from 'lucide-react';
+import { RefreshCw, FolderOpen, Settings, Download, ChevronDown, ChevronRight, Search, Loader2, Terminal, MessageSquare, Trash2, GitBranch, Play, Star, Clock, X, Layers } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import LaunchModal from './LaunchModal';
 import { useSocket } from '../hooks/useSocket';
@@ -39,6 +39,7 @@ interface SidebarProps {
   onDismissInstance: (id: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
+  onToggleMeta: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
   onPullAll: () => void;
   onCheckoutDefault: (projectPath: string) => void;
@@ -81,13 +82,14 @@ interface ProjectRowProps {
   onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
+  onToggleMeta: (projectPath: string) => void;
   onRefreshProjects: () => void;
   showWorkspace?: string | null;
 }
 
 function ProjectRow({
   project, worktrees, instances, selectedInstanceId, isFavorite,
-  onSelectInstance, onKillInstance, onDismissInstance, onLaunch, onDeleteWorktree, onToggleFavorite, onRefreshProjects, showWorkspace,
+  onSelectInstance, onKillInstance, onDismissInstance, onLaunch, onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects, showWorkspace,
 }: ProjectRowProps) {
   const [expanded, setExpanded] = useState(() => {
     // Auto-expand if there are active instances or worktrees
@@ -137,13 +139,22 @@ function ProjectRow({
         {/* Actions (hover) */}
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100">
           {!hasActivity && (
-            <span
-              onClick={e => { e.stopPropagation(); onToggleFavorite(project.path); }}
-              className={`rounded p-0.5 transition-colors ${isFavorite ? 'text-amber-400' : 'text-faint hover:text-amber-400'}`}
-              title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-            >
-              <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
-            </span>
+            <>
+              <span
+                onClick={e => { e.stopPropagation(); onToggleMeta(project.path); }}
+                className={`rounded p-0.5 transition-colors ${project.isMeta ? 'text-violet-400' : 'text-faint hover:text-violet-400'}`}
+                title={project.isMeta ? 'Remove meta-project' : 'Mark as meta-project'}
+              >
+                <Layers className={`h-3 w-3 ${project.isMeta ? 'fill-violet-400/30' : ''}`} />
+              </span>
+              <span
+                onClick={e => { e.stopPropagation(); onToggleFavorite(project.path); }}
+                className={`rounded p-0.5 transition-colors ${isFavorite ? 'text-amber-400' : 'text-faint hover:text-amber-400'}`}
+                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
+              </span>
+            </>
           )}
           <span
             onClick={e => { e.stopPropagation(); setLaunchModalOpen(true); }}
@@ -253,7 +264,7 @@ export default function Sidebar({
   projects, projectsLoading, projectsRefreshing, instances, selectedInstanceId,
   scanPaths, favoriteProjects, pullingProjects, checkingOutProjects, pullingAll, queuedIds,
   onRefreshProjects, onLaunchProject, onSelectInstance, onKillInstance, onDismissInstance,
-  onDeleteWorktree, onToggleFavorite, onPullProject, onPullAll, onCheckoutDefault, onOpenScanPaths,
+  onDeleteWorktree, onToggleFavorite, onToggleMeta, onPullProject, onPullAll, onCheckoutDefault, onOpenScanPaths,
   collapsed, onExpand,
 }: SidebarProps) {
   const [filter, setFilter] = useState('');
@@ -380,10 +391,11 @@ export default function Sidebar({
       onLaunch={onLaunchProject}
       onDeleteWorktree={onDeleteWorktree}
       onToggleFavorite={onToggleFavorite}
+      onToggleMeta={onToggleMeta}
       onRefreshProjects={onRefreshProjects}
       showWorkspace={getWorkspaceLabel(project)}
     />
-  ), [worktreesByParent, instancesByProject, selectedInstanceId, favoriteProjects, onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onRefreshProjects, getWorkspaceLabel]);
+  ), [worktreesByParent, instancesByProject, selectedInstanceId, favoriteProjects, onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects, getWorkspaceLabel]);
 
   return (
     <aside
