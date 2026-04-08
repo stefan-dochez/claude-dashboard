@@ -83,7 +83,7 @@ function ProjectRow({
 
   return (
     <>
-      <div className="group/row flex cursor-default items-center gap-1 rounded-lg px-1.5 py-1 transition-colors hover:bg-elevated/50" onClick={() => { if (hasActivity) setExpanded(!expanded); else setLaunchModalOpen(true); }}>
+      <div className="group/row flex cursor-default items-center gap-1 rounded-lg px-1.5 py-1 transition-colors hover:bg-elevated/50" onClick={() => setLaunchModalOpen(true)}>
         {/* Expand toggle */}
         {hasActivity ? (
           <span
@@ -128,15 +128,13 @@ function ProjectRow({
               <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
             </span>
           )}
-          {!hasActivity && (
-            <span
-              onClick={e => { e.stopPropagation(); setLaunchModalOpen(true); }}
-              className="rounded p-0.5 text-faint transition-colors group-hover/row:text-green-400"
-              title="Launch"
-            >
-              <Play className="h-3 w-3" />
-            </span>
-          )}
+          <span
+            onClick={e => { e.stopPropagation(); setLaunchModalOpen(true); }}
+            className="rounded p-0.5 text-faint transition-colors group-hover/row:text-green-400"
+            title="New task"
+          >
+            <Play className="h-3 w-3" />
+          </span>
         </div>
       </div>
 
