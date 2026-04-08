@@ -16,15 +16,24 @@ let mainWindow: BrowserWindow | null = null;
 
 // --------------- Logging ---------------
 
-const logDir = path.join(os.homedir(), '.claude-dashboard', 'logs');
-try { fs.mkdirSync(logDir, { recursive: true }); } catch { /* ignore */ }
-const logFile = path.join(logDir, 'electron.log');
-const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+let logFile = '';
+let logStream: fs.WriteStream | null = null;
+
+function initLogging() {
+  try {
+    const logDir = path.join(os.homedir(), '.claude-dashboard', 'logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    logFile = path.join(logDir, 'electron.log');
+    logStream = fs.createWriteStream(logFile, { flags: 'a' });
+  } catch {
+    // Logging unavailable — continue without it
+  }
+}
 
 function log(msg: string) {
   const line = `[${new Date().toISOString()}] ${msg}`;
-  logStream.write(line + '\n');
-  process.stdout.write(line + '\n');
+  try { logStream?.write(line + '\n'); } catch { /* ignore */ }
+  try { process.stdout.write(line + '\n'); } catch { /* ignore */ }
 }
 
 // --------------- Backend lifecycle ---------------
@@ -183,7 +192,7 @@ function createWindow() {
     title: 'Claude Dashboard',
     icon: iconPath,
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
-    trafficLightPosition: isMac ? { x: 12, y: 12 } : undefined,
+    ...(isMac ? { trafficLightPosition: { x: 12, y: 12 } } : {}),
     backgroundColor: '#0d0d0d',
     webPreferences: {
       nodeIntegration: false,
@@ -222,6 +231,7 @@ function isPortInUse(port: number): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
+  initLogging();
   log(`App starting — version ${app.getVersion()}, platform ${process.platform}, arch ${process.arch}`);
   log(`resourcesPath: ${process.resourcesPath}`);
 
