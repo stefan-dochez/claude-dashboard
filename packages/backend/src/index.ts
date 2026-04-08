@@ -9,6 +9,7 @@ import { ProcessManager } from './process-manager.js';
 import { StatusMonitor } from './status-monitor.js';
 import { WorktreeManager } from './worktree-manager.js';
 import { StreamProcessManager } from './stream-process.js';
+import { TaskStore } from './task-store.js';
 import { createRoutes } from './routes.js';
 import { setupSocketHandlers } from './socket.js';
 import { setupStreamSocketHandlers } from './stream-socket.js';
@@ -24,6 +25,8 @@ async function main(): Promise<void> {
   const processManager = new ProcessManager(config);
   const statusMonitor = new StatusMonitor(processManager, config);
   const worktreeManager = new WorktreeManager();
+  const taskStore = new TaskStore();
+  await taskStore.load();
   const streamProcess = new StreamProcessManager(config);
 
   // Express + Socket.io setup
@@ -46,7 +49,7 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Routes
-  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager);
+  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore);
   app.use(routes);
 
   // In production, serve the frontend static files

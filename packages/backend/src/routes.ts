@@ -6,6 +6,7 @@ import type { ProjectScanner } from './scanner.js';
 import type { ProcessManager } from './process-manager.js';
 import type { StreamProcessManager } from './stream-process.js';
 import type { WorktreeManager } from './worktree-manager.js';
+import type { TaskStore } from './task-store.js';
 
 const execAsync = promisify(exec);
 
@@ -15,6 +16,7 @@ export function createRoutes(
   processManager: ProcessManager,
   streamProcess: StreamProcessManager,
   worktreeManager: WorktreeManager,
+  taskStore: TaskStore,
 ): Router {
   const router = Router();
 
@@ -125,6 +127,13 @@ export function createRoutes(
           parentProjectPath,
           branchName,
         });
+        taskStore.addTask({
+          id: instance.id, projectPath, projectName: instance.projectName,
+          worktreePath: worktreePath ?? null, branchName: branchName ?? null,
+          taskDescription: taskDescription ?? null, sessionId: null,
+          model: null, totalCostUsd: 0, totalInputTokens: 0, totalOutputTokens: 0,
+          mode: 'chat', createdAt: new Date().toISOString(), endedAt: null,
+        });
         res.status(201).json({ ...instance, mode: 'chat', pid: 0 });
       } else {
         // Terminal mode — uses PTY
@@ -134,6 +143,13 @@ export function createRoutes(
           worktreePath,
           parentProjectPath,
           branchName,
+        });
+        taskStore.addTask({
+          id: instance.id, projectPath, projectName: instance.projectName,
+          worktreePath: worktreePath ?? null, branchName: branchName ?? null,
+          taskDescription: taskDescription ?? null, sessionId: null,
+          model: null, totalCostUsd: 0, totalInputTokens: 0, totalOutputTokens: 0,
+          mode: 'terminal', createdAt: new Date().toISOString(), endedAt: null,
         });
         res.status(201).json({ ...instance, mode: 'terminal' });
       }
@@ -181,6 +197,7 @@ export function createRoutes(
 
       if (ptyInstance) {
         await processManager.kill(id);
+        taskStore.endTask(id);
         if (deleteWorktree && ptyInstance.worktreePath && ptyInstance.parentProjectPath) {
           try {
             await worktreeManager.removeWorktree(ptyInstance.parentProjectPath, ptyInstance.worktreePath);
@@ -193,6 +210,11 @@ export function createRoutes(
         }
       } else if (streamInstance) {
         await streamProcess.kill(id);
+        taskStore.endTask(id, {
+          totalCostUsd: streamInstance.totalCostUsd,
+          totalInputTokens: streamInstance.totalInputTokens,
+          totalOutputTokens: streamInstance.totalOutputTokens,
+        });
         if (deleteWorktree && streamInstance.worktreePath && streamInstance.parentProjectPath) {
           try {
             await worktreeManager.removeWorktree(streamInstance.parentProjectPath, streamInstance.worktreePath);
@@ -402,6 +424,39 @@ export function createRoutes(
     } catch {
       // No PR exists for this branch
       res.json({ url: null });
+    }
+  });
+
+  // Task history
+  router.get('/api/tasks/history', (_req, res) => {
+    res.json(taskStore.getHistory());
+  });
+
+  router.delete('/api/tasks/:id', async (req, res) => {
+    await taskStore.removeTask(req.params.id);
+    res.json({ ok: true });
+  });
+
+  // Git — recent commits for context attachments
+  router.get('/api/git/commits', async (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    const limit = parseInt(req.query.limit as string ?? '20', 10);
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    try {
+      const { stdout } = await execAsync(
+        `git log --oneline -${limit} --format="%H|||%s|||%ar"`,
+        { cwd: projectPath, encoding: 'utf-8', timeout: 5000 },
+      );
+      const commits = stdout.split('\n').filter(l => l.trim()).map(line => {
+        const [hash, message, date] = line.split('|||');
+        return { hash, message, date };
+      });
+      res.json(commits);
+    } catch {
+      res.json([]);
     }
   });
 

@@ -430,6 +430,7 @@ export default function App() {
                     <ChatView
                       key={selectedInstance.id}
                       instanceId={selectedInstance.id}
+                      projectPath={instanceProjectPath!}
                       status={selectedInstance.status}
                       onTypingChange={handleTypingChange}
                       initialModel={selectedInstance.model}

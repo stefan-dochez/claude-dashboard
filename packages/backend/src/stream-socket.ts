@@ -89,6 +89,12 @@ export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProce
       }
     });
 
+    socket.on('chat:interrupt', async ({ instanceId }: { instanceId: string }) => {
+      try {
+        await streamProcess.interrupt(instanceId);
+      } catch { /* ignore */ }
+    });
+
     socket.on('chat:approve_tool', ({ instanceId, toolName }: { instanceId: string; toolName: string }) => {
       streamProcess.approveTool(instanceId, toolName);
     });

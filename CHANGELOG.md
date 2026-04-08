@@ -6,6 +6,14 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Features
 
+- **Chat interrupt** — Stop button now interrupts the active SDK conversation immediately.
+
+- **Diff views in chat** — Edit/Write tool results show colored diffs (red for removed, green for added) instead of raw JSON. Bash commands show `$ command` with output below. File paths shown in tool headers.
+
+- **Context attachments** — `+` button in chat input to attach files, branches, commits, or local changes to the message. Context chips shown above the textarea with remove buttons. Context prepended to the prompt when sending.
+
+- **Task persistence** — Active tasks saved to `~/.claude-dashboard/tasks.json`. Task history endpoint (`GET /api/tasks/history`) for past tasks with cost/token stats. Tasks marked as ended when instances are killed.
+
 - **Electron app** — Desktop app via Electron. Single command `npm run electron:dev` launches backend, frontend, and Electron window. `npm run electron:build` packages as `.dmg` (macOS) / `.exe` (Windows). macOS traffic lights support with draggable titlebar. Auto-detects running servers. Backend serves frontend static files in production. node-pty prebuilds bundled with correct permissions.
 
 - **Unified sidebar** — Projects, instances, and worktrees merged into a single view. Active projects (with running instances or worktrees) float to the top and auto-expand. Instances and worktrees shown inline under their parent project. Click a project to launch, click an active project to expand/collapse. Worktrees clickable to resume. Workspace selector prominent at the top. Duplicate project names show their workspace origin. Favorite/play buttons hidden on active projects.

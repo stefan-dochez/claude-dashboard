@@ -6,13 +6,21 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {
   Send, Square, Loader2, ChevronDown, ChevronRight,
   Wrench, AlertCircle, CheckCircle2, Brain, User, Bot,
-  Sparkles, Shield, CircleStop,
+  Sparkles, Shield, CircleStop, Plus, X,
+  FileText, GitBranch, GitCommit, FileCode2,
 } from 'lucide-react';
 import { useSocket } from '../hooks/useSocket';
 import type { ChatMessage, ContentBlock, SessionInfo } from '../types';
 
+interface ContextItem {
+  type: 'file' | 'branch' | 'commit' | 'changes';
+  label: string;
+  value: string;
+}
+
 interface ChatViewProps {
   instanceId: string;
+  projectPath: string;
   status: string;
   onTypingChange?: (typing: boolean) => void;
   initialModel?: string | null;
@@ -172,10 +180,104 @@ function ToolProgressRing({ seconds }: { seconds: number }) {
   );
 }
 
+function ToolDetailView({ tool }: { tool: { use: ContentBlock; result?: ContentBlock } }) {
+  const input = tool.use.input as Record<string, unknown> | null;
+  const name = tool.use.name ?? '';
+  const isEdit = name === 'Edit' || name === 'Write';
+  const isBash = name === 'Bash';
+  const isRead = name === 'Read' || name === 'Glob' || name === 'Grep';
+
+  const filePath = input?.file_path as string | undefined;
+  const command = input?.command as string | undefined;
+  const oldStr = input?.old_string as string | undefined;
+  const newStr = input?.new_string as string | undefined;
+
+  return (
+    <div className="rounded border border-border-subtle bg-codeblock p-2">
+      {/* Header: tool name + file path or command */}
+      <div className="mb-1 flex items-center gap-1.5 text-[11px]">
+        <span className="font-medium text-muted">{name}</span>
+        {filePath && (
+          <span className="truncate font-mono text-faint" title={filePath}>
+            {filePath.split('/').pop()}
+          </span>
+        )}
+        {isBash && command && (
+          <span className="truncate font-mono text-faint" title={command}>
+            $ {command.length > 60 ? command.slice(0, 60) + '...' : command}
+          </span>
+        )}
+      </div>
+
+      {/* Edit/Write: show diff */}
+      {isEdit && oldStr != null && newStr != null && (
+        <div className="max-h-48 overflow-auto rounded bg-root p-1.5 font-mono text-[11px] leading-relaxed">
+          {oldStr.split('\n').map((line, i) => (
+            <div key={`old-${i}`} className="text-red-400/70"><span className="mr-2 select-none text-red-400/40">-</span>{line}</div>
+          ))}
+          {newStr.split('\n').map((line, i) => (
+            <div key={`new-${i}`} className="text-green-400/70"><span className="mr-2 select-none text-green-400/40">+</span>{line}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Write (new file): show content */}
+      {name === 'Write' && !oldStr && input?.content != null && (
+        <div className="max-h-48 overflow-auto rounded bg-root p-1.5 font-mono text-[11px] leading-relaxed">
+          {String(input.content).split('\n').map((line, i) => (
+            <div key={i} className="text-green-400/70"><span className="mr-2 select-none text-green-400/40">+</span>{line}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Bash: show command */}
+      {isBash && command && !oldStr && (
+        <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded bg-root p-1.5 text-[11px] text-muted">
+          $ {command}
+        </pre>
+      )}
+
+      {/* Read/Glob/Grep: show path or pattern */}
+      {isRead && !filePath && input != null && (
+        <pre className="max-h-20 overflow-auto whitespace-pre-wrap text-[11px] text-faint">
+          {typeof input === 'string' ? input : JSON.stringify(input, null, 2)}
+        </pre>
+      )}
+
+      {/* Generic fallback for other tools */}
+      {!isEdit && !isBash && !isRead && input != null && (
+        <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-[11px] text-faint">
+          {typeof input === 'string' ? input : JSON.stringify(input, null, 2)}
+        </pre>
+      )}
+
+      {/* Result */}
+      {tool.result && (
+        <div className={`mt-1.5 border-t pt-1.5 ${tool.result.is_error ? 'border-red-500/20' : 'border-border-subtle'}`}>
+          {isBash && !tool.result.is_error ? (
+            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded bg-root p-1.5 text-[11px] text-muted">
+              {(tool.result.content ?? tool.result.stdout ?? '').slice(0, 3000)}
+            </pre>
+          ) : (
+            <pre className={`max-h-32 overflow-auto whitespace-pre-wrap text-[11px] ${tool.result.is_error ? 'text-red-400/70' : 'text-muted'}`}>
+              {(tool.result.content ?? tool.result.stdout ?? '').slice(0, 3000)}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToolGroupBlock({ tools }: { tools: Array<{ use: ContentBlock; result?: ContentBlock }> }) {
   const [expanded, setExpanded] = useState(false);
   const hasError = tools.some(t => t.result?.is_error);
   const toolNames = tools.map(t => t.use.name).filter(Boolean);
+
+  // Summary for collapsed state
+  const summary = tools.length === 1
+    ? toolNames[0]
+    : `${toolNames.length} tools: ${[...new Set(toolNames)].join(', ')}`;
 
   return (
     <div className={`my-1.5 rounded-lg border px-3 py-2 ${hasError ? 'border-red-500/20 bg-red-500/5' : 'border-border-default bg-elevated/30'}`}>
@@ -184,31 +286,15 @@ function ToolGroupBlock({ tools }: { tools: Array<{ use: ContentBlock; result?: 
         className="flex w-full items-center gap-2 text-left text-xs"
       >
         <Wrench className={`h-3 w-3 ${hasError ? 'text-red-400' : 'text-blue-400'}`} />
-        <span className="font-medium text-secondary">
-          {toolNames.length === 1 ? toolNames[0] : `${toolNames.length} tools`}
-        </span>
-        {hasError && <AlertCircle className="h-3 w-3 text-red-400" />}
-        {!hasError && <CheckCircle2 className="h-3 w-3 text-green-500/60" />}
-        {expanded ? <ChevronDown className="ml-auto h-3 w-3 text-faint" /> : <ChevronRight className="ml-auto h-3 w-3 text-faint" />}
+        <span className="min-w-0 flex-1 truncate font-medium text-secondary">{summary}</span>
+        {hasError && <AlertCircle className="h-3 w-3 shrink-0 text-red-400" />}
+        {!hasError && <CheckCircle2 className="h-3 w-3 shrink-0 text-green-500/60" />}
+        {expanded ? <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-faint" /> : <ChevronRight className="ml-auto h-3 w-3 shrink-0 text-faint" />}
       </button>
       {expanded && (
         <div className="mt-2 flex flex-col gap-2">
           {tools.map((tool, i) => (
-            <div key={i} className="rounded border border-border-subtle bg-codeblock p-2">
-              <div className="mb-1 text-[11px] font-medium text-muted">{tool.use.name}</div>
-              {tool.use.input != null && (
-                <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-[11px] text-faint">
-                  {typeof tool.use.input === 'string' ? tool.use.input : JSON.stringify(tool.use.input, null, 2)}
-                </pre>
-              )}
-              {tool.result && (
-                <div className={`mt-1.5 border-t pt-1.5 ${tool.result.is_error ? 'border-red-500/20' : 'border-border-subtle'}`}>
-                  <pre className={`max-h-32 overflow-auto whitespace-pre-wrap text-[11px] ${tool.result.is_error ? 'text-red-400/70' : 'text-muted'}`}>
-                    {(tool.result.content ?? tool.result.stdout ?? '').slice(0, 3000)}
-                  </pre>
-                </div>
-              )}
-            </div>
+            <ToolDetailView key={i} tool={tool} />
           ))}
         </div>
       )}
@@ -482,7 +568,7 @@ function Dropdown<T extends string>({ value, options, onChange, icon: Icon, labe
 // --------------- Main ChatView ---------------
 
 export default function ChatView({
-  instanceId, status, onTypingChange,
+  instanceId, projectPath, status, onTypingChange,
   initialModel, initialPermissionMode, initialEffort,
 }: ChatViewProps) {
   const socket = useSocket();
@@ -500,6 +586,14 @@ export default function ChatView({
   const [input, setInput] = useState('');
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+
+  // Context attachments
+  const [contextItems, setContextItems] = useState<ContextItem[]>([]);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuSection, setContextMenuSection] = useState<'files' | 'branches' | 'commits' | null>(null);
+  const [contextSearchResults, setContextSearchResults] = useState<Array<{ label: string; value: string }>>([]);
+  const [contextLoading, setContextLoading] = useState(false);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   // Selectors
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'claude-opus-4-6');
@@ -674,6 +768,73 @@ export default function ChatView({
   }, [instanceId]);
 
   // Send message
+  // Context menu helpers
+  const fetchContextSection = useCallback(async (section: 'files' | 'branches' | 'commits') => {
+    setContextLoading(true);
+    setContextSearchResults([]);
+    try {
+      if (section === 'files') {
+        const res = await fetch(`/api/files/search?path=${encodeURIComponent(projectPath)}&q=`);
+        if (res.ok) {
+          const files: Array<{ name: string; path: string; relative: string }> = await res.json();
+          setContextSearchResults(files.map(f => ({ label: f.relative, value: f.path })));
+        }
+      } else if (section === 'branches') {
+        const res = await fetch(`/api/git/branches?path=${encodeURIComponent(projectPath)}`);
+        if (res.ok) {
+          const branches: Array<{ name: string }> = await res.json();
+          setContextSearchResults(branches.map(b => ({ label: b.name, value: b.name })));
+        }
+      } else if (section === 'commits') {
+        const res = await fetch(`/api/git/commits?path=${encodeURIComponent(projectPath)}&limit=15`);
+        if (res.ok) {
+          const commits: Array<{ hash: string; message: string; date: string }> = await res.json();
+          setContextSearchResults(commits.map(c => ({ label: `${c.hash.slice(0, 7)} ${c.message}`, value: c.hash })));
+        }
+      }
+    } catch { /* ignore */ }
+    setContextLoading(false);
+  }, [projectPath]);
+
+  const addContextItem = useCallback((type: ContextItem['type'], label: string, value: string) => {
+    setContextItems(prev => {
+      if (prev.some(c => c.value === value)) return prev;
+      return [...prev, { type, label, value }];
+    });
+    setContextMenuOpen(false);
+    setContextMenuSection(null);
+  }, []);
+
+  const removeContextItem = useCallback((value: string) => {
+    setContextItems(prev => prev.filter(c => c.value !== value));
+  }, []);
+
+  const addChangesContext = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/git/diff?path=${encodeURIComponent(projectPath)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.diff) {
+          addContextItem('changes', 'Local changes', data.diff);
+        }
+      }
+    } catch { /* ignore */ }
+    setContextMenuOpen(false);
+  }, [projectPath, addContextItem]);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenuOpen(false);
+        setContextMenuSection(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [contextMenuOpen]);
+
   const handleSend = useCallback(() => {
     const text = input.trim();
     if (!text || sending) return;
@@ -684,20 +845,34 @@ export default function ChatView({
     setThinkingText('');
     setStreamingBlocks([]);
 
+    // Build prompt with context
+    let prompt = text;
+    if (contextItems.length > 0) {
+      const contextParts = contextItems.map(c => {
+        switch (c.type) {
+          case 'file': return `[File: ${c.label}]\n${c.value}`;
+          case 'branch': return `[Git Branch: ${c.label}]`;
+          case 'commit': return `[Git Commit: ${c.label}]`;
+          case 'changes': return `[Local Changes]\n${c.value}`;
+          default: return c.value;
+        }
+      });
+      prompt = `Context:\n${contextParts.join('\n\n')}\n\n---\n\n${text}`;
+      setContextItems([]);
+    }
+
     socket.emit('chat:send', {
       instanceId,
-      prompt: text,
+      prompt,
       model: selectedModel,
       permissionMode,
       effort: effortLevel,
     });
 
     if (onTypingChange) onTypingChange(false);
-
-    // Reset textarea height
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setTimeout(scrollToBottom, 50);
-  }, [input, sending, instanceId, socket, selectedModel, permissionMode, effortLevel, onTypingChange, scrollToBottom]);
+  }, [input, sending, instanceId, socket, selectedModel, permissionMode, effortLevel, onTypingChange, scrollToBottom, contextItems]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -809,18 +984,92 @@ export default function ChatView({
       {/* Input bar */}
       <div className="border-t border-border-default bg-surface px-4 py-3">
         <div className="mx-auto max-w-3xl">
-          {/* Textarea */}
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={isExited ? 'Instance has exited' : 'Send a message... (Shift+Enter for newline)'}
-            rows={1}
-            disabled={isExited}
-            className="w-full resize-none rounded-lg border border-border-input bg-input px-3 py-2 text-sm text-primary placeholder-placeholder outline-none transition-colors focus:border-border-focus disabled:opacity-50"
-            style={{ minHeight: 20, maxHeight: 120 }}
-          />
+          {/* Context chips */}
+          {contextItems.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {contextItems.map(item => (
+                <span key={item.value} className="flex items-center gap-1 rounded bg-elevated px-2 py-0.5 text-[11px] text-secondary">
+                  {item.type === 'file' && <FileText className="h-2.5 w-2.5 text-blue-400" />}
+                  {item.type === 'branch' && <GitBranch className="h-2.5 w-2.5 text-violet-400" />}
+                  {item.type === 'commit' && <GitCommit className="h-2.5 w-2.5 text-amber-400" />}
+                  {item.type === 'changes' && <FileCode2 className="h-2.5 w-2.5 text-green-400" />}
+                  <span className="max-w-[150px] truncate">{item.label}</span>
+                  <button onClick={() => removeContextItem(item.value)} className="text-faint hover:text-secondary">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Textarea row */}
+          <div className="relative flex gap-2">
+            {/* Context menu button */}
+            <div ref={contextMenuRef} className="relative shrink-0">
+              <button
+                onClick={() => { setContextMenuOpen(!contextMenuOpen); setContextMenuSection(null); }}
+                className={`mt-1.5 rounded p-1 transition-colors ${contextMenuOpen ? 'bg-elevated text-primary' : 'text-faint hover:text-secondary'}`}
+                title="Attach context"
+                disabled={isExited}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+              {contextMenuOpen && (
+                <div className="absolute bottom-full left-0 z-50 mb-1 min-w-[200px] rounded-lg border border-border-default bg-popover py-1 shadow-lg">
+                  {!contextMenuSection ? (
+                    <>
+                      <button onClick={() => { setContextMenuSection('files'); fetchContextSection('files'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
+                        <FileText className="h-3 w-3 text-blue-400" /> Files
+                      </button>
+                      <button onClick={() => { setContextMenuSection('branches'); fetchContextSection('branches'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
+                        <GitBranch className="h-3 w-3 text-violet-400" /> Branches
+                      </button>
+                      <button onClick={() => { setContextMenuSection('commits'); fetchContextSection('commits'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
+                        <GitCommit className="h-3 w-3 text-amber-400" /> Commits
+                      </button>
+                      <button onClick={addChangesContext} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
+                        <FileCode2 className="h-3 w-3 text-green-400" /> Local changes
+                      </button>
+                    </>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto">
+                      {contextLoading ? (
+                        <div className="flex justify-center py-3"><Loader2 className="h-3 w-3 animate-spin text-faint" /></div>
+                      ) : contextSearchResults.length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-faint">Nothing found</p>
+                      ) : (
+                        contextSearchResults.map(r => (
+                          <button
+                            key={r.value}
+                            onClick={() => {
+                              const typeMap = { files: 'file', branches: 'branch', commits: 'commit' } as const;
+                              addContextItem(typeMap[contextMenuSection!], r.label, r.value);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-1 text-left text-[12px] text-tertiary hover:bg-hover hover:text-secondary"
+                          >
+                            <span className="min-w-0 truncate">{r.label}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder={isExited ? 'Instance has exited' : 'Send a message... (Shift+Enter for newline)'}
+              rows={1}
+              disabled={isExited}
+              className="flex-1 resize-none rounded-lg border border-border-input bg-input px-3 py-2 text-sm text-primary placeholder-placeholder outline-none transition-colors focus:border-border-focus disabled:opacity-50"
+              style={{ minHeight: 20, maxHeight: 120 }}
+            />
+          </div>
 
           {/* Controls row */}
           <div className="mt-2 flex items-center gap-1">
@@ -850,7 +1099,7 @@ export default function ChatView({
 
             {/* Send / Stop */}
             <button
-              onClick={sending ? undefined : handleSend}
+              onClick={sending ? () => socket.emit('chat:interrupt', { instanceId }) : handleSend}
               disabled={isExited || (!input.trim() && !sending)}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 sending

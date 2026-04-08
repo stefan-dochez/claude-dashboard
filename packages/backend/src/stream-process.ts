@@ -554,6 +554,19 @@ export class StreamProcessManager extends EventEmitter {
     pending.resolve({ behavior: 'allow', updatedInput: { answer } });
   }
 
+  // --------------- Interrupt ---------------
+
+  async interrupt(instanceId: string): Promise<void> {
+    const handle = this.handles.get(instanceId);
+    if (!handle) return;
+    if (handle.conversation) {
+      try { await handle.conversation.interrupt(); } catch { /* ignore */ }
+    }
+    handle.instance.status = INSTANCE_STATUS.WAITING_INPUT;
+    handle.instance.lastActivity = new Date();
+    this.emit('status', instanceId, INSTANCE_STATUS.WAITING_INPUT);
+  }
+
   // --------------- Lifecycle ---------------
 
   getAll(): StreamInstance[] {
