@@ -76,7 +76,7 @@ jobs:
         run: npm run build -w packages/electron
 
       - name: Package Electron
-        run: npm run package -w packages/electron
+        run: npx -w packages/electron electron-builder --publish never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
