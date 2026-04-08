@@ -121,8 +121,8 @@ function startBackend(): ChildProcess {
     log(`Using node: ${nodeBin}`);
     const indexJs = path.join(cwd, 'dist', 'index.js');
     if (isWin) {
-      // Use cmd /c with quoted paths to handle spaces in "C:\Program Files\..."
-      return spawn('cmd', ['/c', `"${nodeBin}" "${indexJs}"`], {
+      const comspec = process.env.ComSpec ?? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe');
+      return spawn(comspec, ['/c', `"${nodeBin}" "${indexJs}"`], {
         cwd,
         env: {
           ...baseEnv,
@@ -131,7 +131,6 @@ function startBackend(): ChildProcess {
           FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
         },
         stdio: 'pipe',
-        shell: false,
         windowsVerbatimArguments: true,
       });
     } else {
