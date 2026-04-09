@@ -554,7 +554,11 @@ export default function Sidebar({
         </div>
 
         {/* History section */}
-        {history.length > 0 && (
+        {(() => {
+          const filteredHistory = selectedRoot
+            ? history.filter(t => t.projectPath.startsWith(selectedRoot))
+            : history;
+          return filteredHistory.length > 0 && (
           <div className="shrink-0 border-t border-border-default">
             <button
               onClick={() => { setHistoryOpen(!historyOpen); if (!historyOpen) fetchHistory(); }}
@@ -563,11 +567,11 @@ export default function Sidebar({
               {historyOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               <Clock className="h-3 w-3" />
               <span>History</span>
-              <span className="ml-auto text-[10px] text-faint">{history.length}</span>
+              <span className="ml-auto text-[10px] text-faint">{filteredHistory.length}</span>
             </button>
             {historyOpen && (
               <div className="max-h-48 overflow-y-auto px-2 pb-2">
-                {history.map(task => (
+                {filteredHistory.map(task => (
                   <div
                     key={task.id}
                     className="group/hist flex cursor-default items-start gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-elevated/30"
@@ -607,7 +611,8 @@ export default function Sidebar({
               </div>
             )}
           </div>
-        )}
+        );
+        })()}
 
         {/* Version */}
         {appVersion && (
