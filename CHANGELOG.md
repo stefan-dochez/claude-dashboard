@@ -18,6 +18,8 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **Directory existence check** — The instance spawn route now verifies the target directory exists before launching, preventing crashes when resuming sessions on deleted worktrees.
 
+- **History filtered by workspace** — The sidebar history section now only shows sessions belonging to the selected workspace/scan path.
+
 - **Chat interrupt** — Stop button now interrupts the active SDK conversation immediately.
 
 - **Diff views in chat** — Edit/Write tool results show colored diffs (red for removed, green for added) instead of raw JSON. Bash commands show `$ command` with output below. File paths shown in tool headers.
