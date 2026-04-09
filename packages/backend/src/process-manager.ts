@@ -78,7 +78,7 @@ function buildPtyEnv(): Record<string, string> {
   // don't think they're nested inside another session
   for (const key of Object.keys(env)) {
     if (key === 'CLAUDECODE' || key.startsWith('CLAUDE_CODE_')) {
-      delete env[key];
+      delete env[key]; // eslint-disable-line @typescript-eslint/no-dynamic-delete
     }
   }
 
@@ -227,7 +227,7 @@ export class ProcessManager extends EventEmitter {
     return new Promise<void>((resolve) => {
       let resolved = false;
       let forceKillTimeout: ReturnType<typeof setTimeout> | undefined;
-      let giveUpTimeout: ReturnType<typeof setTimeout> | undefined;
+      let giveUpTimeout: ReturnType<typeof setTimeout> | undefined; // eslint-disable-line prefer-const
       const done = () => {
         if (resolved) return;
         resolved = true;

@@ -10,6 +10,8 @@ function execAsync(cmd: string, opts: { encoding: BufferEncoding; cwd?: string; 
   return execPromise(cmd, { ...opts, shell: process.platform === 'win32' ? true as unknown as string : undefined });
 }
 
+type ProjectType = 'repo' | 'workspace' | 'monorepo';
+
 interface Project {
   name: string;
   path: string;
@@ -17,7 +19,7 @@ interface Project {
   hasClaudeMd: boolean;
   lastModified: Date;
   isWorktree: boolean;
-  isMeta: boolean;
+  type: ProjectType;
   parentProject?: string;
 }
 
@@ -38,7 +40,7 @@ export class ProjectScanner {
     const projects: Project[] = [];
     const seen = new Set<string>();
 
-    const resolvedMetaProjects = new Set(
+    const resolvedMonorepos = new Set(
       (config.metaProjects ?? []).map(p =>
         path.resolve(p.replace(/^~/, os.homedir())),
       ),
@@ -46,7 +48,7 @@ export class ProjectScanner {
 
     for (const scanPath of config.scanPaths) {
       const resolved = path.resolve(scanPath.replace(/^~/, os.homedir()));
-      await this.scanDirectory(resolved, config.projectMarkers, config.scanDepth, projects, seen, resolvedMetaProjects);
+      await this.scanDirectory(resolved, config.projectMarkers, config.scanDepth, projects, seen, resolvedMonorepos);
     }
 
     // Sort by name
@@ -70,7 +72,7 @@ export class ProjectScanner {
     depth: number,
     results: Project[],
     seen: Set<string>,
-    metaProjects: Set<string>,
+    monorepos: Set<string>,
   ): Promise<void> {
     if (depth < 0) return;
 
@@ -88,30 +90,34 @@ export class ProjectScanner {
     const isProject = await this.hasAnyMarker(dir, markers);
     if (isProject) {
       seen.add(realDir);
-      const isMeta = metaProjects.has(realDir) || metaProjects.has(dir);
-      const project = await this.buildProject(dir, undefined, isMeta);
+      const isGitRepo = await this.hasGitDir(dir);
+      const isMonorepo = isGitRepo && (monorepos.has(realDir) || monorepos.has(dir));
+      const projectType: ProjectType = !isGitRepo ? 'workspace' : isMonorepo ? 'monorepo' : 'repo';
+      const project = await this.buildProject(dir, undefined, projectType);
       results.push(project);
 
-      // Also check for git worktrees
-      const worktrees = await this.detectWorktrees(dir);
-      for (const wt of worktrees) {
-        if (!seen.has(wt)) {
-          seen.add(wt);
-          const wtProject = await this.buildProject(wt, dir);
-          results.push(wtProject);
+      // Also check for git worktrees (only for git repos)
+      if (isGitRepo) {
+        const worktrees = await this.detectWorktrees(dir);
+        for (const wt of worktrees) {
+          if (!seen.has(wt)) {
+            seen.add(wt);
+            const wtProject = await this.buildProject(wt, dir);
+            results.push(wtProject);
+          }
         }
       }
 
-      // For meta-projects, continue scanning subdirectories with extra depth
+      // For monorepos and workspaces, continue scanning subdirectories with extra depth
       // since sub-repos can be nested deeply (e.g. src/team/app/<repo>)
-      if (isMeta) {
+      if (projectType === 'monorepo' || projectType === 'workspace') {
         const config = await this.configService.get();
-        const metaDepth = config.scanDepth + 3;
+        const deepDepth = config.scanDepth + 3;
         try {
           const entries = await fs.readdir(dir, { withFileTypes: true });
           for (const entry of entries) {
             if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-              await this.scanDirectory(path.join(dir, entry.name), markers, metaDepth - 1, results, seen, metaProjects);
+              await this.scanDirectory(path.join(dir, entry.name), markers, deepDepth - 1, results, seen, monorepos);
             }
           }
         } catch {
@@ -127,7 +133,7 @@ export class ProjectScanner {
       const entries = await fs.readdir(dir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-          await this.scanDirectory(path.join(dir, entry.name), markers, depth - 1, results, seen, metaProjects);
+          await this.scanDirectory(path.join(dir, entry.name), markers, depth - 1, results, seen, monorepos);
         }
       }
     } catch {
@@ -147,9 +153,9 @@ export class ProjectScanner {
     return false;
   }
 
-  private async buildProject(projectPath: string, parentProject?: string, isMeta = false): Promise<Project> {
+  private async buildProject(projectPath: string, parentProject?: string, projectType: ProjectType = 'repo'): Promise<Project> {
     const name = path.basename(projectPath);
-    const gitBranch = await this.getGitBranch(projectPath);
+    const gitBranch = projectType === 'workspace' ? null : await this.getGitBranch(projectPath);
     const hasClaudeMd = await fs.access(path.join(projectPath, 'CLAUDE.md')).then(() => true).catch(() => false);
     const lastModified = await this.getLastModified(projectPath);
     const isWorktree = parentProject !== undefined || await this.isGitWorktree(projectPath);
@@ -161,9 +167,18 @@ export class ProjectScanner {
       hasClaudeMd,
       lastModified,
       isWorktree,
-      isMeta,
+      type: projectType,
       ...(parentProject ? { parentProject } : {}),
     };
+  }
+
+  private async hasGitDir(dir: string): Promise<boolean> {
+    try {
+      await fs.access(path.join(dir, '.git'));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async getGitBranch(dir: string): Promise<string | null> {

@@ -1,3 +1,10 @@
+export const PROJECT_TYPE = {
+  REPO: 'repo',
+  WORKSPACE: 'workspace',
+  MONOREPO: 'monorepo',
+} as const;
+export type ProjectType = typeof PROJECT_TYPE[keyof typeof PROJECT_TYPE];
+
 export interface Project {
   name: string;
   path: string;
@@ -5,7 +12,7 @@ export interface Project {
   hasClaudeMd: boolean;
   lastModified: string;
   isWorktree: boolean;
-  isMeta: boolean;
+  type: ProjectType;
   parentProject?: string;
 }
 

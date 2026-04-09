@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useContext, createContext } from 'react';
-import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star, Download, RotateCcw } from 'lucide-react';
+import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star, Download, RotateCcw, Box } from 'lucide-react';
 import type { Project, Instance } from '../types';
 import LaunchModal from './LaunchModal';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -644,8 +644,10 @@ function ProjectRow({
           <span className="mt-1 w-3 shrink-0" />
         )}
 
-        {project.isMeta ? (
+        {project.type === 'monorepo' ? (
           <Layers className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-400" />
+        ) : project.type === 'workspace' ? (
+          <Box className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-400" />
         ) : (
           <FolderGit2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
         )}
@@ -658,9 +660,14 @@ function ProjectRow({
             {project.hasClaudeMd && (
               <span title="Has CLAUDE.md"><FileText className="h-3 w-3 shrink-0 text-amber-500/70" /></span>
             )}
-            {project.isMeta && (
+            {project.type === 'monorepo' && (
               <span className="shrink-0 rounded bg-violet-500/10 px-1 py-0.5 text-[9px] font-medium text-violet-400">
-                META
+                MONO
+              </span>
+            )}
+            {project.type === 'workspace' && (
+              <span className="shrink-0 rounded bg-cyan-500/10 px-1 py-0.5 text-[9px] font-medium text-cyan-400">
+                WS
               </span>
             )}
             {project.isWorktree && (

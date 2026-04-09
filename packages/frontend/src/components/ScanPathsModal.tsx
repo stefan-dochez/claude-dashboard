@@ -123,10 +123,10 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
         {/* Meta Projects section */}
         <div className="mb-2 flex items-center gap-1.5">
           <Layers className="h-3.5 w-3.5 text-violet-400" />
-          <p className="text-xs font-medium text-secondary">Meta Projects</p>
+          <p className="text-xs font-medium text-secondary">Monorepos</p>
         </div>
         <p className="mb-2 text-[12px] text-muted">
-          Projects containing sub-projects (monorepos). Their subdirectories will also be scanned.
+          Git repos containing sub-projects. Their subdirectories will be scanned with extra depth.
         </p>
 
         <div className="mb-2 flex max-h-36 flex-col gap-2 overflow-y-auto">
@@ -137,13 +137,13 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
                 type="text"
                 value={meta}
                 onChange={e => handleChangeMeta(index, e.target.value)}
-                placeholder="~/dev/my-monorepo"
+                placeholder="~/dev/my-meta-repo"
                 className="flex-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
               />
               <button
                 onClick={() => handleRemoveMeta(index)}
                 className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-red-400"
-                title="Remove meta project"
+                title="Remove monorepo"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -156,7 +156,7 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
           className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-violet-800/50 py-1.5 text-xs text-muted transition-colors hover:border-violet-600 hover:text-secondary"
         >
           <Plus className="h-3 w-3" />
-          Add meta project
+          Add monorepo
         </button>
 
         <div className="flex justify-end gap-2">

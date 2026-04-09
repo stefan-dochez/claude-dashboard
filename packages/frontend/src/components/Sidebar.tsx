@@ -1,4 +1,4 @@
-import { RefreshCw, FolderOpen, Settings, Download, ChevronDown, ChevronRight, Search, Loader2, Terminal, MessageSquare, Trash2, GitBranch, Play, Star, Clock, X, Layers } from 'lucide-react';
+import { RefreshCw, FolderOpen, Settings, Download, ChevronDown, ChevronRight, Search, Loader2, Terminal, MessageSquare, Trash2, GitBranch, Play, Star, Clock, X, Layers, Box } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import LaunchModal from './LaunchModal';
 import { useSocket } from '../hooks/useSocket';
@@ -102,7 +102,7 @@ function ProjectRow({
 
   return (
     <>
-      <div className="group/row flex cursor-default items-center gap-1 rounded-lg px-1.5 py-1 transition-colors hover:bg-elevated/50" onClick={() => setLaunchModalOpen(true)}>
+      <div className={`group/row flex cursor-default items-center gap-1 rounded-lg px-1.5 py-1 transition-colors hover:bg-elevated/50 ${project.type === 'monorepo' ? 'border-l-2 border-violet-500/50' : project.type === 'workspace' ? 'border-l-2 border-cyan-500/50' : ''}`} onClick={() => setLaunchModalOpen(true)}>
         {/* Expand toggle */}
         {hasActivity ? (
           <span
@@ -140,13 +140,24 @@ function ProjectRow({
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100">
           {!hasActivity && (
             <>
-              <span
-                onClick={e => { e.stopPropagation(); onToggleMeta(project.path); }}
-                className={`rounded p-0.5 transition-colors ${project.isMeta ? 'text-violet-400' : 'text-faint hover:text-violet-400'}`}
-                title={project.isMeta ? 'Remove meta-project' : 'Mark as meta-project'}
-              >
-                <Layers className={`h-3 w-3 ${project.isMeta ? 'fill-violet-400/30' : ''}`} />
-              </span>
+              {project.type === 'repo' && (
+                <span
+                  onClick={e => { e.stopPropagation(); onToggleMeta(project.path); }}
+                  className="rounded p-0.5 text-faint transition-colors hover:text-violet-400"
+                  title="Mark as monorepo"
+                >
+                  <Layers className="h-3 w-3" />
+                </span>
+              )}
+              {project.type === 'monorepo' && (
+                <span
+                  onClick={e => { e.stopPropagation(); onToggleMeta(project.path); }}
+                  className="rounded p-0.5 text-violet-400 transition-colors"
+                  title="Remove monorepo"
+                >
+                  <Layers className="h-3 w-3 fill-violet-400/30" />
+                </span>
+              )}
               <span
                 onClick={e => { e.stopPropagation(); onToggleFavorite(project.path); }}
                 className={`rounded p-0.5 transition-colors ${isFavorite ? 'text-amber-400' : 'text-faint hover:text-amber-400'}`}
@@ -354,11 +365,28 @@ export default function Sidebar({
     return rootProjects.filter(p => favoriteProjects.has(p.path) && !activeSet.has(p.path));
   }, [rootProjects, favoriteProjects, activeProjects]);
 
+  // Monorepos (excluding already shown in active/favorites)
+  const monorepoProjects = useMemo(() => {
+    const shown = new Set([...activeProjects.map(p => p.path), ...favoriteProjectsList.map(p => p.path)]);
+    return rootProjects.filter(p => p.type === 'monorepo' && !shown.has(p.path));
+  }, [rootProjects, activeProjects, favoriteProjectsList]);
+
+  // Workspaces (excluding already shown in active/favorites)
+  const workspaceProjects = useMemo(() => {
+    const shown = new Set([...activeProjects.map(p => p.path), ...favoriteProjectsList.map(p => p.path)]);
+    return rootProjects.filter(p => p.type === 'workspace' && !shown.has(p.path));
+  }, [rootProjects, activeProjects, favoriteProjectsList]);
+
   // Other projects
   const otherProjects = useMemo(() => {
-    const shown = new Set([...activeProjects.map(p => p.path), ...favoriteProjectsList.map(p => p.path)]);
+    const shown = new Set([
+      ...activeProjects.map(p => p.path),
+      ...favoriteProjectsList.map(p => p.path),
+      ...monorepoProjects.map(p => p.path),
+      ...workspaceProjects.map(p => p.path),
+    ]);
     return rootProjects.filter(p => !shown.has(p.path));
-  }, [rootProjects, activeProjects, favoriteProjectsList]);
+  }, [rootProjects, activeProjects, favoriteProjectsList, monorepoProjects, workspaceProjects]);
 
   // Detect duplicate project names to show workspace disambiguation
   const duplicateNames = useMemo(() => {
@@ -471,10 +499,38 @@ export default function Sidebar({
                 </>
               )}
 
+              {/* Monorepos */}
+              {monorepoProjects.length > 0 && (
+                <>
+                  {(activeProjects.length > 0 || favoriteProjectsList.length > 0) && (
+                    <div className="mx-1 my-1.5 border-t border-border-default" />
+                  )}
+                  <div className="mb-0.5 flex items-center gap-1.5 px-1.5 pt-0.5 pb-1">
+                    <Layers className="h-3 w-3 text-violet-400" />
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-faint">Monorepos</span>
+                  </div>
+                  {monorepoProjects.map(renderProject)}
+                </>
+              )}
+
+              {/* Workspaces */}
+              {workspaceProjects.length > 0 && (
+                <>
+                  {(activeProjects.length > 0 || favoriteProjectsList.length > 0 || monorepoProjects.length > 0) && (
+                    <div className="mx-1 my-1.5 border-t border-border-default" />
+                  )}
+                  <div className="mb-0.5 flex items-center gap-1.5 px-1.5 pt-0.5 pb-1">
+                    <Box className="h-3 w-3 text-cyan-400" />
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-faint">Workspaces</span>
+                  </div>
+                  {workspaceProjects.map(renderProject)}
+                </>
+              )}
+
               {/* Other projects */}
               {otherProjects.length > 0 && (
                 <>
-                  {(activeProjects.length > 0 || favoriteProjectsList.length > 0) && (
+                  {(activeProjects.length > 0 || favoriteProjectsList.length > 0 || monorepoProjects.length > 0 || workspaceProjects.length > 0) && (
                     <div className="mx-1 my-1.5 border-t border-border-default" />
                   )}
                   {otherProjects.map(renderProject)}
