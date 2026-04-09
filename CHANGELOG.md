@@ -20,6 +20,8 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **History filtered by workspace** — The sidebar history section now only shows sessions belonging to the selected workspace/scan path.
 
+- **Dynamic version display fix** — Version now correctly resolved from package.json using `import.meta.url` at startup, working in dev (tsx), prod (dist), and Electron. Falls back to `dev` if not found.
+
 - **Chat interrupt** — Stop button now interrupts the active SDK conversation immediately.
 
 - **Diff views in chat** — Edit/Write tool results show colored diffs (red for removed, green for added) instead of raw JSON. Bash commands show `$ command` with output below. File paths shown in tool headers.

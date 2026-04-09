@@ -17,6 +17,7 @@ export function createRoutes(
   streamProcess: StreamProcessManager,
   worktreeManager: WorktreeManager,
   taskStore: TaskStore,
+  appVersion: string,
 ): Router {
   const router = Router();
 
@@ -25,16 +26,9 @@ export function createRoutes(
     res.json({ status: 'ok' });
   });
 
-  // Version
-  router.get('/api/version', async (_req, res) => {
-    try {
-      const fsPromises = await import('fs/promises');
-      const pathMod = await import('path');
-      const pkg = JSON.parse(await fsPromises.readFile(pathMod.resolve(__dirname, '..', 'package.json'), 'utf-8'));
-      res.json({ version: pkg.version });
-    } catch {
-      res.json({ version: 'unknown' });
-    }
+  // Version — read from backend package.json at startup
+  router.get('/api/version', (_req, res) => {
+    res.json({ version: appVersion });
   });
 
   // Config

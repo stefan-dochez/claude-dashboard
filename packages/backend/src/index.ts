@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { ConfigService } from './config.js';
@@ -13,6 +15,22 @@ import { TaskStore } from './task-store.js';
 import { createRoutes } from './routes.js';
 import { setupSocketHandlers } from './socket.js';
 import { setupStreamSocketHandlers } from './stream-socket.js';
+
+async function readVersion(): Promise<string> {
+  const thisDir = path.dirname(fileURLToPath(import.meta.url));
+  // Try ../package.json (from src/ in dev or dist/ in prod)
+  const candidates = [
+    path.resolve(thisDir, '..', 'package.json'),
+    path.resolve(thisDir, '..', '..', 'package.json'),
+  ];
+  for (const candidate of candidates) {
+    try {
+      const pkg = JSON.parse(await fs.readFile(candidate, 'utf-8'));
+      if (pkg.version && pkg.version !== '0.0.0') return pkg.version;
+    } catch { /* try next */ }
+  }
+  return 'dev';
+}
 
 async function main(): Promise<void> {
   // Init services
@@ -28,6 +46,8 @@ async function main(): Promise<void> {
   const taskStore = new TaskStore();
   await taskStore.load();
   const streamProcess = new StreamProcessManager(config);
+  const appVersion = await readVersion();
+  console.log(`[server] Version: ${appVersion}`);
 
   // Express + Socket.io setup
   const app = express();
@@ -49,7 +69,7 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Routes
-  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore);
+  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion);
   app.use(routes);
 
   // In production, serve the frontend static files
