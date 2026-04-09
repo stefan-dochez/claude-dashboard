@@ -25,6 +25,18 @@ export function createRoutes(
     res.json({ status: 'ok' });
   });
 
+  // Version
+  router.get('/api/version', async (_req, res) => {
+    try {
+      const fsPromises = await import('fs/promises');
+      const pathMod = await import('path');
+      const pkg = JSON.parse(await fsPromises.readFile(pathMod.resolve(__dirname, '..', 'package.json'), 'utf-8'));
+      res.json({ version: pkg.version });
+    } catch {
+      res.json({ version: 'unknown' });
+    }
+  });
+
   // Config
   router.get('/api/config', async (_req, res) => {
     try {
@@ -88,6 +100,15 @@ export function createRoutes(
       return;
     }
 
+    // Verify the target directory exists (worktree may have been deleted)
+    try {
+      const fsPromises = await import('fs/promises');
+      await fsPromises.access(projectPath);
+    } catch {
+      res.status(404).json({ error: `Directory not found: ${projectPath}` });
+      return;
+    }
+
     try {
       let worktreePath: string | undefined;
       let branchName: string | undefined;
@@ -139,8 +160,28 @@ export function createRoutes(
           worktreePath,
           parentProjectPath,
           branchName,
+          resumeSessionId,
         });
-        // Terminal sessions are not persisted to history
+        // Persist terminal session to history (preserve firstPrompt when resuming)
+        const existingTask = resumeSessionId ? taskStore.findBySessionId(resumeSessionId) : undefined;
+        taskStore.addTask({
+          id: instance.id,
+          projectPath: instance.projectPath,
+          projectName: instance.projectName,
+          worktreePath: instance.worktreePath,
+          branchName: instance.branchName,
+          taskDescription: instance.taskDescription,
+          sessionId: instance.sessionId,
+          model: null,
+          totalCostUsd: 0,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          mode: 'terminal',
+          firstPrompt: existingTask?.firstPrompt ?? null,
+          title: existingTask?.title ?? null,
+          createdAt: instance.createdAt.toISOString(),
+          endedAt: null,
+        });
         res.status(201).json({ ...instance, mode: 'terminal' });
       }
     } catch (err) {

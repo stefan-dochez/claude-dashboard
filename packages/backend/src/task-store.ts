@@ -19,6 +19,7 @@ export interface StoredTask {
   totalOutputTokens: number;
   mode: 'terminal' | 'chat';
   firstPrompt: string | null;
+  title: string | null;
   createdAt: string;
   endedAt: string | null;
 }
@@ -34,6 +35,20 @@ export class TaskStore {
     } catch {
       this.tasks = [];
     }
+
+    // Close orphaned tasks from a previous crash/unclean shutdown
+    let orphansFixed = 0;
+    for (const task of this.tasks) {
+      if (!task.endedAt) {
+        task.endedAt = new Date().toISOString();
+        orphansFixed++;
+      }
+    }
+    if (orphansFixed > 0) {
+      console.log(`[task-store] Closed ${orphansFixed} orphaned task(s) from previous session`);
+      await this.save();
+    }
+
     return this.tasks;
   }
 
@@ -80,6 +95,18 @@ export class TaskStore {
   async removeTask(id: string): Promise<void> {
     this.tasks = this.tasks.filter(t => t.id !== id);
     await this.save();
+  }
+
+  async updateTitle(id: string, title: string): Promise<void> {
+    const task = this.tasks.find(t => t.id === id);
+    if (task) {
+      task.title = title;
+      await this.save();
+    }
+  }
+
+  findBySessionId(sessionId: string): StoredTask | undefined {
+    return this.tasks.find(t => t.sessionId === sessionId);
   }
 
   getAll(): StoredTask[] {

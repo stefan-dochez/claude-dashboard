@@ -6,6 +6,18 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Features
 
+- **Terminal session resume** — Terminal sessions now track their Claude session ID (`--session-id` at spawn). Resuming from history uses `--resume <sessionId>` to continue the conversation. Both terminal and chat sessions are persisted to the task store.
+
+- **Session history in launch modal** — New "History" tab in the launch modal shows past sessions for the selected project. Click to resume a session with its full conversation context.
+
+- **Auto-generated session titles** — After the first user message, a lightweight Haiku call generates a 3-8 word title summarizing the session. Displayed in the sidebar history and launch modal instead of the raw first prompt.
+
+- **Graceful shutdown persistence** — Active sessions are properly ended in the task store on app shutdown (SIGINT/SIGTERM). Orphaned tasks from crashes are auto-closed on next startup.
+
+- **Dynamic version display** — App version shown at the bottom of the sidebar, fetched from the backend (`/api/version`). Automatically reflects the version set by CI from git tags.
+
+- **Directory existence check** — The instance spawn route now verifies the target directory exists before launching, preventing crashes when resuming sessions on deleted worktrees.
+
 - **Chat interrupt** — Stop button now interrupts the active SDK conversation immediately.
 
 - **Diff views in chat** — Edit/Write tool results show colored diffs (red for removed, green for added) instead of raw JSON. Bash commands show `$ command` with output below. File paths shown in tool headers.

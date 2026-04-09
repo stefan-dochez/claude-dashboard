@@ -108,6 +108,8 @@ interface Instance {
   parentProjectPath: string | null;
   branchName: string | null;
   lastUserPrompt: string | null;
+  firstUserPrompt: string | null;
+  sessionId: string | null;
 }
 
 interface SpawnOptions {
@@ -116,6 +118,7 @@ interface SpawnOptions {
   worktreePath?: string;
   parentProjectPath?: string;
   branchName?: string;
+  resumeSessionId?: string;
 }
 
 interface PtyHandle {
@@ -155,9 +158,20 @@ export class ProcessManager extends EventEmitter {
     // Build a fresh env each time to avoid stale state after tsx watch reloads
     const env = buildPtyEnv();
 
-    console.log(`[process-manager] Spawning ${this.claudeBinary} in ${cwd}`);
+    // Build CLI args: either resume an existing session or start a new one with a controlled session ID
+    const args: string[] = [];
+    let sessionId: string;
+    if (options.resumeSessionId) {
+      args.push('--resume', options.resumeSessionId);
+      sessionId = options.resumeSessionId;
+    } else {
+      sessionId = randomUUID();
+      args.push('--session-id', sessionId);
+    }
 
-    const ptyProcess = pty.spawn(this.claudeBinary, [], {
+    console.log(`[process-manager] Spawning ${this.claudeBinary} in ${cwd} (session ${sessionId}, resume=${!!options.resumeSessionId})`);
+
+    const ptyProcess = pty.spawn(this.claudeBinary, args, {
       name: 'xterm-256color',
       cols: 120,
       rows: 30,
@@ -178,6 +192,8 @@ export class ProcessManager extends EventEmitter {
       parentProjectPath: options.parentProjectPath ?? null,
       branchName: options.branchName ?? null,
       lastUserPrompt: null,
+      firstUserPrompt: null,
+      sessionId,
     };
 
     const handle: PtyHandle = {
@@ -319,6 +335,10 @@ export class ProcessManager extends EventEmitter {
         const prompt = handle.inputLineBuffer.trim();
         if (prompt.length > 0) {
           handle.instance.lastUserPrompt = prompt;
+          if (!handle.instance.firstUserPrompt) {
+            handle.instance.firstUserPrompt = prompt.slice(0, 200);
+            this.emit('first_prompt', handle.instance.id, handle.instance.firstUserPrompt);
+          }
           this.emit('context', handle.instance.id, {
             taskDescription: handle.instance.taskDescription,
             lastUserPrompt: handle.instance.lastUserPrompt,

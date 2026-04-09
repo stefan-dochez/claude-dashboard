@@ -16,6 +16,7 @@ interface HistoryTask {
   totalCostUsd: number;
   mode: 'terminal' | 'chat';
   firstPrompt: string | null;
+  title: string | null;
   createdAt: string;
   endedAt: string | null;
 }
@@ -282,6 +283,7 @@ export default function Sidebar({
   const [selectedRoot, setSelectedRoot] = useState<string | null>(scanPaths[0] ?? null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryTask[]>([]);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -291,6 +293,10 @@ export default function Sidebar({
   }, []);
 
   const socket = useSocket();
+
+  useEffect(() => {
+    fetch('/api/version').then(r => r.json()).then(d => setAppVersion(d.version)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchHistory();
@@ -304,7 +310,8 @@ export default function Sidebar({
     // Use worktreePath if available (avoid creating a new worktree)
     const targetPath = task.worktreePath ?? task.projectPath;
     // Don't pass taskDescription — that would create a new worktree
-    onLaunchProject(targetPath, undefined, undefined, undefined, task.mode, task.mode === 'chat' ? task.sessionId ?? undefined : undefined);
+    // Pass sessionId for both chat and terminal modes to enable resume
+    onLaunchProject(targetPath, undefined, undefined, undefined, task.mode, task.sessionId ?? undefined);
   }, [onLaunchProject]);
 
   const handleRemoveHistory = useCallback(async (id: string) => {
@@ -555,7 +562,7 @@ export default function Sidebar({
             >
               {historyOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               <Clock className="h-3 w-3" />
-              <span>Chat History</span>
+              <span>History</span>
               <span className="ml-auto text-[10px] text-faint">{history.length}</span>
             </button>
             {historyOpen && (
@@ -565,9 +572,13 @@ export default function Sidebar({
                     key={task.id}
                     className="group/hist flex cursor-default items-start gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-elevated/30"
                   >
+                    {task.mode === 'chat'
+                      ? <MessageSquare className="mt-0.5 h-3 w-3 shrink-0 text-faint" />
+                      : <Terminal className="mt-0.5 h-3 w-3 shrink-0 text-faint" />
+                    }
                     <div className="min-w-0 flex-1">
                       <span className="block truncate text-[12px] text-tertiary">
-                        {task.firstPrompt ?? task.taskDescription ?? task.projectName}
+                        {task.title ?? task.firstPrompt ?? task.taskDescription ?? task.projectName}
                       </span>
                       <div className="flex items-center gap-2 text-[10px] text-faint">
                         <span className="truncate">{task.projectName}</span>
@@ -579,7 +590,7 @@ export default function Sidebar({
                       <span
                         onClick={() => handleResume(task)}
                         className="rounded p-0.5 text-faint transition-colors hover:text-green-400"
-                        title={task.mode === 'chat' && task.sessionId ? 'Resume conversation' : 'Relaunch'}
+                        title={task.sessionId ? 'Resume session' : 'Relaunch'}
                       >
                         <Play className="h-3 w-3" />
                       </span>
@@ -595,6 +606,13 @@ export default function Sidebar({
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Version */}
+        {appVersion && (
+          <div className="shrink-0 px-3 py-1.5 text-center text-[10px] text-faint">
+            v{appVersion}
           </div>
         )}
       </div>

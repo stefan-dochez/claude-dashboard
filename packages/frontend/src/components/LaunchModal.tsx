@@ -1,9 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap, MessageSquare, Terminal } from 'lucide-react';
+import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap, MessageSquare, Terminal, Clock } from 'lucide-react';
 import type { Project } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const MAIN_BRANCHES = ['main', 'master', 'develop'];
+
+interface HistoryTask {
+  id: string;
+  projectPath: string;
+  projectName: string;
+  worktreePath: string | null;
+  sessionId: string | null;
+  mode: 'terminal' | 'chat';
+  firstPrompt: string | null;
+  title: string | null;
+  taskDescription: string | null;
+  branchName: string | null;
+  totalCostUsd: number;
+  createdAt: string;
+  endedAt: string | null;
+}
 
 const BRANCH_PREFIXES = [
   { value: 'feat', label: 'feat/' },
@@ -24,7 +40,7 @@ interface BranchInfo {
 interface LaunchModalProps {
   project: Project;
   worktrees: Project[];
-  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => void;
+  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string) => void;
   onClose: () => void;
   onRefreshProjects: () => void;
 }
@@ -33,14 +49,44 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
   const [taskDescription, setTaskDescription] = useState('');
   const [branchPrefix, setBranchPrefix] = useState('feat');
   const [launchMode, setLaunchMode] = useState<'terminal' | 'chat'>('terminal');
-  const [mode, setMode] = useState<'new' | 'existing' | 'branches'>(worktrees.length > 0 ? 'existing' : 'new');
+  const [mode, setMode] = useState<'new' | 'existing' | 'branches' | 'history'>(worktrees.length > 0 ? 'existing' : 'new');
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [convertingBranch, setConvertingBranch] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryTask[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const modalRef = useFocusTrap<HTMLDivElement>();
 
   const isGit = project.gitBranch !== null;
   const canDetach = isGit && !project.isWorktree && project.gitBranch !== null && !MAIN_BRANCHES.includes(project.gitBranch);
+
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch('/api/tasks/history');
+      if (!res.ok) throw new Error('Failed to fetch history');
+      const all: HistoryTask[] = await res.json();
+      // Filter for this project (match on projectPath or worktreePath)
+      setHistory(all.filter(t => t.projectPath === project.path || t.worktreePath?.startsWith(project.path)));
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [project.path]);
+
+  useEffect(() => {
+    if (mode === 'history' && history.length === 0) {
+      fetchHistory();
+    }
+  }, [mode, history.length, fetchHistory]);
+
+  const handleResumeSession = (task: HistoryTask) => {
+    // Fall back to projectPath if worktree no longer exists
+    const targetPath = task.worktreePath ?? task.projectPath;
+    onLaunch(targetPath, undefined, undefined, undefined, task.mode, task.sessionId ?? undefined);
+    onClose();
+  };
 
   const fetchBranches = useCallback(async () => {
     setBranchesLoading(true);
@@ -212,35 +258,35 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
         )}
 
         {/* Mode tabs */}
-        {isGit && (
-          <div className="mb-3 flex rounded-md border border-border-input text-xs">
-            {worktrees.length > 0 && (
-              <button
-                onClick={() => setMode('existing')}
-                className={`flex-1 rounded-l-md px-3 py-1.5 font-medium transition-colors ${
-                  mode === 'existing'
-                    ? 'bg-hover text-primary'
-                    : 'text-muted hover:text-secondary'
-                }`}
-              >
-                Resume ({worktrees.length})
-              </button>
-            )}
+        <div className="mb-3 flex rounded-md border border-border-input text-xs">
+          {isGit && worktrees.length > 0 && (
             <button
-              onClick={() => setMode('new')}
-              className={`flex-1 px-3 py-1.5 font-medium transition-colors ${
-                worktrees.length === 0 ? 'rounded-l-md' : ''
-              } ${
-                mode === 'new'
+              onClick={() => setMode('existing')}
+              className={`flex-1 rounded-l-md px-3 py-1.5 font-medium transition-colors ${
+                mode === 'existing'
                   ? 'bg-hover text-primary'
                   : 'text-muted hover:text-secondary'
               }`}
             >
-              New task
+              Resume ({worktrees.length})
             </button>
+          )}
+          <button
+            onClick={() => setMode('new')}
+            className={`flex-1 px-3 py-1.5 font-medium transition-colors ${
+              !isGit || worktrees.length === 0 ? 'rounded-l-md' : ''
+            } ${
+              mode === 'new'
+                ? 'bg-hover text-primary'
+                : 'text-muted hover:text-secondary'
+            }`}
+          >
+            New task
+          </button>
+          {isGit && (
             <button
               onClick={() => setMode('branches')}
-              className={`flex-1 rounded-r-md px-3 py-1.5 font-medium transition-colors ${
+              className={`flex-1 px-3 py-1.5 font-medium transition-colors ${
                 mode === 'branches'
                   ? 'bg-hover text-primary'
                   : 'text-muted hover:text-secondary'
@@ -248,8 +294,18 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
             >
               Branches
             </button>
-          </div>
-        )}
+          )}
+          <button
+            onClick={() => setMode('history')}
+            className={`flex-1 rounded-r-md px-3 py-1.5 font-medium transition-colors ${
+              mode === 'history'
+                ? 'bg-hover text-primary'
+                : 'text-muted hover:text-secondary'
+            }`}
+          >
+            History
+          </button>
+        </div>
 
         {mode === 'existing' ? (
           /* Existing worktrees list */
@@ -301,6 +357,44 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
                   ) : (
                     <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-blue-400" />
                   )}
+                </button>
+              ))
+            )}
+          </div>
+        ) : mode === 'history' ? (
+          /* Session history for this project */
+          <div className="flex max-h-48 flex-col gap-1 overflow-y-auto">
+            {historyLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-4 w-4 animate-spin text-muted" />
+              </div>
+            ) : history.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted">
+                No previous sessions
+              </p>
+            ) : (
+              history.map(task => (
+                <button
+                  key={task.id}
+                  onClick={() => handleResumeSession(task)}
+                  disabled={!task.sessionId}
+                  className="group flex items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-elevated disabled:opacity-40"
+                >
+                  {task.mode === 'chat'
+                    ? <MessageSquare className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                    : <Terminal className="h-3.5 w-3.5 shrink-0 text-muted" />
+                  }
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-medium text-primary">
+                      {task.title ?? task.firstPrompt ?? task.taskDescription ?? 'Session'}
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-muted">
+                      {task.branchName && <span className="truncate">{task.branchName}</span>}
+                      {task.endedAt && <span>{new Date(task.endedAt).toLocaleDateString()}</span>}
+                      {task.totalCostUsd > 0 && <span>${task.totalCostUsd.toFixed(4)}</span>}
+                    </div>
+                  </div>
+                  <Play className="h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-green-400" />
                 </button>
               ))
             )}

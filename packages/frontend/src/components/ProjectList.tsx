@@ -140,7 +140,7 @@ interface ProjectListProps {
   favoriteProjects: Set<string>;
   pullingProjects: Set<string>;
   checkingOutProjects: Set<string>;
-  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => void;
+  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
@@ -241,9 +241,9 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     });
   }, []);
 
-  const handleLaunchFromModal = (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => {
+  const handleLaunchFromModal = (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string) => {
     setLaunching(projectPath);
-    onLaunch(projectPath, taskDescription, detachBranch, branchPrefix, mode);
+    onLaunch(projectPath, taskDescription, detachBranch, branchPrefix, mode, sessionId);
     setTimeout(() => setLaunching(null), 1000);
   };
 

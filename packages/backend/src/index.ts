@@ -63,7 +63,7 @@ async function main(): Promise<void> {
   }
 
   // WebSocket
-  setupSocketHandlers(io, processManager);
+  setupSocketHandlers(io, processManager, taskStore);
   setupStreamSocketHandlers(io, streamProcess, taskStore);
 
   // Start status monitoring
@@ -84,6 +84,19 @@ async function main(): Promise<void> {
     shuttingDown = true;
     console.log('[server] Shutting down...');
     statusMonitor.stop();
+
+    // End all active tasks in the store before killing processes
+    for (const inst of processManager.getAll()) {
+      await taskStore.endTask(inst.id);
+    }
+    for (const inst of streamProcess.getAll()) {
+      await taskStore.endTask(inst.id, {
+        totalCostUsd: inst.totalCostUsd,
+        totalInputTokens: inst.totalInputTokens,
+        totalOutputTokens: inst.totalOutputTokens,
+      });
+    }
+
     await processManager.killAll();
     await streamProcess.killAll();
     httpServer.close();

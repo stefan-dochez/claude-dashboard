@@ -1,7 +1,9 @@
 import type { Server, Socket } from 'socket.io';
 import type { ProcessManager, InstanceContext } from './process-manager.js';
+import type { TaskStore } from './task-store.js';
+import { generateSessionTitle } from './title-generator.js';
 
-export function setupSocketHandlers(io: Server, processManager: ProcessManager): void {
+export function setupSocketHandlers(io: Server, processManager: ProcessManager, taskStore?: TaskStore): void {
   // Track which sockets are attached to which instances
   const attachments = new Map<string, Set<string>>(); // instanceId -> Set<socketId>
 
@@ -28,6 +30,35 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager):
   // Forward context changes to all clients
   processManager.on('context', (instanceId: string, context: InstanceContext) => {
     io.emit('instance:context', { instanceId, ...context });
+  });
+
+  // Persist first user prompt to task store
+  processManager.on('first_prompt', (instanceId: string, firstPrompt: string) => {
+    if (taskStore) {
+      const instance = processManager.get(instanceId);
+      if (instance) {
+        taskStore.addTask({
+          id: instanceId,
+          projectPath: instance.projectPath,
+          projectName: instance.projectName,
+          worktreePath: instance.worktreePath,
+          branchName: instance.branchName,
+          taskDescription: instance.taskDescription,
+          sessionId: instance.sessionId,
+          model: null,
+          totalCostUsd: 0,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          mode: 'terminal',
+          firstPrompt,
+          title: null,
+          createdAt: instance.createdAt.toISOString(),
+          endedAt: null,
+        });
+        // Generate title in background
+        generateSessionTitle(taskStore, instanceId, firstPrompt);
+      }
+    }
   });
 
   io.on('connection', (socket: Socket) => {

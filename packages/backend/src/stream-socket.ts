@@ -1,6 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import type { StreamProcessManager, ChatMessage, ContentBlock } from './stream-process.js';
 import type { TaskStore } from './task-store.js';
+import { generateSessionTitle } from './title-generator.js';
 
 function instanceRoom(instanceId: string): string {
   return `stream:${instanceId}`;
@@ -41,6 +42,8 @@ export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProce
       const rec = info as Record<string, unknown>;
       const instance = streamProcess.get(instanceId);
       if (instance) {
+        const sessionId = (rec.sessionId as string) ?? null;
+        const existingTask = sessionId ? taskStore.findBySessionId(sessionId) : undefined;
         taskStore.addTask({
           id: instanceId,
           projectPath: instance.projectPath,
@@ -48,13 +51,14 @@ export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProce
           worktreePath: instance.worktreePath,
           branchName: instance.branchName,
           taskDescription: instance.taskDescription,
-          sessionId: (rec.sessionId as string) ?? null,
+          sessionId,
           model: (rec.model as string) ?? null,
           totalCostUsd: instance.totalCostUsd,
           totalInputTokens: instance.totalInputTokens,
           totalOutputTokens: instance.totalOutputTokens,
           mode: 'chat',
-          firstPrompt: instance.firstPrompt,
+          firstPrompt: instance.firstPrompt ?? existingTask?.firstPrompt ?? null,
+          title: existingTask?.title ?? null,
           createdAt: instance.createdAt.toISOString(),
           endedAt: null,
         });
@@ -107,7 +111,13 @@ export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProce
       effort?: string;
     }) => {
       try {
+        const instance = streamProcess.get(instanceId);
+        const isFirstPrompt = instance && !instance.firstPrompt;
         await streamProcess.sendMessage(instanceId, prompt, { model, permissionMode, effort });
+        // Generate title after the first user message
+        if (isFirstPrompt && taskStore) {
+          generateSessionTitle(taskStore, instanceId, prompt);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to send message';
         socket.emit('chat:error', { instanceId, error: message });
