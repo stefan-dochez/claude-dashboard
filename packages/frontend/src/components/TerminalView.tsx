@@ -80,10 +80,11 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
       }
     });
 
-    // Only accept the first history event per mount, and block live output
-    // until history has been received to prevent overlaps.
+    // Only accept the first history event per attach cycle, and block live
+    // output until history has been received to prevent overlaps.
     let historyWritten = false;
     let outputEnabled = false;
+    let attached = false;
 
     const onOutput = ({ instanceId: id, data }: { instanceId: string; data: string }) => {
       if (id === currentInstanceId && outputEnabled) {
@@ -102,22 +103,41 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
       }
     };
 
+    // Perform a resize + attach sequence.  Called on initial mount and
+    // again whenever the socket reconnects (new socket.id → old attachment
+    // is gone server-side, so we must re-attach to receive output).
+    let pendingAttachTimer: ReturnType<typeof setTimeout> | undefined;
+    const attachToInstance = () => {
+      historyWritten = false;
+      outputEnabled = false;
+
+      socket.emit('terminal:resize', {
+        instanceId: currentInstanceId,
+        cols: term.cols,
+        rows: term.rows,
+      });
+
+      clearTimeout(pendingAttachTimer);
+      pendingAttachTimer = setTimeout(() => {
+        socket.emit('terminal:attach', { instanceId: currentInstanceId });
+        attached = true;
+      }, 80);
+    };
+
+    // Re-attach after socket reconnection so live output resumes
+    const onConnect = () => {
+      if (attached) {
+        console.log(`[terminal] Socket reconnected, re-attaching to ${currentInstanceId}`);
+        attachToInstance();
+      }
+    };
+
     socket.on('terminal:output', onOutput);
     socket.on('terminal:history', onHistory);
+    socket.on('connect', onConnect);
 
-    // Send resize FIRST so the PTY has the correct dimensions before we
-    // request the buffer snapshot.  Claude Code redraws its TUI on resize,
-    // and the brief delay lets that redraw land in the buffer so the
-    // history we receive already reflects the correct terminal size.
-    socket.emit('terminal:resize', {
-      instanceId: currentInstanceId,
-      cols: term.cols,
-      rows: term.rows,
-    });
-
-    const attachTimer = setTimeout(() => {
-      socket.emit('terminal:attach', { instanceId: currentInstanceId });
-    }, 80);
+    // Initial attach
+    attachToInstance();
 
     // Handle container resize
     const resizeObserver = new ResizeObserver(() => {
@@ -134,10 +154,11 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
     resizeObserver.observe(containerRef.current);
 
     return () => {
-      clearTimeout(attachTimer);
+      clearTimeout(pendingAttachTimer);
       resizeObserver.disconnect();
       socket.off('terminal:output', onOutput);
       socket.off('terminal:history', onHistory);
+      socket.off('connect', onConnect);
       socket.emit('terminal:detach', { instanceId: currentInstanceId });
       term.dispose();
       termRef.current = null;

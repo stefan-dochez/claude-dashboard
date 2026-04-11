@@ -4,6 +4,10 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ## [Unreleased]
 
+### Bug Fixes
+
+- **Terminal output lost after socket reconnection** — When the WebSocket briefly disconnected (Wi-Fi hiccup, sleep/wake), the terminal would stop updating even though input still worked. Fixed by re-attaching to the PTY stream on socket reconnection. Also reordered backend attach logic to eliminate a potential output gap between history snapshot and live forwarding.
+
 ### Features
 
 - **Windows compatibility** — Cross-platform support for Windows: centralized platform abstractions (`platform.ts`), cross-platform postinstall script, `/dev/null` → `nul` on Windows, cross-platform path shortening via `usePlatform` hook, Windows process kill via `taskkill`, PTY terminal name adaptation, and PowerShell equivalents for all shell scripts.

@@ -67,27 +67,31 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
     socket.on('terminal:attach', ({ instanceId }: { instanceId: string }) => {
       console.log(`[socket] ${socket.id} attaching to ${instanceId}`);
 
-      // Send buffer history BEFORE adding to live output stream to avoid duplicates
+      // Capture the buffer snapshot, add to attachments, THEN send history.
+      // This order ensures no output is lost between the snapshot and the
+      // live forwarding.  The client gates live output behind a flag that
+      // only turns on after receiving history, so any overlap is harmless.
+      let buffer = '';
       try {
-        const buffer = processManager.getBuffer(instanceId);
-        socket.emit('terminal:history', { instanceId, data: buffer });
+        buffer = processManager.getBuffer(instanceId);
       } catch (err) {
         console.log(`[socket] Error getting buffer for ${instanceId}:`, err);
-        // Still send empty history so client knows to start accepting live output
-        socket.emit('terminal:history', { instanceId, data: '' });
       }
+
+      // Track attachment BEFORE sending history so no output slips through
+      if (!attachments.has(instanceId)) {
+        attachments.set(instanceId, new Set());
+      }
+      attachments.get(instanceId)!.add(socket.id);
+
+      // Now send history — client ignores live output until this arrives
+      socket.emit('terminal:history', { instanceId, data: buffer });
 
       // Also send current context data on attach
       const context = processManager.getContext(instanceId);
       if (context) {
         socket.emit('instance:context', { instanceId, ...context });
       }
-
-      // THEN track attachment for live output forwarding
-      if (!attachments.has(instanceId)) {
-        attachments.set(instanceId, new Set());
-      }
-      attachments.get(instanceId)!.add(socket.id);
     });
 
     socket.on('terminal:detach', ({ instanceId }: { instanceId: string }) => {
