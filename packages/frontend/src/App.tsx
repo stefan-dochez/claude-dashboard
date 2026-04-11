@@ -65,6 +65,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'main' | 'changes' | 'pr' | 'file'>('main');
   const [openedFile, setOpenedFile] = useState<string | null>(null);
 
+  // Code selection for chat context
+  const [codeSelection, setCodeSelection] = useState<{ filePath: string; startLine: number; endLine: number; code: string } | null>(null);
+
   const handleSelectInstance = useCallback((id: string | null) => {
     setSelectedInstanceId(prev => {
       // Only reset tab when switching to a different instance
@@ -79,6 +82,11 @@ export default function App() {
   const handleOpenFile = useCallback((filePath: string) => {
     setOpenedFile(filePath);
     setActiveTab('file');
+  }, []);
+
+  const handleSendToChat = useCallback((filePath: string, startLine: number, endLine: number, code: string) => {
+    setCodeSelection({ filePath, startLine, endLine, code });
+    setActiveTab('main');
   }, []);
 
   const { queue, skipInstance, jumpToInstance } = useAttentionQueue({
@@ -465,6 +473,8 @@ export default function App() {
                       initialModel={selectedInstance.model}
                       initialPermissionMode={null}
                       initialEffort={null}
+                      codeSelection={codeSelection}
+                      onClearCodeSelection={() => setCodeSelection(null)}
                     />
                   ) : (
                     <TerminalView
@@ -488,6 +498,7 @@ export default function App() {
                   key={openedFile}
                   filePath={openedFile}
                   onClose={() => { setOpenedFile(null); setActiveTab('main'); }}
+                  onSendToChat={selectedInstance?.mode === 'chat' ? handleSendToChat : undefined}
                 />
               ) : activeTab === 'changes' ? (
                 <ChangesView

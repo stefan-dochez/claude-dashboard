@@ -5,7 +5,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {
   Send, Square, Loader2, ChevronDown, ChevronRight,
-  Wrench, AlertCircle, CheckCircle2, Brain, User, Bot,
+  Wrench, AlertCircle, AlertTriangle, CheckCircle2, Brain, User, Bot,
   Sparkles, Shield, CircleStop, Plus, X,
   FileText, GitBranch, GitCommit, FileCode2,
 } from 'lucide-react';
@@ -18,6 +18,13 @@ interface ContextItem {
   value: string;
 }
 
+export interface CodeSelection {
+  filePath: string;
+  startLine: number;
+  endLine: number;
+  code: string;
+}
+
 interface ChatViewProps {
   instanceId: string;
   projectPath: string;
@@ -26,6 +33,8 @@ interface ChatViewProps {
   initialModel?: string | null;
   initialPermissionMode?: string | null;
   initialEffort?: string | null;
+  codeSelection?: CodeSelection | null;
+  onClearCodeSelection?: () => void;
 }
 
 // --------------- Block grouping ---------------
@@ -565,11 +574,32 @@ function Dropdown<T extends string>({ value, options, onChange, icon: Icon, labe
   );
 }
 
+// --------------- Rate Limit Countdown ---------------
+
+function RateLimitCountdown({ resetsAt }: { resetsAt: number }) {
+  const [remaining, setRemaining] = useState('');
+  useEffect(() => {
+    const update = () => {
+      const diff = Math.max(0, Math.ceil((resetsAt * 1000 - Date.now()) / 1000));
+      if (diff <= 0) { setRemaining(''); return; }
+      const m = Math.floor(diff / 60);
+      const s = diff % 60;
+      setRemaining(m > 0 ? `${m}m ${s.toString().padStart(2, '0')}s` : `${s}s`);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [resetsAt]);
+  if (!remaining) return null;
+  return <span className="tabular-nums">— resumes in {remaining}</span>;
+}
+
 // --------------- Main ChatView ---------------
 
 export default function ChatView({
   instanceId, projectPath, status, onTypingChange,
   initialModel, initialPermissionMode, initialEffort,
+  codeSelection, onClearCodeSelection,
 }: ChatViewProps) {
   const socket = useSocket();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -586,6 +616,22 @@ export default function ChatView({
   const [input, setInput] = useState('');
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+
+  // @-mention autocomplete
+  const [mentionActive, setMentionActive] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionResults, setMentionResults] = useState<Array<{ label: string; insertText: string }>>([]);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const mentionSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Staleness recovery
+  const stalenessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Rate limit
+  const [rateLimitInfo, setRateLimitInfo] = useState<{ resetsAt?: number } | null>(null);
+
+  // Context usage
+  const [contextUsage, setContextUsage] = useState<{ usedTokens: number; maxTokens: number } | null>(null);
 
   // Context attachments
   const [contextItems, setContextItems] = useState<ContextItem[]>([]);
@@ -634,6 +680,44 @@ export default function ChatView({
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Staleness timer — reset UI if no events for 30s during streaming
+  const resetStalenessTimer = useCallback(() => {
+    if (stalenessTimerRef.current) clearTimeout(stalenessTimerRef.current);
+    stalenessTimerRef.current = setTimeout(() => {
+      setSending(false);
+      setToolProgress(null);
+    }, 30_000);
+  }, []);
+
+  const clearStalenessTimer = useCallback(() => {
+    if (stalenessTimerRef.current) {
+      clearTimeout(stalenessTimerRef.current);
+      stalenessTimerRef.current = null;
+    }
+  }, []);
+
+  // @-mention search
+  useEffect(() => {
+    if (!mentionActive || !mentionQuery) {
+      setMentionResults([]);
+      return;
+    }
+    if (mentionSearchTimer.current) clearTimeout(mentionSearchTimer.current);
+    mentionSearchTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/files/search?path=${encodeURIComponent(projectPath)}&q=${encodeURIComponent(mentionQuery)}`);
+        if (res.ok) {
+          const files: Array<{ name: string; path: string; relative: string }> = await res.json();
+          setMentionResults(files.slice(0, 12).map(f => ({ label: f.relative, insertText: f.relative })));
+          setMentionIndex(0);
+        }
+      } catch {
+        setMentionResults([]);
+      }
+    }, 150);
+    return () => { if (mentionSearchTimer.current) clearTimeout(mentionSearchTimer.current); };
+  }, [mentionActive, mentionQuery, projectPath]);
+
   // Load message history
   useEffect(() => {
     fetch(`/api/instances/${instanceId}/messages`)
@@ -671,6 +755,7 @@ export default function ChatView({
 
     const onStreamDelta = ({ instanceId: id, text, thinking }: { instanceId: string; text?: string; thinking?: string }) => {
       if (id !== currentId) return;
+      resetStalenessTimer();
       if (text) {
         deltaBufferRef.current += text;
         if (!flushTimerRef.current) {
@@ -698,6 +783,7 @@ export default function ChatView({
 
     const onToolProgress = ({ instanceId: id, toolName, elapsedSeconds }: { instanceId: string; toolName: string; elapsedSeconds: number }) => {
       if (id !== currentId) return;
+      resetStalenessTimer();
       setToolProgress({ toolName, elapsedSeconds });
     };
 
@@ -721,6 +807,7 @@ export default function ChatView({
       instanceId: string; toolName: string; toolInput: unknown; toolUseId: string; title?: string; description?: string;
     }) => {
       if (id !== currentId) return;
+      clearStalenessTimer();
       setPermissionQueue(prev => [...prev, data]);
     };
 
@@ -728,13 +815,29 @@ export default function ChatView({
       instanceId: string; toolUseId: string; questions: Array<{ question: string; options?: Array<{ label: string }> }>;
     }) => {
       if (id !== currentId) return;
+      clearStalenessTimer();
       setPendingQuestion(data);
     };
 
-    const onResult = ({ instanceId: id }: { instanceId: string }) => {
+    const onResult = ({ instanceId: id, usedTokens, maxTokens }: { instanceId: string; usedTokens?: number; maxTokens?: number }) => {
       if (id !== currentId) return;
+      clearStalenessTimer();
       setSending(false);
       setToolProgress(null);
+      if (usedTokens != null && maxTokens != null && maxTokens > 0) {
+        setContextUsage({ usedTokens, maxTokens });
+      }
+    };
+
+    const onRateLimit = ({ instanceId: id, resetsAt }: { instanceId: string; resetsAt?: number }) => {
+      if (id !== currentId) return;
+      setRateLimitInfo({ resetsAt });
+      if (resetsAt) {
+        const delay = (resetsAt * 1000) - Date.now();
+        if (delay > 0 && delay < 600_000) {
+          setTimeout(() => setRateLimitInfo(null), delay + 1000);
+        }
+      }
     };
 
     socket.on('chat:message', onMessage);
@@ -747,6 +850,7 @@ export default function ChatView({
     socket.on('chat:permission_request', onPermissionRequest);
     socket.on('chat:user_question', onUserQuestion);
     socket.on('chat:result', onResult);
+    socket.on('chat:rate_limit', onRateLimit);
 
     return () => {
       socket.emit('instance:leave', { instanceId: currentId });
@@ -760,6 +864,8 @@ export default function ChatView({
       socket.off('chat:permission_request', onPermissionRequest);
       socket.off('chat:user_question', onUserQuestion);
       socket.off('chat:result', onResult);
+      socket.off('chat:rate_limit', onRateLimit);
+      clearStalenessTimer();
       if (flushTimerRef.current) cancelAnimationFrame(flushTimerRef.current);
       if (thinkingFlushTimerRef.current) cancelAnimationFrame(thinkingFlushTimerRef.current);
       if (onTypingChange) onTypingChange(false);
@@ -846,9 +952,18 @@ export default function ChatView({
     setStreamingBlocks([]);
 
     // Build prompt with context
+    const allContext = [...contextItems];
+    if (codeSelection) {
+      allContext.push({
+        type: 'file',
+        label: `${codeSelection.filePath.split('/').pop()}:${codeSelection.startLine}-${codeSelection.endLine}`,
+        value: codeSelection.code,
+      });
+    }
+
     let prompt = text;
-    if (contextItems.length > 0) {
-      const contextParts = contextItems.map(c => {
+    if (allContext.length > 0) {
+      const contextParts = allContext.map(c => {
         switch (c.type) {
           case 'file': return `[File: ${c.label}]\n${c.value}`;
           case 'branch': return `[Git Branch: ${c.label}]`;
@@ -859,6 +974,7 @@ export default function ChatView({
       });
       prompt = `Context:\n${contextParts.join('\n\n')}\n\n---\n\n${text}`;
       setContextItems([]);
+      onClearCodeSelection?.();
     }
 
     socket.emit('chat:send', {
@@ -869,25 +985,68 @@ export default function ChatView({
       effort: effortLevel,
     });
 
+    resetStalenessTimer();
     if (onTypingChange) onTypingChange(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setTimeout(scrollToBottom, 50);
-  }, [input, sending, instanceId, socket, selectedModel, permissionMode, effortLevel, onTypingChange, scrollToBottom, contextItems]);
+  }, [input, sending, instanceId, socket, selectedModel, permissionMode, effortLevel, onTypingChange, scrollToBottom, contextItems, codeSelection, onClearCodeSelection, resetStalenessTimer]);
+
+  const handleMentionSelect = useCallback((result: { label: string; insertText: string }) => {
+    const cursorPos = textareaRef.current?.selectionStart ?? input.length;
+    const beforeCursor = input.slice(0, cursorPos);
+    const atIdx = beforeCursor.lastIndexOf('@');
+    if (atIdx >= 0) {
+      const newInput = input.slice(0, atIdx) + '@' + result.insertText + ' ' + input.slice(cursorPos);
+      setInput(newInput);
+    }
+    setMentionActive(false);
+    setMentionQuery('');
+  }, [input]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // @-mention keyboard navigation
+    if (mentionActive && mentionResults.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(prev => Math.min(prev + 1, mentionResults.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(prev => Math.max(prev - 1, 0)); return; }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault();
+        handleMentionSelect(mentionResults[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') { e.preventDefault(); setMentionActive(false); setMentionQuery(''); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  }, [handleSend]);
+  }, [handleSend, mentionActive, mentionResults, mentionIndex, handleMentionSelect]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
+    const val = e.target.value;
+    setInput(val);
     // Auto-grow
     const ta = e.target;
     ta.style.height = 'auto';
     ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
-    if (onTypingChange) onTypingChange(e.target.value.length > 0);
+    if (onTypingChange) onTypingChange(val.length > 0);
+
+    // @-mention detection
+    const cursorPos = e.target.selectionStart;
+    const beforeCursor = val.slice(0, cursorPos);
+    const atIdx = beforeCursor.lastIndexOf('@');
+    if (atIdx >= 0 && (atIdx === 0 || /\s/.test(beforeCursor[atIdx - 1]))) {
+      const query = beforeCursor.slice(atIdx + 1);
+      if (!query.includes(' ') && query.length > 0) {
+        setMentionActive(true);
+        setMentionQuery(query);
+      } else {
+        setMentionActive(false);
+        setMentionQuery('');
+      }
+    } else {
+      setMentionActive(false);
+      setMentionQuery('');
+    }
   }, [onTypingChange]);
 
   // Permission handlers
@@ -920,6 +1079,21 @@ export default function ChatView({
             <span>{sessionInfo.mcpServers.length} MCP</span>
           )}
           {sessionInfo.permissionMode && <span>Mode: {sessionInfo.permissionMode}</span>}
+          {contextUsage && contextUsage.maxTokens > 0 && (
+            <span className="flex items-center gap-1.5" title={`${contextUsage.usedTokens.toLocaleString()} / ${contextUsage.maxTokens.toLocaleString()} tokens`}>
+              <div className="h-1 w-16 overflow-hidden rounded-full bg-elevated">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    contextUsage.usedTokens / contextUsage.maxTokens > 0.9 ? 'bg-rose-400'
+                      : contextUsage.usedTokens / contextUsage.maxTokens > 0.7 ? 'bg-amber-400'
+                      : 'bg-emerald-400'
+                  }`}
+                  style={{ width: `${Math.min(100, (contextUsage.usedTokens / contextUsage.maxTokens) * 100)}%` }}
+                />
+              </div>
+              <span>{Math.round((contextUsage.usedTokens / contextUsage.maxTokens) * 100)}% ctx</span>
+            </span>
+          )}
         </div>
       )}
 
@@ -964,6 +1138,35 @@ export default function ChatView({
         </div>
       )}
 
+      {/* Rate limit banner */}
+      {rateLimitInfo && (
+        <div className="border-t border-amber-500/20 bg-amber-500/5 px-4 py-2">
+          <div className="mx-auto flex max-w-3xl items-center gap-2 text-xs text-amber-400">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            <span>Rate limit reached {rateLimitInfo.resetsAt && <RateLimitCountdown resetsAt={rateLimitInfo.resetsAt} />}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Context usage warning */}
+      {contextUsage && contextUsage.maxTokens > 0 && contextUsage.usedTokens / contextUsage.maxTokens > 0.8 && (
+        <div className={`border-t px-4 py-1.5 ${
+          contextUsage.usedTokens / contextUsage.maxTokens > 0.95
+            ? 'border-rose-500/20 bg-rose-500/5'
+            : 'border-amber-500/20 bg-amber-500/5'
+        }`}>
+          <div className="mx-auto flex max-w-3xl items-center gap-2 text-[11px]">
+            <AlertTriangle className={`h-3 w-3 shrink-0 ${
+              contextUsage.usedTokens / contextUsage.maxTokens > 0.95 ? 'text-rose-400' : 'text-amber-400'
+            }`} />
+            <span className={contextUsage.usedTokens / contextUsage.maxTokens > 0.95 ? 'text-rose-300' : 'text-amber-300'}>
+              Context {Math.round((contextUsage.usedTokens / contextUsage.maxTokens) * 100)}% full
+              {contextUsage.usedTokens / contextUsage.maxTokens > 0.95 && ' — consider starting a new task or using /compact'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Permission prompt */}
       {pendingPermission && (
         <PermissionPrompt
@@ -984,8 +1187,8 @@ export default function ChatView({
       {/* Input bar */}
       <div className="border-t border-border-default bg-surface px-4 py-3">
         <div className="mx-auto max-w-3xl">
-          {/* Context chips */}
-          {contextItems.length > 0 && (
+          {/* Context chips + code selection */}
+          {(contextItems.length > 0 || codeSelection) && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {contextItems.map(item => (
                 <span key={item.value} className="flex items-center gap-1 rounded bg-elevated px-2 py-0.5 text-[11px] text-secondary">
@@ -999,11 +1202,43 @@ export default function ChatView({
                   </button>
                 </span>
               ))}
+              {codeSelection && (
+                <span className="flex items-center gap-1 rounded border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] text-violet-300">
+                  <FileText className="h-2.5 w-2.5" />
+                  <span className="max-w-[200px] truncate">{codeSelection.filePath.split('/').pop()}:{codeSelection.startLine}-{codeSelection.endLine}</span>
+                  <span className="text-[9px] text-violet-300/60">{codeSelection.endLine - codeSelection.startLine + 1}L</span>
+                  <button onClick={onClearCodeSelection} className="text-violet-300/50 hover:text-violet-200">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              )}
             </div>
           )}
 
           {/* Textarea row */}
           <div className="relative flex gap-2">
+            {/* @-mention dropdown */}
+            {mentionActive && mentionResults.length > 0 && (
+              <div className="absolute bottom-full left-6 right-0 z-20 mb-1">
+                <div className="overflow-hidden rounded-lg border border-border-input bg-popover shadow-xl">
+                  <div className="max-h-48 overflow-y-auto py-1">
+                    {mentionResults.map((result, i) => (
+                      <button
+                        key={result.label}
+                        onMouseDown={e => { e.preventDefault(); handleMentionSelect(result); }}
+                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors ${
+                          i === mentionIndex ? 'bg-elevated text-primary' : 'text-tertiary hover:bg-hover'
+                        }`}
+                      >
+                        <FileText className="h-3 w-3 shrink-0 text-blue-400" />
+                        <span className="min-w-0 truncate">{result.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Context menu button */}
             <div ref={contextMenuRef} className="relative shrink-0">
               <button

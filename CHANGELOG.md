@@ -18,6 +18,16 @@ All notable changes to Claude Dashboard since the initial commit.
 
 - **Code search modal** — Full-text search across project files (Cmd+Shift+F). Debounced grep-based search with results grouped by file, line numbers, match highlighting, and keyboard navigation (arrows + Enter). Opens the selected file in the file viewer.
 
+- **@-mention autocomplete** — Type `@` in the chat input to search project files inline. Debounced search (150ms), keyboard navigation (↑↓/Tab/Enter), results inserted as file references. Works alongside the existing `+` context menu.
+
+- **Staleness recovery** — If no streaming events are received for 30 seconds during chat processing, the UI automatically resets the sending state to prevent permanently stuck sessions. Clears on permission/question prompts.
+
+- **Rate limit countdown** — When the API rate-limits a chat session, an amber banner shows the remaining time before the limit resets. Auto-dismisses when the cooldown expires.
+
+- **Context usage bar** — Progress bar in the session info showing context window consumption (tokens used / max). Color-coded: green (<70%), amber (70-90%), red (>90%). Warning banner when context exceeds 80%, with `/compact` suggestion above 95%.
+
+- **Code selection to chat** — Select code in the FileViewer, click "Send to chat" to attach it as context. Shows as a violet chip with file name, line range, and line count. Cleared after sending.
+
 - **Terminal session resume** — Terminal sessions now track their Claude session ID (`--session-id` at spawn). Resuming from history uses `--resume <sessionId>` to continue the conversation. Both terminal and chat sessions are persisted to the task store.
 
 - **Session history in launch modal** — New "History" tab in the launch modal shows past sessions for the selected project. Click to resume a session with its full conversation context.
