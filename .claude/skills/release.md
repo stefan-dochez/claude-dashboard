@@ -1,9 +1,9 @@
 ---
-name: ship-version
-description: Bump version, update changelog, commit, push, and tag. Use when the user asks to commit+push or ship changes.
+name: release
+description: Bump version, update changelog, commit, push, and tag. Use when the user asks to release, commit+push, or "version bump" changes. NOT the same as the "ship" skill which creates PRs.
 ---
 
-# Ship Version
+# Release
 
 Complete workflow to ship changes: bump version, update CHANGELOG, commit, push, and create a git tag.
 
