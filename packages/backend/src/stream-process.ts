@@ -2,6 +2,9 @@ import path from 'path';
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
 import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
+import { createLogger } from './logger.js';
+
+const log = createLogger('stream-process');
 import type {
   Query,
   SDKMessage,
@@ -210,13 +213,13 @@ export class StreamProcessManager extends EventEmitter {
         const cwd = instance.worktreePath ?? instance.projectPath;
         const sdkMessages = await getSessionMessages(options.sessionId, { dir: cwd });
         instance.messages = this.mapSessionMessages(sdkMessages);
-        console.log(`[stream-process] Loaded ${instance.messages.length} messages from session ${options.sessionId}`);
+        log.info(`Loaded ${instance.messages.length} messages from session ${options.sessionId}`);
       } catch (err) {
-        console.log(`[stream-process] Failed to load session history:`, err);
+        log.warn(`Failed to load session history:`, err);
       }
     }
 
-    console.log(`[stream-process] Created instance ${id} for ${options.worktreePath ?? options.projectPath}`);
+    log.info(`Created instance ${id} for ${options.worktreePath ?? options.projectPath}`);
     return instance;
   }
 
@@ -355,7 +358,7 @@ export class StreamProcessManager extends EventEmitter {
 
     // Process in background
     this.processConversation(instanceId, conversation).catch(err => {
-      console.log(`[stream-process] Conversation error for ${instanceId}:`, err);
+      log.error(`Conversation error for ${instanceId}:`, err);
     });
   }
 
@@ -408,12 +411,12 @@ export class StreamProcessManager extends EventEmitter {
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        console.log(`[stream-process] Conversation aborted for ${instanceId}`);
+        log.info(`Conversation aborted for ${instanceId}`);
       } else {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        console.log(`[stream-process] Conversation error for ${instanceId}:`, errorMsg);
+        log.error(`Conversation error for ${instanceId}:`, errorMsg);
         if (err instanceof Error && err.stack) {
-          console.log(`[stream-process] Stack:`, err.stack);
+          log.debug(`Stack:`, err.stack);
         }
         this.emit('error', instanceId, errorMsg);
       }

@@ -2,38 +2,36 @@ import type { Server, Socket } from 'socket.io';
 import type { ProcessManager, InstanceContext } from './process-manager.js';
 import type { TaskStore } from './task-store.js';
 import { generateSessionTitle } from './title-generator.js';
+import { createLogger } from './logger.js';
 
-export function setupSocketHandlers(io: Server, processManager: ProcessManager, taskStore?: TaskStore): void {
+const log = createLogger('socket');
+
+export function setupSocketHandlers(io: Server, processManager: ProcessManager, taskStore?: TaskStore): () => void {
   // Track which sockets are attached to which instances
   const attachments = new Map<string, Set<string>>(); // instanceId -> Set<socketId>
 
-  // Forward PTY output to attached sockets
-  processManager.on('output', (instanceId: string, data: string) => {
+  // Named handlers so they can be removed on cleanup
+  const onOutput = (instanceId: string, data: string) => {
     const sockets = attachments.get(instanceId);
     if (!sockets || sockets.size === 0) return;
-
     for (const socketId of sockets) {
       io.to(socketId).emit('terminal:output', { instanceId, data });
     }
-  });
+  };
 
-  // Forward status changes to all clients
-  processManager.on('status', (instanceId: string, status: string) => {
+  const onStatus = (instanceId: string, status: string) => {
     io.emit('instance:status', { instanceId, status });
-  });
+  };
 
-  // Forward exit events to all clients
-  processManager.on('exited', (instanceId: string, exitCode: number) => {
+  const onExited = (instanceId: string, exitCode: number) => {
     io.emit('instance:exited', { instanceId, exitCode });
-  });
+  };
 
-  // Forward context changes to all clients
-  processManager.on('context', (instanceId: string, context: InstanceContext) => {
+  const onContext = (instanceId: string, context: InstanceContext) => {
     io.emit('instance:context', { instanceId, ...context });
-  });
+  };
 
-  // Persist first user prompt to task store
-  processManager.on('first_prompt', (instanceId: string, firstPrompt: string) => {
+  const onFirstPrompt = (instanceId: string, firstPrompt: string) => {
     if (taskStore) {
       const instance = processManager.get(instanceId);
       if (instance) {
@@ -55,17 +53,22 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
           createdAt: instance.createdAt.toISOString(),
           endedAt: null,
         });
-        // Generate title in background
         generateSessionTitle(taskStore, instanceId, firstPrompt);
       }
     }
-  });
+  };
+
+  processManager.on('output', onOutput);
+  processManager.on('status', onStatus);
+  processManager.on('exited', onExited);
+  processManager.on('context', onContext);
+  processManager.on('first_prompt', onFirstPrompt);
 
   io.on('connection', (socket: Socket) => {
-    console.log(`[socket] Client connected: ${socket.id}`);
+    log.info(`Client connected: ${socket.id}`);
 
     socket.on('terminal:attach', ({ instanceId }: { instanceId: string }) => {
-      console.log(`[socket] ${socket.id} attaching to ${instanceId}`);
+      log.debug(`${socket.id} attaching to ${instanceId}`);
 
       // Capture the buffer snapshot, add to attachments, THEN send history.
       // This order ensures no output is lost between the snapshot and the
@@ -75,7 +78,7 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
       try {
         buffer = processManager.getBuffer(instanceId);
       } catch (err) {
-        console.log(`[socket] Error getting buffer for ${instanceId}:`, err);
+        log.error(`Error getting buffer for ${instanceId}:`, err);
       }
 
       // Track attachment BEFORE sending history so no output slips through
@@ -97,7 +100,7 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
     socket.on('terminal:detach', ({ instanceId }: { instanceId: string }) => {
       const wasAttached = attachments.get(instanceId)?.delete(socket.id) ?? false;
       if (wasAttached) {
-        console.log(`[socket] ${socket.id} detaching from ${instanceId}`);
+        log.debug(`${socket.id} detaching from ${instanceId}`);
       }
     });
 
@@ -105,7 +108,7 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
       try {
         processManager.write(instanceId, data);
       } catch (err) {
-        console.log(`[socket] Error writing to ${instanceId}:`, err);
+        log.error(`Error writing to ${instanceId}:`, err);
       }
     });
 
@@ -113,16 +116,24 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
       try {
         processManager.resize(instanceId, cols, rows);
       } catch (err) {
-        console.log(`[socket] Error resizing ${instanceId}:`, err);
+        log.error(`Error resizing ${instanceId}:`, err);
       }
     });
 
     socket.on('disconnect', () => {
-      console.log(`[socket] Client disconnected: ${socket.id}`);
-      // Remove this socket from all attachments
+      log.info(`Client disconnected: ${socket.id}`);
       for (const [, sockets] of attachments) {
         sockets.delete(socket.id);
       }
     });
   });
+
+  // Return cleanup function to remove all listeners
+  return () => {
+    processManager.off('output', onOutput);
+    processManager.off('status', onStatus);
+    processManager.off('exited', onExited);
+    processManager.off('context', onContext);
+    processManager.off('first_prompt', onFirstPrompt);
+  };
 }

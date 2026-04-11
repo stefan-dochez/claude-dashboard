@@ -15,6 +15,9 @@ import { TaskStore } from './task-store.js';
 import { createRoutes } from './routes.js';
 import { setupSocketHandlers } from './socket.js';
 import { setupStreamSocketHandlers } from './stream-socket.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('server');
 
 async function readVersion(): Promise<string> {
   const thisDir = path.dirname(fileURLToPath(import.meta.url));
@@ -47,7 +50,7 @@ async function main(): Promise<void> {
   await taskStore.load();
   const streamProcess = new StreamProcessManager(config);
   const appVersion = await readVersion();
-  console.log(`[server] Version: ${appVersion}`);
+  log.info(`Version: ${appVersion}`);
 
   // Express + Socket.io setup
   const app = express();
@@ -91,18 +94,18 @@ async function main(): Promise<void> {
 
   // Initial project scan
   scanner.scan().catch(err => {
-    console.log('[server] Initial scan failed:', err);
+    log.warn('Initial scan failed:', err);
   });
 
   // Graceful shutdown
   let shuttingDown = false;
   const shutdown = async () => {
     if (shuttingDown) {
-      console.log('[server] Force exit');
+      log.warn('Force exit');
       process.exit(1);
     }
     shuttingDown = true;
-    console.log('[server] Shutting down...');
+    log.info('Shutting down...');
     statusMonitor.stop();
 
     // End all active tasks in the store before killing processes
@@ -127,11 +130,11 @@ async function main(): Promise<void> {
   process.on('SIGTERM', shutdown);
 
   httpServer.listen(PORT, () => {
-    console.log(`[server] Claude Dashboard backend on http://localhost:${PORT}`);
+    log.info(`Claude Dashboard backend on http://localhost:${PORT}`);
   });
 }
 
 main().catch(err => {
-  console.error('[server] Fatal error:', err);
+  log.error('Fatal error:', err);
   process.exit(1);
 });

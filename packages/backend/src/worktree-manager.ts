@@ -3,6 +3,9 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import { IS_WINDOWS, NULL_DEVICE, PATH_SEP, getExtraPaths } from './platform.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('worktree-manager');
 
 const execPromise = promisify(exec);
 
@@ -82,13 +85,13 @@ export class WorktreeManager {
           timeout: 30000,
         });
         startPoint = `origin/${defaultBranch}`;
-        console.log(`[worktree-manager] Using ${startPoint} as starting point`);
+        log.info(` Using ${startPoint} as starting point`);
       } catch {
-        console.log(`[worktree-manager] Failed to fetch origin, using current HEAD`);
+        log.info(` Failed to fetch origin, using current HEAD`);
       }
     }
 
-    console.log(`[worktree-manager] Creating worktree at ${worktreePath} (branch: ${finalBranch})`);
+    log.info(` Creating worktree at ${worktreePath} (branch: ${finalBranch})`);
 
     const startArg = startPoint ? ` "${startPoint}"` : '';
     await execAsync(`git worktree add -b "${finalBranch}" "${worktreePath}"${startArg}`, {
@@ -97,7 +100,7 @@ export class WorktreeManager {
       timeout: 30000,
     });
 
-    console.log(`[worktree-manager] Worktree created successfully`);
+    log.info(` Worktree created successfully`);
 
     return { worktreePath, branchName: finalBranch };
   }
@@ -159,7 +162,7 @@ export class WorktreeManager {
       worktreePath = `${projectPath}--${slug}-${suffix}`;
     }
 
-    console.log(`[worktree-manager] Creating worktree for branch ${branchName} at ${worktreePath}`);
+    log.info(` Creating worktree for branch ${branchName} at ${worktreePath}`);
 
     await execAsync(`git worktree add "${worktreePath}" "${branchName}"`, {
       cwd: projectPath,
@@ -167,7 +170,7 @@ export class WorktreeManager {
       timeout: 30000,
     });
 
-    console.log(`[worktree-manager] Worktree created successfully`);
+    log.info(` Worktree created successfully`);
 
     return { worktreePath, branchName };
   }
@@ -210,7 +213,7 @@ export class WorktreeManager {
       // non-fatal — checkout succeeded
     }
 
-    console.log(`[worktree-manager] Switched ${projectPath} from ${currentBranch} to ${defaultBranch}`);
+    log.info(` Switched ${projectPath} from ${currentBranch} to ${defaultBranch}`);
     return { success: true, message: `Switched to ${defaultBranch}`, branch: defaultBranch };
   }
 
@@ -239,7 +242,7 @@ export class WorktreeManager {
       worktreePath = `${projectPath}--${slug}-${suffix}`;
     }
 
-    console.log(`[worktree-manager] Detaching branch ${currentBranch} to worktree at ${worktreePath}`);
+    log.info(` Detaching branch ${currentBranch} to worktree at ${worktreePath}`);
 
     // Step 1: Stash any local changes (including untracked files)
     const { stdout: stashOutput } = await execAsync('git stash push -u -m "claude-dashboard: detach branch"', {
@@ -250,7 +253,7 @@ export class WorktreeManager {
     const stashResult = stashOutput.trim();
     const hasStash = !stashResult.includes('No local changes');
     if (hasStash) {
-      console.log(`[worktree-manager] Stashed local changes`);
+      log.info(` Stashed local changes`);
     }
 
     // Step 2: Fetch origin and switch repo to default branch
@@ -261,7 +264,7 @@ export class WorktreeManager {
         timeout: 30000,
       });
     } catch {
-      console.log(`[worktree-manager] Failed to fetch origin, continuing with local state`);
+      log.info(` Failed to fetch origin, continuing with local state`);
     }
 
     try {
@@ -277,9 +280,9 @@ export class WorktreeManager {
           encoding: 'utf-8',
           timeout: 30000,
         });
-        console.log(`[worktree-manager] Updated ${defaultBranch} to latest origin`);
+        log.info(` Updated ${defaultBranch} to latest origin`);
       } catch {
-        console.log(`[worktree-manager] Failed to pull ${defaultBranch}, continuing with local state`);
+        log.info(` Failed to pull ${defaultBranch}, continuing with local state`);
       }
     } catch (err) {
       // Restore stash if checkout fails
@@ -325,13 +328,13 @@ export class WorktreeManager {
           encoding: 'utf-8',
           timeout: 15000,
         });
-        console.log(`[worktree-manager] Restored stashed changes in worktree`);
+        log.info(` Restored stashed changes in worktree`);
       } catch (err) {
-        console.log(`[worktree-manager] Warning: failed to pop stash in worktree: ${err}`);
+        log.info(` Warning: failed to pop stash in worktree: ${err}`);
       }
     }
 
-    console.log(`[worktree-manager] Branch ${currentBranch} detached to worktree, repo now on ${defaultBranch}`);
+    log.info(` Branch ${currentBranch} detached to worktree, repo now on ${defaultBranch}`);
 
     return { worktreePath, branchName: currentBranch };
   }
@@ -340,7 +343,7 @@ export class WorktreeManager {
     const branchName = await this.getBranchName(worktreePath);
     const dirExists = fs.existsSync(worktreePath);
 
-    console.log(`[worktree-manager] Removing worktree at ${worktreePath} (dirExists=${dirExists})`);
+    log.info(` Removing worktree at ${worktreePath} (dirExists=${dirExists})`);
 
     // Prune stale worktree references first so git doesn't choke on orphaned entries
     try {
@@ -368,7 +371,7 @@ export class WorktreeManager {
           break;
         } catch {
           // git doesn't know about this worktree anymore — remove the directory manually
-          console.log(`[worktree-manager] git worktree remove failed, removing directory manually (attempt ${attempt}/${maxAttempts})`);
+          log.info(` git worktree remove failed, removing directory manually (attempt ${attempt}/${maxAttempts})`);
           try {
             fs.rmSync(worktreePath, { recursive: true, force: true });
             dirRemoved = true;
@@ -376,10 +379,10 @@ export class WorktreeManager {
           } catch (rmErr) {
             const isBusy = rmErr instanceof Error && 'code' in rmErr && (rmErr as NodeJS.ErrnoException).code === 'EBUSY';
             if (isBusy && attempt < maxAttempts) {
-              console.log(`[worktree-manager] EBUSY, retrying in ${attempt}s...`);
+              log.info(` EBUSY, retrying in ${attempt}s...`);
               await new Promise(r => setTimeout(r, attempt * 1000));
             } else {
-              console.log(`[worktree-manager] Failed to remove directory after ${maxAttempts} attempts`);
+              log.info(` Failed to remove directory after ${maxAttempts} attempts`);
               // Don't throw — still try to clean up branch and git references below
             }
           }
@@ -409,7 +412,7 @@ export class WorktreeManager {
           encoding: 'utf-8',
           timeout: 5000,
         });
-        console.log(`[worktree-manager] Deleted branch ${branchName}`);
+        log.info(` Deleted branch ${branchName}`);
       } catch {
         // Branch already deleted or never existed — not an error
       }
@@ -599,7 +602,7 @@ export class WorktreeManager {
         timeout: 30000,
       });
     } catch {
-      console.log('[worktree-manager] Failed to fetch origin for branch diff, using local state');
+      log.warn('Failed to fetch origin for branch diff, using local state');
     }
 
     // Use origin/<base> to avoid comparing against a stale local branch

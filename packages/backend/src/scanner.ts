@@ -5,6 +5,9 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { ConfigService } from './config.js';
 import { IS_WINDOWS, PATH_SEP, getExtraPaths } from './platform.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('scanner');
 
 const execPromise = promisify(exec);
 
@@ -71,7 +74,7 @@ export class ProjectScanner {
 
     this.cache = projects;
     this.cacheTimestamp = now;
-    console.log(`[scanner] Found ${projects.length} projects`);
+    log.info(`Found ${projects.length} projects`);
     return projects;
   }
 

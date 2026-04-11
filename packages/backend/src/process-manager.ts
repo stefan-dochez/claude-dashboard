@@ -6,6 +6,10 @@ import path from 'path';
 import { EventEmitter } from 'events';
 import type { AppConfig } from './config.js';
 import { IS_WINDOWS, PATH_SEP, getExtraPaths, PTY_TERM_NAME } from './platform.js';
+import { TIMEOUTS, LIMITS, PTY_DEFAULTS } from './constants.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('process-manager');
 
 function resolveClaudeBinary(): string {
   const exeNames = IS_WINDOWS ? ['claude.exe', 'claude.cmd', 'claude'] : ['claude'];
@@ -18,7 +22,7 @@ function resolveClaudeBinary(): string {
       const candidate = path.join(dir, exe);
       try {
         fs.accessSync(candidate, fs.constants.X_OK);
-        console.log(`[process-manager] Resolved claude binary: ${candidate}`);
+        log.info(`Resolved claude binary: ${candidate}`);
         return candidate;
       } catch {
         // Not found or not executable
@@ -33,7 +37,7 @@ function resolveClaudeBinary(): string {
       const candidate = path.join(dir, exe);
       try {
         fs.accessSync(candidate, fs.constants.X_OK);
-        console.log(`[process-manager] Resolved claude binary from PATH: ${candidate}`);
+        log.info(`Resolved claude binary from PATH: ${candidate}`);
         return candidate;
       } catch {
         // Not found
@@ -41,7 +45,7 @@ function resolveClaudeBinary(): string {
     }
   }
 
-  console.log('[process-manager] Could not resolve claude binary, falling back to "claude"');
+  log.warn('Could not resolve claude binary, falling back to "claude"');
   return 'claude';
 }
 
@@ -120,7 +124,6 @@ interface InstanceContext {
 
 export class ProcessManager extends EventEmitter {
   private handles = new Map<string, PtyHandle>();
-  private readonly MAX_BUFFER_BYTES = 512 * 1024; // 512KB of raw terminal data
   private readonly claudeBinary: string;
 
   constructor(private config: AppConfig) {
@@ -153,12 +156,12 @@ export class ProcessManager extends EventEmitter {
       args.push('--session-id', sessionId);
     }
 
-    console.log(`[process-manager] Spawning ${this.claudeBinary} in ${cwd} (session ${sessionId}, resume=${!!options.resumeSessionId})`);
+    log.info(`Spawning ${this.claudeBinary} in ${cwd} (session ${sessionId}, resume=${!!options.resumeSessionId})`);
 
     const ptyProcess = pty.spawn(this.claudeBinary, args, {
       name: PTY_TERM_NAME,
-      cols: 120,
-      rows: 30,
+      cols: PTY_DEFAULTS.COLS,
+      rows: PTY_DEFAULTS.ROWS,
       cwd,
       env,
     });
@@ -200,10 +203,10 @@ export class ProcessManager extends EventEmitter {
       handle.instance.status = INSTANCE_STATUS.EXITED;
       this.emit('status', id, INSTANCE_STATUS.EXITED);
       this.emit('exited', id, exitCode);
-      console.log(`[process-manager] Instance ${id} exited with code ${exitCode}`);
+      log.info(`Instance ${id} exited with code ${exitCode}`);
     });
 
-    console.log(`[process-manager] Spawned instance ${id} (pid ${ptyProcess.pid}) for ${cwd}`);
+    log.info(`Spawned instance ${id} (pid ${ptyProcess.pid}) for ${cwd}`);
     this.emit('status', id, INSTANCE_STATUS.LAUNCHING);
 
     return instance;
@@ -222,7 +225,7 @@ export class ProcessManager extends EventEmitter {
     }
 
     const pid = handle.instance.pid;
-    console.log(`[process-manager] Killing instance ${instanceId} (pid ${pid})`);
+    log.info(`Killing instance ${instanceId} (pid ${pid})`);
 
     return new Promise<void>((resolve) => {
       let resolved = false;
@@ -247,7 +250,7 @@ export class ProcessManager extends EventEmitter {
         const taskkillPath = path.join(systemRoot, 'System32', 'taskkill.exe');
         exec(`"${taskkillPath}" /F /T /PID ${pid}`, (err) => {
           if (err) {
-            console.log(`[process-manager] taskkill failed for pid ${pid}: ${err.message}`);
+            log.warn(`taskkill failed for pid ${pid}: ${err.message}`);
           }
         });
       } else {
@@ -259,19 +262,19 @@ export class ProcessManager extends EventEmitter {
           return;
         }
 
-        // SIGKILL after 3s if SIGTERM didn't work
+        // SIGKILL after timeout if SIGTERM didn't work
         forceKillTimeout = setTimeout(() => {
           try {
             handle.process.kill('SIGKILL');
           } catch {
             // Already dead
           }
-        }, 3000);
+        }, TIMEOUTS.KILL_SIGTERM);
       }
 
-      // Give up after 5s no matter what — clean up and move on
+      // Give up after timeout no matter what — clean up and move on
       giveUpTimeout = setTimeout(() => {
-        console.log(`[process-manager] Instance ${instanceId} did not exit in 5s, force cleaning up`);
+        log.warn(`Instance ${instanceId} did not exit in ${TIMEOUTS.KILL_GIVE_UP}ms, force cleaning up`);
         try {
           if (IS_WINDOWS) {
             const systemRoot = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows';
@@ -283,7 +286,7 @@ export class ProcessManager extends EventEmitter {
           // pid might already be gone
         }
         done();
-      }, 5000);
+      }, TIMEOUTS.KILL_GIVE_UP);
     });
   }
 
@@ -326,7 +329,7 @@ export class ProcessManager extends EventEmitter {
         if (prompt.length > 0) {
           handle.instance.lastUserPrompt = prompt;
           if (!handle.instance.firstUserPrompt) {
-            handle.instance.firstUserPrompt = prompt.slice(0, 200);
+            handle.instance.firstUserPrompt = prompt.slice(0, LIMITS.FIRST_PROMPT_LENGTH);
             this.emit('first_prompt', handle.instance.id, handle.instance.firstUserPrompt);
           }
           this.emit('context', handle.instance.id, {
@@ -375,7 +378,7 @@ export class ProcessManager extends EventEmitter {
     handle.bufferSize += data.length;
 
     // Trim buffer if over byte limit — drop oldest chunks
-    while (handle.bufferSize > this.MAX_BUFFER_BYTES && handle.buffer.length > 1) {
+    while (handle.bufferSize > LIMITS.PTY_BUFFER_BYTES && handle.buffer.length > 1) {
       const removed = handle.buffer.shift()!;
       handle.bufferSize -= removed.length;
     }
@@ -385,16 +388,16 @@ export class ProcessManager extends EventEmitter {
     const ids = Array.from(this.handles.keys());
     if (ids.length === 0) return;
 
-    console.log(`[process-manager] Killing all ${ids.length} instances...`);
+    log.info(`Killing all ${ids.length} instances...`);
 
-    // Kill all with a hard 8s ceiling
+    // Kill all with a hard ceiling
     await Promise.race([
       Promise.all(ids.map(id => this.kill(id))),
       new Promise<void>(resolve => setTimeout(() => {
-        console.log('[process-manager] killAll hard timeout, force cleaning remaining');
+        log.warn('killAll hard timeout, force cleaning remaining');
         this.forceDestroyAll();
         resolve();
-      }, 8000)),
+      }, TIMEOUTS.KILL_ALL)),
     ]);
   }
 

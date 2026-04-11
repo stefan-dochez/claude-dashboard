@@ -7,37 +7,35 @@ function instanceRoom(instanceId: string): string {
   return `stream:${instanceId}`;
 }
 
-export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProcessManager, taskStore?: TaskStore): void {
+export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProcessManager, taskStore?: TaskStore): () => void {
 
-  // --- Instance-scoped events (only clients in the room) ---
-
-  streamProcess.on('message', (instanceId: string, message: ChatMessage) => {
+  // Named handlers for cleanup
+  const onMessage = (instanceId: string, message: ChatMessage) => {
     io.to(instanceRoom(instanceId)).emit('chat:message', { instanceId, message });
-  });
+  };
 
-  streamProcess.on('content_block', (instanceId: string, block: ContentBlock) => {
+  const onContentBlock = (instanceId: string, block: ContentBlock) => {
     io.to(instanceRoom(instanceId)).emit('chat:content_block', { instanceId, block });
-  });
+  };
 
-  streamProcess.on('stream_delta', (instanceId: string, delta: { text?: string; thinking?: string }) => {
+  const onStreamDelta = (instanceId: string, delta: { text?: string; thinking?: string }) => {
     io.to(instanceRoom(instanceId)).emit('chat:stream_delta', { instanceId, ...delta });
-  });
+  };
 
-  streamProcess.on('tool_progress', (instanceId: string, progress: { toolUseId: string; toolName: string; elapsedSeconds: number }) => {
+  const onToolProgress = (instanceId: string, progress: { toolUseId: string; toolName: string; elapsedSeconds: number }) => {
     io.to(instanceRoom(instanceId)).emit('chat:tool_progress', { instanceId, ...progress });
-  });
+  };
 
-  streamProcess.on('permission_request', (instanceId: string, data: unknown) => {
+  const onPermissionRequest = (instanceId: string, data: unknown) => {
     io.to(instanceRoom(instanceId)).emit('chat:permission_request', { instanceId, ...data as Record<string, unknown> });
-  });
+  };
 
-  streamProcess.on('user_question', (instanceId: string, data: unknown) => {
+  const onUserQuestion = (instanceId: string, data: unknown) => {
     io.to(instanceRoom(instanceId)).emit('chat:user_question', { instanceId, ...data as Record<string, unknown> });
-  });
+  };
 
-  streamProcess.on('session', (instanceId: string, info: unknown) => {
+  const onSession = (instanceId: string, info: unknown) => {
     io.to(instanceRoom(instanceId)).emit('chat:session', { instanceId, ...info as Record<string, unknown> });
-    // Persist sessionId and model to task store
     if (taskStore) {
       const rec = info as Record<string, unknown>;
       const instance = streamProcess.get(instanceId);
@@ -64,33 +62,45 @@ export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProce
         });
       }
     }
-  });
+  };
 
-  streamProcess.on('error', (instanceId: string, error: string) => {
+  const onError = (instanceId: string, error: string) => {
     io.to(instanceRoom(instanceId)).emit('chat:error', { instanceId, error });
-  });
+  };
 
-  streamProcess.on('rate_limit', (instanceId: string, info: unknown) => {
+  const onRateLimit = (instanceId: string, info: unknown) => {
     io.to(instanceRoom(instanceId)).emit('chat:rate_limit', { instanceId, ...info as Record<string, unknown> });
-  });
+  };
 
-  // --- Broadcast events (all clients) ---
-
-  streamProcess.on('status', (instanceId: string, status: string) => {
+  const onStatus = (instanceId: string, status: string) => {
     io.emit('instance:status', { instanceId, status });
-  });
+  };
 
-  streamProcess.on('exited', (instanceId: string, exitCode: number) => {
+  const onExited = (instanceId: string, exitCode: number) => {
     io.emit('instance:exited', { instanceId, exitCode });
-  });
+  };
 
-  streamProcess.on('result', (instanceId: string, result: unknown) => {
+  const onResult = (instanceId: string, result: unknown) => {
     io.to(instanceRoom(instanceId)).emit('chat:result', { instanceId, ...result as Record<string, unknown> });
-  });
+  };
 
-  streamProcess.on('activity', (instanceId: string, toolName: string) => {
+  const onActivity = (instanceId: string, toolName: string) => {
     io.emit('instance:activity', { instanceId, toolName });
-  });
+  };
+
+  streamProcess.on('message', onMessage);
+  streamProcess.on('content_block', onContentBlock);
+  streamProcess.on('stream_delta', onStreamDelta);
+  streamProcess.on('tool_progress', onToolProgress);
+  streamProcess.on('permission_request', onPermissionRequest);
+  streamProcess.on('user_question', onUserQuestion);
+  streamProcess.on('session', onSession);
+  streamProcess.on('error', onError);
+  streamProcess.on('rate_limit', onRateLimit);
+  streamProcess.on('status', onStatus);
+  streamProcess.on('exited', onExited);
+  streamProcess.on('result', onResult);
+  streamProcess.on('activity', onActivity);
 
   // --- Client socket handlers ---
 
@@ -151,4 +161,21 @@ export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProce
       streamProcess.resolveUserQuestion(instanceId, toolUseId, answer);
     });
   });
+
+  // Return cleanup function to remove all listeners
+  return () => {
+    streamProcess.off('message', onMessage);
+    streamProcess.off('content_block', onContentBlock);
+    streamProcess.off('stream_delta', onStreamDelta);
+    streamProcess.off('tool_progress', onToolProgress);
+    streamProcess.off('permission_request', onPermissionRequest);
+    streamProcess.off('user_question', onUserQuestion);
+    streamProcess.off('session', onSession);
+    streamProcess.off('error', onError);
+    streamProcess.off('rate_limit', onRateLimit);
+    streamProcess.off('status', onStatus);
+    streamProcess.off('exited', onExited);
+    streamProcess.off('result', onResult);
+    streamProcess.off('activity', onActivity);
+  };
 }

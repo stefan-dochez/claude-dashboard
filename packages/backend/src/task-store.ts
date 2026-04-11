@@ -1,6 +1,10 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { LIMITS } from './constants.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('task-store');
 
 const STORE_DIR = path.join(os.homedir(), '.claude-dashboard');
 const TASKS_FILE = path.join(STORE_DIR, 'tasks.json');
@@ -45,7 +49,7 @@ export class TaskStore {
       }
     }
     if (orphansFixed > 0) {
-      console.log(`[task-store] Closed ${orphansFixed} orphaned task(s) from previous session`);
+      log.info(`Closed ${orphansFixed} orphaned task(s) from previous session`);
       await this.save();
     }
 
@@ -57,7 +61,7 @@ export class TaskStore {
       await fs.mkdir(STORE_DIR, { recursive: true });
       await fs.writeFile(TASKS_FILE, JSON.stringify(this.tasks, null, 2));
     } catch (err) {
-      console.log('[task-store] Failed to save:', err);
+      log.error('Failed to save:', err);
     }
   }
 
@@ -72,9 +76,8 @@ export class TaskStore {
     } else {
       this.tasks.unshift(task);
     }
-    // Keep max 100 tasks
-    if (this.tasks.length > 100) {
-      this.tasks = this.tasks.slice(0, 100);
+    if (this.tasks.length > LIMITS.MAX_TASKS) {
+      this.tasks = this.tasks.slice(0, LIMITS.MAX_TASKS);
     }
     await this.save();
   }

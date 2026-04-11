@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import path from 'path';
 import os from 'os';
 import type { ConfigService } from './config.js';
 import type { ProjectScanner } from './scanner.js';
@@ -8,8 +10,42 @@ import type { ProcessManager } from './process-manager.js';
 import type { StreamProcessManager } from './stream-process.js';
 import type { WorktreeManager } from './worktree-manager.js';
 import type { TaskStore } from './task-store.js';
+import { TIMEOUTS, LIMITS } from './constants.js';
+import { createLogger } from './logger.js';
 
+const log = createLogger('routes');
 const execAsync = promisify(exec);
+
+/**
+ * Wraps an async route handler so that thrown errors are caught and returned
+ * as a JSON error response, eliminating ~30 identical try/catch blocks.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function asyncHandler(fn: (req: any, res: Response, next: NextFunction) => Promise<void>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res, next).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Internal server error';
+      log.error(`${req.method} ${req.path}:`, err);
+      res.status(500).json({ error: message });
+    });
+  };
+}
+
+/** Trigger a background scanner refresh without blocking the response. */
+function refreshProjectsInBackground(scanner: ProjectScanner): void {
+  scanner.refresh().catch(err => {
+    log.warn('Background scanner refresh failed:', err);
+  });
+}
+
+/**
+ * Validate that a file path is contained within one of the allowed project paths.
+ * Prevents path traversal attacks on file-serving endpoints.
+ */
+function isPathAllowed(filePath: string, allowedRoots: string[]): boolean {
+  const resolved = path.resolve(filePath);
+  return allowedRoots.some(root => resolved.startsWith(path.resolve(root)));
+}
 
 export function createRoutes(
   configService: ConfigService,
@@ -38,46 +74,26 @@ export function createRoutes(
   });
 
   // Config
-  router.get('/api/config', async (_req, res) => {
-    try {
-      const config = await configService.get();
-      res.json(config);
-    } catch (err) {
-      console.log('[routes] Error reading config:', err);
-      res.status(500).json({ error: 'Failed to read config' });
-    }
-  });
+  router.get('/api/config', asyncHandler(async (_req, res) => {
+    const config = await configService.get();
+    res.json(config);
+  }));
 
-  router.put('/api/config', async (req, res) => {
-    try {
-      const updated = await configService.save(req.body);
-      res.json(updated);
-    } catch (err) {
-      console.log('[routes] Error saving config:', err);
-      res.status(500).json({ error: 'Failed to save config' });
-    }
-  });
+  router.put('/api/config', asyncHandler(async (req, res) => {
+    const updated = await configService.save(req.body);
+    res.json(updated);
+  }));
 
   // Projects
-  router.get('/api/projects', async (_req, res) => {
-    try {
-      const projects = await scanner.scan();
-      res.json(projects);
-    } catch (err) {
-      console.log('[routes] Error scanning projects:', err);
-      res.status(500).json({ error: 'Failed to scan projects' });
-    }
-  });
+  router.get('/api/projects', asyncHandler(async (_req, res) => {
+    const projects = await scanner.scan();
+    res.json(projects);
+  }));
 
-  router.post('/api/projects/refresh', async (_req, res) => {
-    try {
-      const projects = await scanner.refresh();
-      res.json(projects);
-    } catch (err) {
-      console.log('[routes] Error refreshing projects:', err);
-      res.status(500).json({ error: 'Failed to refresh projects' });
-    }
-  });
+  router.post('/api/projects/refresh', asyncHandler(async (_req, res) => {
+    const projects = await scanner.refresh();
+    res.json(projects);
+  }));
 
   // Instances — merges PTY and stream instances
   router.get('/api/instances', (_req, res) => {
@@ -86,7 +102,7 @@ export function createRoutes(
     res.json([...ptyInstances, ...streamInstances]);
   });
 
-  router.post('/api/instances', async (req, res) => {
+  router.post('/api/instances', asyncHandler(async (req, res) => {
     const { projectPath, taskDescription, detachBranch, branchPrefix, mode, sessionId: resumeSessionId } = req.body as {
       projectPath?: string;
       taskDescription?: string;
@@ -101,95 +117,79 @@ export function createRoutes(
     }
 
     // Verify the target directory exists (worktree may have been deleted)
+    const fsPromises = await import('fs/promises');
     try {
-      const fsPromises = await import('fs/promises');
       await fsPromises.access(projectPath);
     } catch {
       res.status(404).json({ error: `Directory not found: ${projectPath}` });
       return;
     }
 
-    try {
-      let worktreePath: string | undefined;
-      let branchName: string | undefined;
-      let parentProjectPath: string | undefined;
+    let worktreePath: string | undefined;
+    let branchName: string | undefined;
+    let parentProjectPath: string | undefined;
 
-      if (detachBranch && await worktreeManager.isGitRepo(projectPath)) {
-        const result = await worktreeManager.detachBranchToWorktree(projectPath);
-        worktreePath = result.worktreePath;
-        branchName = result.branchName;
-        parentProjectPath = projectPath;
-
-        scanner.refresh().catch(err => {
-          console.log('[routes] Background scanner refresh failed:', err);
-        });
-      } else if (taskDescription && await worktreeManager.isGitRepo(projectPath)) {
-        const result = await worktreeManager.createWorktree(projectPath, taskDescription, branchPrefix);
-        worktreePath = result.worktreePath;
-        branchName = result.branchName;
-        parentProjectPath = projectPath;
-
-        scanner.refresh().catch(err => {
-          console.log('[routes] Background scanner refresh failed:', err);
-        });
-      } else if (worktreeManager.isWorktree(projectPath)) {
-        worktreePath = projectPath;
-        branchName = (await worktreeManager.getGitBranch(projectPath)) ?? undefined;
-        parentProjectPath = worktreeManager.getParentProjectPath(projectPath) ?? undefined;
-      } else if (await worktreeManager.isGitRepo(projectPath)) {
-        branchName = (await worktreeManager.getGitBranch(projectPath)) ?? undefined;
-      }
-
-      if (mode === 'chat') {
-        // Stream/chat mode — uses Agent SDK
-        const instance = await streamProcess.createInstance({
-          projectPath,
-          taskDescription,
-          worktreePath,
-          parentProjectPath,
-          branchName,
-          sessionId: resumeSessionId,
-        });
-        // Chat tasks are persisted when the SDK session initializes (stream-socket.ts)
-        res.status(201).json({ ...instance, mode: 'chat', pid: 0 });
-      } else {
-        // Terminal mode — uses PTY
-        const instance = await processManager.spawn({
-          projectPath,
-          taskDescription,
-          worktreePath,
-          parentProjectPath,
-          branchName,
-          resumeSessionId,
-        });
-        // Persist terminal session to history (preserve firstPrompt when resuming)
-        const existingTask = resumeSessionId ? taskStore.findBySessionId(resumeSessionId) : undefined;
-        taskStore.addTask({
-          id: instance.id,
-          projectPath: instance.projectPath,
-          projectName: instance.projectName,
-          worktreePath: instance.worktreePath,
-          branchName: instance.branchName,
-          taskDescription: instance.taskDescription,
-          sessionId: instance.sessionId,
-          model: null,
-          totalCostUsd: 0,
-          totalInputTokens: 0,
-          totalOutputTokens: 0,
-          mode: 'terminal',
-          firstPrompt: existingTask?.firstPrompt ?? null,
-          title: existingTask?.title ?? null,
-          createdAt: instance.createdAt.toISOString(),
-          endedAt: null,
-        });
-        res.status(201).json({ ...instance, mode: 'terminal' });
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to spawn instance';
-      console.log('[routes] Error spawning instance:', err);
-      res.status(500).json({ error: message });
+    if (detachBranch && await worktreeManager.isGitRepo(projectPath)) {
+      const result = await worktreeManager.detachBranchToWorktree(projectPath);
+      worktreePath = result.worktreePath;
+      branchName = result.branchName;
+      parentProjectPath = projectPath;
+      refreshProjectsInBackground(scanner);
+    } else if (taskDescription && await worktreeManager.isGitRepo(projectPath)) {
+      const result = await worktreeManager.createWorktree(projectPath, taskDescription, branchPrefix);
+      worktreePath = result.worktreePath;
+      branchName = result.branchName;
+      parentProjectPath = projectPath;
+      refreshProjectsInBackground(scanner);
+    } else if (worktreeManager.isWorktree(projectPath)) {
+      worktreePath = projectPath;
+      branchName = (await worktreeManager.getGitBranch(projectPath)) ?? undefined;
+      parentProjectPath = worktreeManager.getParentProjectPath(projectPath) ?? undefined;
+    } else if (await worktreeManager.isGitRepo(projectPath)) {
+      branchName = (await worktreeManager.getGitBranch(projectPath)) ?? undefined;
     }
-  });
+
+    if (mode === 'chat') {
+      const instance = await streamProcess.createInstance({
+        projectPath,
+        taskDescription,
+        worktreePath,
+        parentProjectPath,
+        branchName,
+        sessionId: resumeSessionId,
+      });
+      res.status(201).json({ ...instance, mode: 'chat', pid: 0 });
+    } else {
+      const instance = await processManager.spawn({
+        projectPath,
+        taskDescription,
+        worktreePath,
+        parentProjectPath,
+        branchName,
+        resumeSessionId,
+      });
+      const existingTask = resumeSessionId ? taskStore.findBySessionId(resumeSessionId) : undefined;
+      taskStore.addTask({
+        id: instance.id,
+        projectPath: instance.projectPath,
+        projectName: instance.projectName,
+        worktreePath: instance.worktreePath,
+        branchName: instance.branchName,
+        taskDescription: instance.taskDescription,
+        sessionId: instance.sessionId,
+        model: null,
+        totalCostUsd: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        mode: 'terminal',
+        firstPrompt: existingTask?.firstPrompt ?? null,
+        title: existingTask?.title ?? null,
+        createdAt: instance.createdAt.toISOString(),
+        endedAt: null,
+      });
+      res.status(201).json({ ...instance, mode: 'terminal' });
+    }
+  }));
 
   // Chat messages
   router.get('/api/instances/:id/messages', (req, res) => {
@@ -197,7 +197,7 @@ export function createRoutes(
     res.json(messages);
   });
 
-  router.post('/api/instances/:id/messages', async (req, res) => {
+  router.post('/api/instances/:id/messages', asyncHandler(async (req, res) => {
     const { prompt, model, permissionMode, effort } = req.body as {
       prompt?: string;
       model?: string;
@@ -208,235 +208,159 @@ export function createRoutes(
       res.status(400).json({ error: 'prompt is required' });
       return;
     }
-    try {
-      await streamProcess.sendMessage(req.params.id, prompt, { model, permissionMode, effort });
-      res.json({ ok: true });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send message';
-      res.status(500).json({ error: message });
-    }
-  });
+    await streamProcess.sendMessage(req.params.id, prompt, { model, permissionMode, effort });
+    res.json({ ok: true });
+  }));
 
-  router.delete('/api/instances/:id', async (req, res) => {
-    const deleteWorktree = req.query.deleteWorktree === 'true';
+  router.delete('/api/instances/:id', asyncHandler(async (req, res) => {
+    const deleteWt = req.query.deleteWorktree === 'true';
     const id = req.params.id;
 
-    try {
-      // Try PTY first, then stream
-      const ptyInstance = processManager.get(id);
-      const streamInstance = streamProcess.get(id);
+    const ptyInstance = processManager.get(id);
+    const streamInstance = streamProcess.get(id);
 
-      if (ptyInstance) {
-        await processManager.kill(id);
-        taskStore.endTask(id);
-        if (deleteWorktree && ptyInstance.worktreePath && ptyInstance.parentProjectPath) {
-          try {
-            await worktreeManager.removeWorktree(ptyInstance.parentProjectPath, ptyInstance.worktreePath);
-            scanner.refresh().catch(err => {
-              console.log('[routes] Background scanner refresh failed:', err);
-            });
-          } catch (err) {
-            console.log('[routes] Worktree cleanup failed (non-fatal):', err);
-          }
+    if (ptyInstance) {
+      await processManager.kill(id);
+      taskStore.endTask(id);
+      if (deleteWt && ptyInstance.worktreePath && ptyInstance.parentProjectPath) {
+        try {
+          await worktreeManager.removeWorktree(ptyInstance.parentProjectPath, ptyInstance.worktreePath);
+          refreshProjectsInBackground(scanner);
+        } catch (err) {
+          log.warn('Worktree cleanup failed (non-fatal):', err);
         }
-      } else if (streamInstance) {
-        await streamProcess.kill(id);
-        taskStore.endTask(id, {
-          totalCostUsd: streamInstance.totalCostUsd,
-          totalInputTokens: streamInstance.totalInputTokens,
-          totalOutputTokens: streamInstance.totalOutputTokens,
-        });
-        if (deleteWorktree && streamInstance.worktreePath && streamInstance.parentProjectPath) {
-          try {
-            await worktreeManager.removeWorktree(streamInstance.parentProjectPath, streamInstance.worktreePath);
-            scanner.refresh().catch(err => {
-              console.log('[routes] Background scanner refresh failed:', err);
-            });
-          } catch (err) {
-            console.log('[routes] Worktree cleanup failed (non-fatal):', err);
-          }
-        }
-      } else {
-        res.status(404).json({ error: `Instance ${id} not found` });
-        return;
       }
-
-      res.json({ ok: true });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to kill instance';
-      console.log('[routes] Error killing instance:', err);
-      res.status(404).json({ error: message });
+    } else if (streamInstance) {
+      await streamProcess.kill(id);
+      taskStore.endTask(id, {
+        totalCostUsd: streamInstance.totalCostUsd,
+        totalInputTokens: streamInstance.totalInputTokens,
+        totalOutputTokens: streamInstance.totalOutputTokens,
+      });
+      if (deleteWt && streamInstance.worktreePath && streamInstance.parentProjectPath) {
+        try {
+          await worktreeManager.removeWorktree(streamInstance.parentProjectPath, streamInstance.worktreePath);
+          refreshProjectsInBackground(scanner);
+        } catch (err) {
+          log.warn('Worktree cleanup failed (non-fatal):', err);
+        }
+      }
+    } else {
+      res.status(404).json({ error: `Instance ${id} not found` });
+      return;
     }
-  });
+
+    res.json({ ok: true });
+  }));
 
   // Worktrees
-  router.delete('/api/worktrees', async (req, res) => {
+  router.delete('/api/worktrees', asyncHandler(async (req, res) => {
     const { projectPath, worktreePath } = req.body as { projectPath?: string; worktreePath?: string };
     if (!projectPath || !worktreePath) {
       res.status(400).json({ error: 'projectPath and worktreePath are required' });
       return;
     }
 
-    try {
-      // Kill any instance running on this worktree before removing it
-      const runningInstance = processManager.getAll().find(i => i.worktreePath === worktreePath);
-      if (runningInstance) {
-        await processManager.kill(runningInstance.id);
-      }
-
-      await worktreeManager.removeWorktree(projectPath, worktreePath);
-      scanner.refresh().catch(err => {
-        console.log('[routes] Background scanner refresh failed:', err);
-      });
-      res.json({ ok: true });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to remove worktree';
-      console.log('[routes] Error removing worktree:', err);
-      res.status(500).json({ error: message });
+    const runningInstance = processManager.getAll().find(i => i.worktreePath === worktreePath);
+    if (runningInstance) {
+      await processManager.kill(runningInstance.id);
     }
-  });
+
+    await worktreeManager.removeWorktree(projectPath, worktreePath);
+    refreshProjectsInBackground(scanner);
+    res.json({ ok: true });
+  }));
 
   // Git — branches
-  router.get('/api/git/branches', async (req, res) => {
+  router.get('/api/git/branches', asyncHandler(async (req, res) => {
     const projectPath = req.query.path as string | undefined;
     if (!projectPath) {
       res.status(400).json({ error: 'path query parameter is required' });
       return;
     }
-    try {
-      const branches = await worktreeManager.listBranches(projectPath);
-      res.json(branches);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to list branches';
-      console.log('[routes] Error listing branches:', err);
-      res.status(500).json({ error: message });
-    }
-  });
+    const branches = await worktreeManager.listBranches(projectPath);
+    res.json(branches);
+  }));
 
-  router.post('/api/git/branch-to-worktree', async (req, res) => {
+  router.post('/api/git/branch-to-worktree', asyncHandler(async (req, res) => {
     const { projectPath, branchName } = req.body as { projectPath?: string; branchName?: string };
     if (!projectPath || !branchName) {
       res.status(400).json({ error: 'projectPath and branchName are required' });
       return;
     }
-    try {
-      const result = await worktreeManager.branchToWorktree(projectPath, branchName);
-      scanner.refresh().catch(err => {
-        console.log('[routes] Background scanner refresh failed:', err);
-      });
-      res.json(result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create worktree';
-      console.log('[routes] Error creating worktree from branch:', err);
-      res.status(500).json({ error: message });
-    }
-  });
+    const result = await worktreeManager.branchToWorktree(projectPath, branchName);
+    refreshProjectsInBackground(scanner);
+    res.json(result);
+  }));
 
   // Git — checkout default branch
-  router.post('/api/git/checkout-default', async (req, res) => {
+  router.post('/api/git/checkout-default', asyncHandler(async (req, res) => {
     const { projectPath } = req.body as { projectPath?: string };
     if (!projectPath) {
       res.status(400).json({ error: 'projectPath is required' });
       return;
     }
-    try {
-      const result = await worktreeManager.checkoutDefaultBranch(projectPath);
-      res.json(result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Checkout failed';
-      console.log('[routes] Error checking out default branch:', err);
-      res.status(500).json({ error: message });
-    }
-  });
+    const result = await worktreeManager.checkoutDefaultBranch(projectPath);
+    res.json(result);
+  }));
 
   // Git — pull / update
-  router.post('/api/git/pull', async (req, res) => {
+  router.post('/api/git/pull', asyncHandler(async (req, res) => {
     const { projectPath } = req.body as { projectPath?: string };
     if (!projectPath) {
       res.status(400).json({ error: 'projectPath is required' });
       return;
     }
-    try {
-      const result = await worktreeManager.pullRepo(projectPath);
-      res.json(result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Pull failed';
-      console.log('[routes] Error pulling repo:', err);
-      res.status(500).json({ error: message });
-    }
-  });
+    const result = await worktreeManager.pullRepo(projectPath);
+    res.json(result);
+  }));
 
-  router.post('/api/git/pull-all', async (req, res) => {
-    try {
-      const projects = await scanner.scan();
-      // Only pull non-worktree git projects
-      const gitProjects = projects.filter(
-        (p: { gitBranch: string | null; isWorktree: boolean }) => p.gitBranch !== null && !p.isWorktree,
-      );
-      const results = await Promise.all(
-        gitProjects.map(async (project) => {
-          const result = await worktreeManager.pullRepo(project.path);
-          return { path: project.path, name: project.name, ...result };
-        }),
-      );
-      res.json(results);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Pull all failed';
-      console.log('[routes] Error pulling all repos:', err);
-      res.status(500).json({ error: message });
-    }
-  });
+  router.post('/api/git/pull-all', asyncHandler(async (_req, res) => {
+    const projects = await scanner.scan();
+    const gitProjects = projects.filter(
+      (p: { gitBranch: string | null; isWorktree: boolean }) => p.gitBranch !== null && !p.isWorktree,
+    );
+    const results = await Promise.all(
+      gitProjects.map(async (project) => {
+        const result = await worktreeManager.pullRepo(project.path);
+        return { path: project.path, name: project.name, ...result };
+      }),
+    );
+    res.json(results);
+  }));
 
   // Git — status and diffs
-  router.get('/api/git/status', async (req, res) => {
+  router.get('/api/git/status', asyncHandler(async (req, res) => {
     const projectPath = req.query.path as string | undefined;
     if (!projectPath) {
       res.status(400).json({ error: 'path query parameter is required' });
       return;
     }
-    try {
-      const files = await worktreeManager.getStatus(projectPath);
-      res.json(files);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to get git status';
-      console.log('[routes] Error getting git status:', err);
-      res.status(500).json({ error: message });
-    }
-  });
+    const files = await worktreeManager.getStatus(projectPath);
+    res.json(files);
+  }));
 
-  router.get('/api/git/diff', async (req, res) => {
+  router.get('/api/git/diff', asyncHandler(async (req, res) => {
     const projectPath = req.query.path as string | undefined;
     const file = req.query.file as string | undefined;
     if (!projectPath) {
       res.status(400).json({ error: 'path query parameter is required' });
       return;
     }
-    try {
-      const diff = await worktreeManager.getWorkingDiff(projectPath, file);
-      res.json({ diff });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to get diff';
-      console.log('[routes] Error getting diff:', err);
-      res.status(500).json({ error: message });
-    }
-  });
+    const diff = await worktreeManager.getWorkingDiff(projectPath, file);
+    res.json({ diff });
+  }));
 
-  router.get('/api/git/branch-diff', async (req, res) => {
+  router.get('/api/git/branch-diff', asyncHandler(async (req, res) => {
     const projectPath = req.query.path as string | undefined;
     const target = req.query.target as string | undefined;
     if (!projectPath) {
       res.status(400).json({ error: 'path query parameter is required' });
       return;
     }
-    try {
-      const result = await worktreeManager.getBranchDiff(projectPath, target);
-      res.json(result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to get branch diff';
-      console.log('[routes] Error getting branch diff:', err);
-      res.status(500).json({ error: message });
-    }
-  });
+    const result = await worktreeManager.getBranchDiff(projectPath, target);
+    res.json(result);
+  }));
 
   // Git — PR info
   router.get('/api/git/pr-url', async (req, res) => {
@@ -449,11 +373,10 @@ export function createRoutes(
       const { stdout } = await execAsync('gh pr view --json url -q .url', {
         cwd: projectPath,
         encoding: 'utf-8',
-        timeout: 10000,
+        timeout: TIMEOUTS.GH_CLI,
       });
       res.json({ url: stdout.trim() || null });
     } catch {
-      // No PR exists for this branch
       res.json({ url: null });
     }
   });
@@ -471,14 +394,13 @@ export function createRoutes(
     }
     try {
       if (addAll) {
-        await execAsync('git add -A', { cwd: projectPath, encoding: 'utf-8', timeout: 15000 });
+        await execAsync('git add -A', { cwd: projectPath, encoding: 'utf-8', timeout: TIMEOUTS.GIT_ADD });
       }
-      // Use -- to separate the message from git flags
-      await execAsync(`git commit -m ${JSON.stringify(message)}`, { cwd: projectPath, encoding: 'utf-8', timeout: 30000 });
+      await execAsync(`git commit -m ${JSON.stringify(message)}`, { cwd: projectPath, encoding: 'utf-8', timeout: TIMEOUTS.GIT_COMMIT });
       res.json({ ok: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Commit failed';
-      console.log('[routes] Error committing:', msg);
+      log.error('Error committing:', msg);
       res.status(500).json({ error: msg.includes('stdout') ? 'Nothing to commit' : msg.split('\n')[0] });
     }
   });
@@ -495,11 +417,11 @@ export function createRoutes(
       const pushCmd = setUpstream && branch
         ? `git push --set-upstream origin ${JSON.stringify(branch)}`
         : 'git push';
-      await execAsync(pushCmd, { cwd: projectPath, encoding: 'utf-8', timeout: 60000 });
+      await execAsync(pushCmd, { cwd: projectPath, encoding: 'utf-8', timeout: TIMEOUTS.GIT_PUSH });
       res.json({ ok: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Push failed';
-      console.log('[routes] Error pushing:', msg);
+      log.error('Error pushing:', msg);
       const needsUpstream = msg.includes('no upstream branch') || msg.includes('--set-upstream');
       res.status(500).json({ error: msg.split('\n')[0], needsUpstream });
     }
@@ -516,13 +438,13 @@ export function createRoutes(
       const bodyArg = body ? `--body ${JSON.stringify(body)}` : '--body ""';
       const { stdout } = await execAsync(
         `gh pr create --title ${JSON.stringify(title)} ${bodyArg}`,
-        { cwd: projectPath, encoding: 'utf-8', timeout: 30000 },
+        { cwd: projectPath, encoding: 'utf-8', timeout: TIMEOUTS.GIT_COMMIT },
       );
       const url = stdout.trim().split('\n').pop() ?? '';
       res.json({ ok: true, url });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'PR creation failed';
-      console.log('[routes] Error creating PR:', msg);
+      log.error('Error creating PR:', msg);
       res.status(500).json({ error: msg.split('\n')[0] });
     }
   });
@@ -540,7 +462,7 @@ export function createRoutes(
   // Git — recent commits for context attachments
   router.get('/api/git/commits', async (req, res) => {
     const projectPath = req.query.path as string | undefined;
-    const limit = parseInt(req.query.limit as string ?? '20', 10);
+    const limit = parseInt(req.query.limit as string ?? String(LIMITS.GIT_LOG_LIMIT), 10);
     if (!projectPath) {
       res.status(400).json({ error: 'path query parameter is required' });
       return;
@@ -548,7 +470,7 @@ export function createRoutes(
     try {
       const { stdout } = await execAsync(
         `git log --oneline -${limit} --format="%H|||%s|||%ar"`,
-        { cwd: projectPath, encoding: 'utf-8', timeout: 5000 },
+        { cwd: projectPath, encoding: 'utf-8', timeout: TIMEOUTS.GIT_SHORT },
       );
       const commits = stdout.split('\n').filter(l => l.trim()).map(line => {
         const [hash, message, date] = line.split('|||');
@@ -560,6 +482,12 @@ export function createRoutes(
     }
   });
 
+  // Helper: get allowed project roots for path validation
+  const getAllowedRoots = async (): Promise<string[]> => {
+    const config = await configService.get();
+    return config.scanPaths ?? [];
+  };
+
   // File explorer — search files by name
   router.get('/api/files/search', async (req, res) => {
     const dirPath = req.query.path as string | undefined;
@@ -568,10 +496,15 @@ export function createRoutes(
       res.status(400).json({ error: 'path and q query parameters are required' });
       return;
     }
+    const roots = await getAllowedRoots();
+    if (!isPathAllowed(dirPath, roots)) {
+      res.status(403).json({ error: 'Access denied: path outside allowed scan paths' });
+      return;
+    }
     try {
       const { stdout } = await execAsync(
-        `find . -maxdepth 8 -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/__pycache__/*' -iname '*${query.replace(/['"\\]/g, '')}*' | head -50`,
-        { cwd: dirPath, encoding: 'utf-8', timeout: 5000 },
+        `find . -maxdepth ${LIMITS.FILE_SEARCH_DEPTH} -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/__pycache__/*' -iname '*${query.replace(/['"\\]/g, '')}*' | head -${LIMITS.FILE_SEARCH_RESULTS}`,
+        { cwd: dirPath, encoding: 'utf-8', timeout: TIMEOUTS.SHELL_SEARCH },
       );
       const files = stdout.split('\n').filter(f => f.trim()).map(f => {
         const relative = f.replace(/^\.\//, '');
@@ -591,21 +524,23 @@ export function createRoutes(
       res.status(400).json({ error: 'path and q query parameters are required' });
       return;
     }
+    const roots = await getAllowedRoots();
+    if (!isPathAllowed(dirPath, roots)) {
+      res.status(403).json({ error: 'Access denied: path outside allowed scan paths' });
+      return;
+    }
     try {
-      // Sanitize for shell safety (single quotes, backslashes)
       const safeQuery = query.replace(/['\\]/g, '');
       if (!safeQuery) {
         res.json([]);
         return;
       }
       const { stdout } = await execAsync(
-        `grep -rn --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.py' --include='*.go' --include='*.rs' --include='*.java' --include='*.cs' --include='*.md' --include='*.css' --include='*.html' --include='*.json' --include='*.yaml' --include='*.yml' --max-count=5 -I '${safeQuery}' . 2>/dev/null | head -200`,
-        { cwd: dirPath, encoding: 'utf-8', timeout: 10000 },
+        `grep -rn --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.py' --include='*.go' --include='*.rs' --include='*.java' --include='*.cs' --include='*.md' --include='*.css' --include='*.html' --include='*.json' --include='*.yaml' --include='*.yml' --max-count=5 -I '${safeQuery}' . 2>/dev/null | head -${LIMITS.CODE_SEARCH_LINES}`,
+        { cwd: dirPath, encoding: 'utf-8', timeout: TIMEOUTS.SHELL_GREP },
       );
-      // Parse grep output: ./path/to/file:lineNum:lineContent
       const resultsByFile = new Map<string, Array<{ line: number; text: string }>>();
       for (const raw of stdout.split('\n').filter(l => l.trim())) {
-        // Match ./relative/path:lineNum:content
         const match = raw.match(/^\.\/(.+?):(\d+):(.*)$/);
         if (!match) continue;
         const [, relative, lineStr, text] = match;
@@ -613,74 +548,71 @@ export function createRoutes(
         if (!resultsByFile.has(relative)) {
           resultsByFile.set(relative, []);
         }
-        resultsByFile.get(relative)!.push({ line, text: text.substring(0, 200) });
+        resultsByFile.get(relative)!.push({ line, text: text.substring(0, LIMITS.GREP_LINE_LENGTH) });
       }
-      const results = [...resultsByFile.entries()].slice(0, 30).map(([relative, matches]) => ({
+      const results = [...resultsByFile.entries()].slice(0, LIMITS.CODE_SEARCH_RESULTS).map(([relative, matches]) => ({
         file: `${dirPath}/${relative}`,
         relative,
         matches,
       }));
       res.json(results);
     } catch {
-      // grep returns exit code 1 when no matches found
       res.json([]);
     }
   });
 
   // File explorer — list directory contents
-  router.get('/api/files', async (req, res) => {
+  router.get('/api/files', asyncHandler(async (req, res) => {
     const dirPath = req.query.path as string | undefined;
     if (!dirPath) {
       res.status(400).json({ error: 'path query parameter is required' });
       return;
     }
-    try {
-      const fsPromises = await import('fs/promises');
-      const pathMod = await import('path');
-      const entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
-      const items = entries
-        .filter(e => !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== 'dist' && e.name !== '__pycache__')
-        .map(e => ({
-          name: e.name,
-          path: pathMod.join(dirPath, e.name),
-          isDirectory: e.isDirectory(),
-        }))
-        .sort((a, b) => {
-          if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
-          return a.name.localeCompare(b.name);
-        });
-      res.json(items);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to list directory';
-      res.status(500).json({ error: message });
+    const roots = await getAllowedRoots();
+    if (!isPathAllowed(dirPath, roots)) {
+      res.status(403).json({ error: 'Access denied: path outside allowed scan paths' });
+      return;
     }
-  });
+    const fsPromises = await import('fs/promises');
+    const entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
+    const items = entries
+      .filter(e => !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== 'dist' && e.name !== '__pycache__')
+      .map(e => ({
+        name: e.name,
+        path: path.join(dirPath, e.name),
+        isDirectory: e.isDirectory(),
+      }))
+      .sort((a, b) => {
+        if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+    res.json(items);
+  }));
 
   // File explorer — read file content
-  router.get('/api/files/content', async (req, res) => {
+  router.get('/api/files/content', asyncHandler(async (req, res) => {
     const filePath = req.query.path as string | undefined;
     if (!filePath) {
       res.status(400).json({ error: 'path query parameter is required' });
       return;
     }
-    try {
-      const fsPromises = await import('fs/promises');
-      const stat = await fsPromises.stat(filePath);
-      // Limit to 500KB
-      if (stat.size > 500 * 1024) {
-        res.json({ content: null, truncated: true, size: stat.size });
-        return;
-      }
-      const content = await fsPromises.readFile(filePath, 'utf-8');
-      res.json({ content, truncated: false, size: stat.size });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to read file';
-      res.status(500).json({ error: message });
+    const roots = await getAllowedRoots();
+    if (!isPathAllowed(filePath, roots)) {
+      res.status(403).json({ error: 'Access denied: path outside allowed scan paths' });
+      return;
     }
-  });
+    const fsPromises = await import('fs/promises');
+    const stat = await fsPromises.stat(filePath);
+    if (stat.size > LIMITS.FILE_READ_MAX_BYTES) {
+      res.json({ content: null, truncated: true, size: stat.size });
+      return;
+    }
+    const content = await fsPromises.readFile(filePath, 'utf-8');
+    res.json({ content, truncated: false, size: stat.size });
+  }));
 
   // Instance context — CLAUDE.md + stats
-  router.get('/api/instances/:id/context', async (req, res) => {
+  router.get('/api/instances/:id/context', asyncHandler(async (req, res) => {
     const id = req.params.id;
     const ptyInstance = processManager.get(id);
     const streamInstance = streamProcess.get(id);
@@ -696,19 +628,17 @@ export function createRoutes(
 
     try {
       const fsPromises = await import('fs/promises');
-      const pathMod = await import('path');
-      claudeMd = await fsPromises.readFile(pathMod.join(cwd, 'CLAUDE.md'), 'utf-8');
+      claudeMd = await fsPromises.readFile(path.join(cwd, 'CLAUDE.md'), 'utf-8');
     } catch {
       // No CLAUDE.md
     }
 
-    // Get git-modified files
     let modifiedFiles: string[] = [];
     try {
       const { stdout } = await execAsync('git diff --name-only HEAD 2>/dev/null; git diff --name-only --cached 2>/dev/null', {
         cwd,
         encoding: 'utf-8',
-        timeout: 5000,
+        timeout: TIMEOUTS.GIT_SHORT,
       });
       modifiedFiles = [...new Set(stdout.split('\n').filter(f => f.trim()))];
     } catch {
@@ -733,7 +663,7 @@ export function createRoutes(
       worktreePath: instance.worktreePath,
       branchName: instance.branchName,
     });
-  });
+  }));
 
   return router;
 }

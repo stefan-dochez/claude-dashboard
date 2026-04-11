@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap, MessageSquare, Terminal, Clock } from 'lucide-react';
+import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap, MessageSquare, Terminal } from 'lucide-react';
 import type { Project } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 

@@ -1,0 +1,225 @@
+import { useState } from 'react';
+import { ChevronDown, ChevronRight, GitBranch, Play, Star, Trash2, Terminal, MessageSquare, X, Layers } from 'lucide-react';
+import LaunchModal from './LaunchModal';
+import { useSidebarActions } from '../hooks/useSidebarActions';
+import { STATUS_DOT, STATUS_LABEL } from '../constants';
+import type { Project } from '../types';
+
+interface ProjectRowProps {
+  project: Project;
+  worktrees: Project[];
+  showWorkspace?: string | null;
+}
+
+export default function ProjectRow({ project, worktrees, showWorkspace }: ProjectRowProps) {
+  const {
+    instancesByProject, selectedInstanceId, favoriteProjects,
+    onSelectInstance, onKillInstance, onDismissInstance, onLaunch,
+    onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects,
+  } = useSidebarActions();
+
+  const instances = instancesByProject.get(project.path) ?? [];
+  const isFavorite = favoriteProjects.has(project.path);
+
+  const [expanded, setExpanded] = useState(() => {
+    return instances.length > 0 || worktrees.length > 0;
+  });
+  const [launchModalOpen, setLaunchModalOpen] = useState(false);
+  const [confirmKillId, setConfirmKillId] = useState<string | null>(null);
+
+  const activeInstances = instances.filter(i => i.status !== 'exited');
+  const hasActivity = activeInstances.length > 0 || worktrees.length > 0;
+
+  return (
+    <>
+      <div className={`group/row flex cursor-default items-center gap-1 rounded-lg px-1.5 py-1 transition-colors hover:bg-elevated/50 ${project.type === 'monorepo' ? 'border-l-2 border-violet-500/50' : project.type === 'workspace' ? 'border-l-2 border-cyan-500/50' : ''}`} onClick={() => setLaunchModalOpen(true)}>
+        {hasActivity ? (
+          <span
+            onClick={e => { e.stopPropagation(); setExpanded(!expanded); }}
+            className="shrink-0 p-0.5 text-faint"
+          >
+            {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          </span>
+        ) : (
+          <span className="inline-block w-4" />
+        )}
+
+        <span
+          className="min-w-0 flex-1 truncate text-[12px] transition-colors group-hover/row:text-primary"
+          title={project.path}
+        >
+          <span className="text-secondary">{project.name}</span>
+          {showWorkspace && <span className="ml-1.5 text-[10px] text-faint">{showWorkspace}</span>}
+        </span>
+
+        {activeInstances.length > 0 && (
+          <span className="flex items-center gap-1">
+            {activeInstances.map(inst => (
+              <span key={inst.id} className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[inst.status]}`} title={STATUS_LABEL[inst.status]} />
+            ))}
+          </span>
+        )}
+        {worktrees.length > 0 && (
+          <span className="text-[10px] text-faint">{worktrees.length} wt</span>
+        )}
+
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100">
+          {!hasActivity && (
+            <>
+              {project.type === 'repo' && (
+                <span
+                  onClick={e => { e.stopPropagation(); onToggleMeta(project.path); }}
+                  className="rounded p-0.5 text-faint transition-colors hover:text-violet-400"
+                  title="Mark as monorepo"
+                >
+                  <Layers className="h-3 w-3" />
+                </span>
+              )}
+              {project.type === 'monorepo' && (
+                <span
+                  onClick={e => { e.stopPropagation(); onToggleMeta(project.path); }}
+                  className="rounded p-0.5 text-violet-400 transition-colors"
+                  title="Remove monorepo"
+                >
+                  <Layers className="h-3 w-3 fill-violet-400/30" />
+                </span>
+              )}
+              <span
+                onClick={e => { e.stopPropagation(); onToggleFavorite(project.path); }}
+                className={`rounded p-0.5 transition-colors ${isFavorite ? 'text-amber-400' : 'text-faint hover:text-amber-400'}`}
+                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
+              </span>
+            </>
+          )}
+          <span
+            onClick={e => { e.stopPropagation(); setLaunchModalOpen(true); }}
+            className="rounded p-0.5 text-faint transition-colors group-hover/row:text-green-400"
+            title="New task"
+          >
+            <Play className="h-3 w-3" />
+          </span>
+        </div>
+      </div>
+
+      {expanded && hasActivity && (
+        <div className="ml-4 border-l border-border-default pl-2">
+          {instances.map(inst => {
+            const isSelected = inst.id === selectedInstanceId;
+            const isChat = inst.mode === 'chat';
+            const ModeIcon = isChat ? MessageSquare : Terminal;
+
+            return (
+              <div
+                key={inst.id}
+                onClick={() => onSelectInstance(inst.id)}
+                className={`group/inst flex cursor-default items-center gap-1.5 rounded px-2 py-1 transition-colors ${
+                  isSelected ? 'bg-elevated/50' : 'hover:bg-elevated/20'
+                }`}
+              >
+                <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[inst.status]}`} />
+                <ModeIcon className="h-3 w-3 shrink-0 text-faint" />
+                <span className={`min-w-0 flex-1 truncate text-[11px] ${isSelected ? 'text-primary' : 'text-tertiary'}`}>
+                  {inst.taskDescription ?? inst.branchName ?? STATUS_LABEL[inst.status]}
+                </span>
+                <span className="shrink-0 text-[9px] text-faint">
+                  {new Date(inst.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {inst.status !== 'exited' ? (
+                  confirmKillId === inst.id && inst.worktreePath ? (
+                    <div className="flex shrink-0 items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => { onKillInstance(inst.id, false); setConfirmKillId(null); }}
+                        className="rounded bg-elevated px-1.5 py-0.5 text-[9px] font-medium text-secondary transition-colors hover:bg-hover"
+                        title="Kill instance only"
+                      >
+                        Kill
+                      </button>
+                      <button
+                        onClick={() => { onKillInstance(inst.id, true); setConfirmKillId(null); }}
+                        className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-medium text-rose-300 transition-colors hover:bg-rose-500/30"
+                        title="Kill and delete worktree"
+                      >
+                        +wt
+                      </button>
+                      <button
+                        onClick={() => setConfirmKillId(null)}
+                        className="rounded p-0.5 text-faint transition-colors hover:text-secondary"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (inst.worktreePath) {
+                          setConfirmKillId(inst.id);
+                        } else {
+                          onKillInstance(inst.id);
+                        }
+                      }}
+                      className="shrink-0 rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
+                      title="Kill"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </button>
+                  )
+                ) : (
+                  <button
+                    onClick={e => { e.stopPropagation(); onDismissInstance(inst.id); }}
+                    className="shrink-0 rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
+                    title="Remove"
+                  >
+                    <Trash2 className="h-2.5 w-2.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {worktrees
+            .filter(wt => !instances.some(i => i.worktreePath === wt.path))
+            .map(wt => (
+              <div
+                key={wt.path}
+                onClick={() => onLaunch(wt.path)}
+                className="group/wt flex cursor-default items-center gap-1.5 rounded px-2 py-1 transition-colors hover:bg-elevated/50"
+              >
+                <GitBranch className="h-3 w-3 shrink-0 text-violet-400/60" />
+                <span className="min-w-0 flex-1 truncate text-[11px] text-faint transition-colors group-hover/wt:text-tertiary">
+                  {wt.gitBranch ?? wt.name}
+                </span>
+                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/wt:opacity-100">
+                  <span
+                    className="rounded p-0.5 text-faint transition-colors group-hover/wt:text-green-400"
+                    title="Resume"
+                  >
+                    <Play className="h-2.5 w-2.5" />
+                  </span>
+                  <span
+                    onClick={e => { e.stopPropagation(); onDeleteWorktree(project.path, wt.path); }}
+                    className="rounded p-0.5 text-faint transition-colors hover:text-rose-300"
+                    title="Delete worktree"
+                  >
+                    <Trash2 className="h-2.5 w-2.5" />
+                  </span>
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {launchModalOpen && (
+        <LaunchModal
+          project={project}
+          worktrees={worktrees}
+          onLaunch={onLaunch}
+          onClose={() => setLaunchModalOpen(false)}
+          onRefreshProjects={onRefreshProjects}
+        />
+      )}
+    </>
+  );
+}

@@ -1,6 +1,9 @@
 import type { ProcessManager } from './process-manager.js';
 import { INSTANCE_STATUS } from './process-manager.js';
 import type { AppConfig } from './config.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('status-monitor');
 
 // Strip ANSI escape sequences so prompt patterns can match clean text.
 // The regex handles several distinct escape families commonly emitted by
@@ -34,7 +37,7 @@ export class StatusMonitor {
     if (this.intervalId) return;
 
     this.intervalId = setInterval(() => this.check(), this.CHECK_INTERVAL);
-    console.log('[status-monitor] Started');
+    log.info('Started');
   }
 
   stop(): void {
@@ -49,7 +52,7 @@ export class StatusMonitor {
       try {
         return new RegExp(p, 'm');
       } catch {
-        console.log(`[status-monitor] Invalid pattern: ${p}`);
+        log.warn(`Invalid pattern: ${p}`);
         return null;
       }
     }).filter((p): p is RegExp => p !== null);

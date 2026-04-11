@@ -1,5 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { TaskStore } from './task-store.js';
+import { LIMITS } from './constants.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('title-generator');
 
 const client = new Anthropic();
 
@@ -15,7 +19,7 @@ export async function generateSessionTitle(
       messages: [
         {
           role: 'user',
-          content: `Generate a very short title (3-8 words, no quotes, no punctuation at the end) summarizing this conversation starter:\n\n"${firstPrompt.slice(0, 500)}"`,
+          content: `Generate a very short title (3-8 words, no quotes, no punctuation at the end) summarizing this conversation starter:\n\n"${firstPrompt.slice(0, LIMITS.TITLE_PROMPT_LENGTH)}"`,
         },
       ],
     });
@@ -28,6 +32,6 @@ export async function generateSessionTitle(
       await taskStore.updateTitle(taskId, title);
     }
   } catch (err) {
-    console.log(`[title-generator] Failed to generate title for ${taskId}:`, err instanceof Error ? err.message : err);
+    log.warn(`Failed to generate title for ${taskId}:`, err instanceof Error ? err.message : err);
   }
 }

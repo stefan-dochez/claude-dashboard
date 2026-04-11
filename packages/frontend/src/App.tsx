@@ -89,7 +89,7 @@ export default function App() {
     setActiveTab('main');
   }, []);
 
-  const { queue, skipInstance, jumpToInstance } = useAttentionQueue({
+  const { queue, skipInstance: _skipInstance, jumpToInstance: _jumpToInstance } = useAttentionQueue({
     instances,
     selectedInstanceId,
     onSelectInstance: handleSelectInstance,
@@ -148,16 +148,6 @@ export default function App() {
     pendingDeleteRef.current = { timeoutId };
     setPendingDelete({ projectPath, worktreePath, name, timeoutId });
   }, [deleteWorktree, refetchInstances]);
-
-  const handleSkip = useCallback((id: string) => {
-    setTypingLocked(false);
-    skipInstance(id);
-  }, [skipInstance]);
-
-  const handleJump = useCallback((id: string) => {
-    setTypingLocked(false);
-    jumpToInstance(id);
-  }, [jumpToInstance]);
 
   const handleTypingChange = useCallback((typing: boolean) => {
     setTypingLocked(typing);
