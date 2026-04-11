@@ -2,6 +2,28 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.5.1]
+
+### Refactoring
+
+- **Structured logger** — Replaced all `console.log` calls across 11 backend files with a lightweight leveled logger (`logger.ts`). Supports `error`, `warn`, `info`, `debug` levels with automatic `[module]` prefixes. Configurable via `LOG_LEVEL` env var.
+
+- **Centralized constants** — Extracted ~20 magic numbers (timeouts, buffer sizes, PTY dimensions, search limits) into `constants.ts`. Eliminates scattered hardcoded values across `process-manager.ts`, `routes.ts`, `task-store.ts`, and `title-generator.ts`.
+
+- **asyncHandler wrapper** — Introduced an `asyncHandler()` utility in `routes.ts` that wraps async route handlers with automatic error catching and JSON error responses. Eliminates ~30 identical try/catch blocks. Added `refreshProjectsInBackground()` helper to deduplicate 6 copies of the same pattern.
+
+- **Path traversal validation** — File-serving endpoints (`/api/files`, `/api/files/content`, `/api/files/search`, `/api/code/search`) now validate that requested paths fall within configured `scanPaths`. Returns 403 for out-of-bounds paths.
+
+- **Event listener cleanup** — `setupSocketHandlers` and `setupStreamSocketHandlers` now use named handler functions and return a cleanup function to remove all listeners. Prevents potential memory leaks if handlers were ever re-initialized.
+
+- **ChatView component extraction** — Extracted 5 inline sub-components (`MarkdownText`, `ThinkingBlock`, `ToolDetailView`, `ToolGroupBlock`, `MessageBubble`) into `components/chat/`. Reduces ChatView by ~300 lines.
+
+- **SidebarContext for prop drilling** — Introduced `SidebarActionsContext` + `useSidebarActions` hook to replace 18-prop drilling through `Sidebar` → `ProjectRow`. `ProjectRow` extracted to its own file, now takes 3 props instead of 18.
+
+- **Shared frontend constants** — `STATUS_DOT` and `STATUS_LABEL` moved to `constants.ts`, eliminating duplication between Sidebar and the (now removed) TaskSidebar.
+
+- **Dead code removal** — Removed 3 unused components (`TaskSidebar`, `ContextBanner`, `AttentionQueueBanner`), unused `Clock` import in `LaunchModal`, and dead `handleSkip`/`handleJump` callbacks in `App.tsx`. Lint now passes with 0 warnings.
+
 ## [0.5.0]
 
 ### Features
