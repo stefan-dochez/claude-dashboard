@@ -4,10 +4,11 @@ import os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { ConfigService } from './config.js';
+import { IS_WINDOWS } from './platform.js';
 
 const execPromise = promisify(exec);
 function execAsync(cmd: string, opts: { encoding: BufferEncoding; cwd?: string; timeout?: number }) {
-  return execPromise(cmd, { ...opts, shell: process.platform === 'win32' ? true as unknown as string : undefined });
+  return execPromise(cmd, { ...opts, shell: IS_WINDOWS ? true as unknown as string : undefined });
 }
 
 type ProjectType = 'repo' | 'workspace' | 'monorepo';

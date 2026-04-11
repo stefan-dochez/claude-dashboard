@@ -3,23 +3,15 @@ import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { exec } from 'child_process';
 import path from 'path';
-import os from 'os';
 import { EventEmitter } from 'events';
 import type { AppConfig } from './config.js';
+import { IS_WINDOWS, PATH_SEP, getExtraPaths, PTY_TERM_NAME } from './platform.js';
 
 function resolveClaudeBinary(): string {
-  const isWindows = process.platform === 'win32';
-  const pathSep = isWindows ? ';' : ':';
-  const exeNames = isWindows ? ['claude.exe', 'claude.cmd', 'claude'] : ['claude'];
+  const exeNames = IS_WINDOWS ? ['claude.exe', 'claude.cmd', 'claude'] : ['claude'];
 
   // Check well-known locations directly (no shell, no output pollution)
-  const candidateDirs = isWindows
-    ? [path.join(os.homedir(), '.local', 'bin')]
-    : [
-        path.join(os.homedir(), '.local', 'bin'),
-        '/usr/local/bin',
-        '/opt/homebrew/bin',
-      ];
+  const candidateDirs = getExtraPaths();
 
   for (const dir of candidateDirs) {
     for (const exe of exeNames) {
@@ -35,7 +27,7 @@ function resolveClaudeBinary(): string {
   }
 
   // Last resort: check PATH entries
-  const pathDirs = (process.env.PATH ?? '').split(pathSep);
+  const pathDirs = (process.env.PATH ?? '').split(PATH_SEP);
   for (const dir of pathDirs) {
     for (const exe of exeNames) {
       const candidate = path.join(dir, exe);
@@ -55,24 +47,16 @@ function resolveClaudeBinary(): string {
 
 function buildPtyEnv(): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
-  const isWindows = process.platform === 'win32';
-  const pathSep = isWindows ? ';' : ':';
   // Ensure common user binary paths are in PATH
-  const extraPaths = isWindows
-    ? [path.join(os.homedir(), '.local', 'bin')]
-    : [
-        path.join(os.homedir(), '.local', 'bin'),
-        '/usr/local/bin',
-        '/opt/homebrew/bin',
-      ];
+  const extraPaths = getExtraPaths();
   const currentPath = env.PATH ?? '';
-  const pathParts = currentPath.split(pathSep);
+  const pathParts = currentPath.split(PATH_SEP);
   for (const p of extraPaths) {
     if (!pathParts.includes(p)) {
       pathParts.unshift(p);
     }
   }
-  env.PATH = pathParts.join(pathSep);
+  env.PATH = pathParts.join(PATH_SEP);
 
   // Remove all Claude Code env vars so spawned instances
   // don't think they're nested inside another session
@@ -172,7 +156,7 @@ export class ProcessManager extends EventEmitter {
     console.log(`[process-manager] Spawning ${this.claudeBinary} in ${cwd} (session ${sessionId}, resume=${!!options.resumeSessionId})`);
 
     const ptyProcess = pty.spawn(this.claudeBinary, args, {
-      name: 'xterm-256color',
+      name: PTY_TERM_NAME,
       cols: 120,
       rows: 30,
       cwd,
@@ -256,10 +240,11 @@ export class ProcessManager extends EventEmitter {
       // Listen for exit (only once)
       handle.process.onExit(() => done());
 
-      if (process.platform === 'win32') {
+      if (IS_WINDOWS) {
         // On Windows, SIGTERM/SIGKILL via node-pty only kills the shell, not
         // child processes.  taskkill /F /T kills the entire process tree.
-        const taskkillPath = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe');
+        const systemRoot = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows';
+        const taskkillPath = path.join(systemRoot, 'System32', 'taskkill.exe');
         exec(`"${taskkillPath}" /F /T /PID ${pid}`, (err) => {
           if (err) {
             console.log(`[process-manager] taskkill failed for pid ${pid}: ${err.message}`);
@@ -288,7 +273,12 @@ export class ProcessManager extends EventEmitter {
       giveUpTimeout = setTimeout(() => {
         console.log(`[process-manager] Instance ${instanceId} did not exit in 5s, force cleaning up`);
         try {
-          process.kill(pid, 'SIGKILL');
+          if (IS_WINDOWS) {
+            const systemRoot = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows';
+            exec(`"${path.join(systemRoot, 'System32', 'taskkill.exe')}" /F /T /PID ${pid}`);
+          } else {
+            process.kill(pid, 'SIGKILL');
+          }
         } catch {
           // pid might already be gone
         }
@@ -411,7 +401,12 @@ export class ProcessManager extends EventEmitter {
   private forceDestroyAll(): void {
     for (const [id, handle] of this.handles) {
       try {
-        process.kill(handle.instance.pid, 'SIGKILL');
+        if (IS_WINDOWS) {
+          const systemRoot = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows';
+          exec(`"${path.join(systemRoot, 'System32', 'taskkill.exe')}" /F /T /PID ${handle.instance.pid}`);
+        } else {
+          process.kill(handle.instance.pid, 'SIGKILL');
+        }
       } catch {
         // Already gone
       }

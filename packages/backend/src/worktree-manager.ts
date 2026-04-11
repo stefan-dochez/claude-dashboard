@@ -2,13 +2,14 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
+import { IS_WINDOWS, NULL_DEVICE } from './platform.js';
 
 const execPromise = promisify(exec);
 
 // Wrap execPromise to inject shell: true — required on Windows where cmd.exe
 // may fail with ENOENT for git commands without an explicit shell.
 function execAsync(cmd: string, opts: { encoding: BufferEncoding; cwd?: string; timeout?: number; maxBuffer?: number }) {
-  return execPromise(cmd, { ...opts, shell: process.platform === 'win32' ? true as unknown as string : undefined });
+  return execPromise(cmd, { ...opts, shell: IS_WINDOWS ? true as unknown as string : undefined });
 }
 
 interface WorktreeResult {
@@ -342,7 +343,7 @@ export class WorktreeManager {
     let dirRemoved = false;
     if (dirExists) {
       // Retry loop: on Windows, processes may hold file locks briefly after exit (EBUSY)
-      const maxAttempts = process.platform === 'win32' ? 5 : 1;
+      const maxAttempts = IS_WINDOWS ? 5 : 1;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
           await execAsync(`git worktree remove --force "${worktreePath}"`, {
@@ -531,7 +532,7 @@ export class WorktreeManager {
       const untracked = (await this.getStatus(projectPath)).filter(f => f.status === '??');
       for (const file of untracked) {
         try {
-          const { stdout: content } = await execAsync(`git diff --no-index /dev/null "${file.path}"`, {
+          const { stdout: content } = await execAsync(`git diff --no-index ${NULL_DEVICE} "${file.path}"`, {
             cwd: projectPath,
             encoding: 'utf-8',
             timeout: 10000,
@@ -550,7 +551,7 @@ export class WorktreeManager {
       const status = (await this.getStatus(projectPath)).find(f => f.path === filePath);
       if (status?.status === '??' && !diff) {
         try {
-          await execAsync(`git diff --no-index /dev/null "${filePath}"`, {
+          await execAsync(`git diff --no-index ${NULL_DEVICE} "${filePath}"`, {
             cwd: projectPath,
             encoding: 'utf-8',
             timeout: 10000,

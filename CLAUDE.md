@@ -9,7 +9,7 @@ Dashboard web local pour orchestrer plusieurs instances Claude Code en parallèl
 - **Monorepo** avec npm workspaces : `packages/backend` + `packages/frontend`
 - **Backend** : Node.js, TypeScript, Express, socket.io, node-pty
 - **Frontend** : React (Vite), TypeScript, Tailwind CSS, xterm.js, socket.io-client, lucide-react
-- **Cible** : macOS uniquement (node-pty + Xcode CLI tools)
+- **Cible** : macOS, Linux, Windows (node-pty requis — Xcode CLI tools sur macOS, build tools sur Windows)
 
 ## Commandes
 
@@ -34,8 +34,11 @@ claude-dashboard/
 │   │   │   ├── scanner.ts          # ProjectScanner : détection projets + worktrees
 │   │   │   ├── process-manager.ts  # ProcessManager : spawn/kill PTY, lifecycle
 │   │   │   ├── status-monitor.ts   # StatusMonitor : parsing output PTY, détection état
+│   │   │   ├── platform.ts         # cross-platform abstractions (paths, null device, etc.)
 │   │   │   ├── routes.ts           # routes REST Express
 │   │   │   └── socket.ts          # handlers WebSocket socket.io
+│   │   ├── scripts/
+│   │   │   └── postinstall.mjs     # cross-platform node-pty permissions fix
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   └── frontend/
@@ -43,7 +46,7 @@ claude-dashboard/
 │       │   ├── App.tsx
 │       │   ├── main.tsx
 │       │   ├── components/         # composants React
-│       │   ├── hooks/              # custom hooks (useSocket, useInstances, etc.)
+│       │   ├── hooks/              # custom hooks (useSocket, useInstances, usePlatform, etc.)
 │       │   └── types.ts            # types partagés frontend
 │       ├── index.html
 │       ├── package.json
@@ -135,6 +138,7 @@ Utilisé pour les opérations CRUD et les requêtes ponctuelles :
 | GET | `/api/instances` | Lister les instances actives |
 | POST | `/api/instances` | Créer une instance `{ projectPath }` |
 | DELETE | `/api/instances/:id` | Kill une instance |
+| GET | `/api/platform` | Info plateforme (homePath, platform) |
 
 ### WebSocket (socket.io)
 
@@ -191,8 +195,17 @@ interface AppConfig {
 - Le binaire `claude` doit être dans le PATH
 - Maximum 10 instances simultanées par défaut (configurable) — chaque PTY consomme un file descriptor
 - Le buffer historique par instance est limité à 5000 lignes
-- node-pty nécessite les Xcode CLI tools (`xcode-select --install`)
+- node-pty nécessite les Xcode CLI tools sur macOS (`xcode-select --install`), Visual Studio Build Tools sur Windows
 - La détection de statut est heuristique — les patterns de prompt Claude Code peuvent changer entre versions
+
+### Cross-platform (Windows)
+
+- Toutes les abstractions plateforme sont centralisées dans `packages/backend/src/platform.ts`
+- Utiliser `NULL_DEVICE` au lieu de hardcoder `/dev/null`
+- Utiliser `IS_WINDOWS` / `PATH_SEP` / `getExtraPaths()` au lieu de checks `process.platform` ad hoc
+- Utiliser `shortenPath` du hook `usePlatform` côté frontend (pas de regex `/Users/` hardcodée)
+- Côté kill de processus : `taskkill /F /T` sur Windows, `SIGTERM`/`SIGKILL` sur Unix
+- Scripts shell (`.sh`) ont leurs équivalents PowerShell (`.ps1`) dans `scripts/`
 
 ## Design
 

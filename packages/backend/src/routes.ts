@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import os from 'os';
 import type { ConfigService } from './config.js';
 import type { ProjectScanner } from './scanner.js';
 import type { ProcessManager } from './process-manager.js';
@@ -29,6 +30,11 @@ export function createRoutes(
   // Version — read from backend package.json at startup
   router.get('/api/version', (_req, res) => {
     res.json({ version: appVersion });
+  });
+
+  // Platform info — used by the frontend for cross-platform path display
+  router.get('/api/platform', (_req, res) => {
+    res.json({ homePath: os.homedir(), platform: process.platform });
   });
 
   // Config

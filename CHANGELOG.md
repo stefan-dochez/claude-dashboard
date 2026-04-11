@@ -6,6 +6,8 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Features
 
+- **Windows compatibility** — Cross-platform support for Windows: centralized platform abstractions (`platform.ts`), cross-platform postinstall script, `/dev/null` → `nul` on Windows, cross-platform path shortening via `usePlatform` hook, Windows process kill via `taskkill`, PTY terminal name adaptation, and PowerShell equivalents for all shell scripts.
+
 - **Resizable panels** — Sidebar and right panel (file explorer, context) are now draggable to resize. Hover the border between panels to reveal the resize handle. Sidebar clamps 200–480px, right panel 200–500px.
 
 - **Token stats in history** — History entries now show model name, input/output token counts (in thousands), and cost. Helps track resource usage across sessions.

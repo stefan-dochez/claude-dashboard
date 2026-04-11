@@ -3,6 +3,7 @@ import {
   Info, FileText, ChevronRight, ChevronDown,
   GitBranch, Coins, Clock, Cpu, FileEdit, Loader2,
 } from 'lucide-react';
+import { usePlatform } from '../hooks/usePlatform';
 
 // --------------- Context Panel ---------------
 
@@ -30,6 +31,7 @@ export default function ContextPanel({ instanceId, onOpenFile }: ContextPanelPro
   const [data, setData] = useState<InstanceContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [claudeMdExpanded, setClaudeMdExpanded] = useState(false);
+  const { shortenPath } = usePlatform();
 
   const fetchContext = useCallback(async () => {
     setLoading(true);
@@ -75,7 +77,7 @@ export default function ContextPanel({ instanceId, onOpenFile }: ContextPanelPro
             </div>
           )}
           <div className="truncate text-[11px] text-faint" title={cwd}>
-            {cwd.replace(/^\/Users\/[^/]+/, '~')}
+            {shortenPath(cwd)}
           </div>
         </div>
 

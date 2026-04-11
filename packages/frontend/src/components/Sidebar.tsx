@@ -2,6 +2,7 @@ import { RefreshCw, FolderOpen, Settings, Download, ChevronDown, ChevronRight, S
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import LaunchModal from './LaunchModal';
 import { useSocket } from '../hooks/useSocket';
+import { usePlatform } from '../hooks/usePlatform';
 import type { Project, Instance, InstanceStatus } from '../types';
 
 interface HistoryTask {
@@ -67,10 +68,6 @@ const STATUS_LABEL: Record<InstanceStatus, string> = {
   idle: 'Idle',
   exited: 'Exited',
 };
-
-function shortenPath(fullPath: string): string {
-  return fullPath.replace(/^\/Users\/[^/]+/, '~');
-}
 
 // --------------- Project row with inline instances + worktrees ---------------
 
@@ -320,6 +317,7 @@ export default function Sidebar({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryTask[]>([]);
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const { shortenPath } = usePlatform();
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -446,7 +444,7 @@ export default function Sidebar({
     const root = scanPaths.find(sp => project.path.startsWith(sp));
     if (!root) return null;
     return shortenPath(root);
-  }, [duplicateNames, scanPaths]);
+  }, [duplicateNames, scanPaths, shortenPath]);
 
   const renderProject = useCallback((project: Project) => (
     <ProjectRow
