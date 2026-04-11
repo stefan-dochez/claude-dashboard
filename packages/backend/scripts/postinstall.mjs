@@ -7,18 +7,24 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const nodeModules = path.resolve(__dirname, '..', '..', '..', 'node_modules');
 
 if (process.platform === 'win32') {
   // Windows: no chmod needed — binaries are executable by default
   process.exit(0);
 }
 
-const prebuildsDir = path.join(nodeModules, 'node-pty', 'prebuilds');
+// Look for node-pty in multiple locations:
+// 1. Monorepo hoisted: ../../.. (root node_modules)
+// 2. Local: ../node_modules (standalone install, e.g. _pkg/)
+const candidates = [
+  path.resolve(__dirname, '..', '..', '..', 'node_modules', 'node-pty', 'prebuilds'),
+  path.resolve(__dirname, '..', 'node_modules', 'node-pty', 'prebuilds'),
+];
+const prebuildsDir = candidates.find(p => fs.existsSync(p));
 
 try {
-  if (!fs.existsSync(prebuildsDir)) {
-    // node-pty prebuilds not yet installed — skip silently
+  if (!prebuildsDir) {
+    // node-pty prebuilds not found in any known location — skip silently
     process.exit(0);
   }
 

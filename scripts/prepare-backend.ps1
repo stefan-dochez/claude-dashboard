@@ -9,8 +9,9 @@ if (Test-Path "_pkg") {
 }
 New-Item -ItemType Directory -Path "_pkg" | Out-Null
 
-# Copy package.json
+# Copy package.json and postinstall script
 Copy-Item "package.json" "_pkg\"
+Copy-Item -Recurse "scripts" "_pkg\scripts"
 
 # Install production deps
 Set-Location "_pkg"

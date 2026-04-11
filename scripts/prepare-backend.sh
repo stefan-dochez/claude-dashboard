@@ -8,8 +8,9 @@ cd "$(dirname "$0")/../packages/backend"
 rm -rf _pkg
 mkdir _pkg
 
-# Copy package.json
+# Copy package.json and postinstall script
 cp package.json _pkg/
+cp -r scripts _pkg/
 
 # Install production deps
 cd _pkg
