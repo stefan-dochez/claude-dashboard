@@ -69,6 +69,7 @@ jobs:
           Remove-Item -Recurse -Force _pkg -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path _pkg
           Copy-Item package.json _pkg/
+          Copy-Item -Recurse scripts _pkg/scripts
           Set-Location _pkg
           npm install --omit=dev
 
