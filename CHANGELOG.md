@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.5.4]
+
+### Fixes
+
+- **Context panel not resizable** — ContextPanel had a hardcoded `w-[280px]` width that ignored the parent's resize state. Changed to `w-full` so it respects the draggable `rightPanelWidth`, matching FileExplorer behavior.
+
 ## [0.5.3]
 
 ### Fixes

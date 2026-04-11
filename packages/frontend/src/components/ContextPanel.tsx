@@ -55,7 +55,7 @@ export default function ContextPanel({ instanceId, onOpenFile }: ContextPanelPro
 
   if (loading && !data) {
     return (
-      <aside className="flex h-full w-[280px] shrink-0 items-center justify-center rounded-xl bg-surface">
+      <aside className="flex h-full w-full shrink-0 items-center justify-center rounded-xl bg-surface">
         <Loader2 className="h-4 w-4 animate-spin text-faint" />
       </aside>
     );
@@ -66,7 +66,7 @@ export default function ContextPanel({ instanceId, onOpenFile }: ContextPanelPro
   const cwd = data.worktreePath ?? data.projectPath;
 
   return (
-    <aside className="flex h-full w-[280px] shrink-0 flex-col overflow-hidden rounded-xl bg-surface">
+    <aside className="flex h-full w-full shrink-0 flex-col overflow-hidden rounded-xl bg-surface">
       <div className="flex-1 overflow-y-auto px-3 py-2">
         {/* Branch + path */}
         <div className="mb-3 flex flex-col gap-1">
