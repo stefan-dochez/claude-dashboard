@@ -50,7 +50,7 @@ export default function ResizeHandle({ side, onResize, onResizeEnd }: ResizeHand
       }`}
     >
       <div className="absolute inset-y-0 -left-1.5 -right-1.5" />
-      <div className="absolute inset-y-0 left-0 w-px bg-transparent transition-colors group-hover:bg-blue-500/50 group-active:bg-blue-500" />
+      <div className="absolute inset-y-0 left-0 w-px bg-transparent transition-colors group-hover:bg-neutral-500/50 group-active:bg-neutral-400" />
     </div>
   );
 }

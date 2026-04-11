@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.5.3]
+
+### Fixes
+
+- **Gray resize handle** — Changed the panel resize handle color from blue to neutral gray for a more subtle appearance.
+
 ## [0.5.2]
 
 ### Bug Fixes
