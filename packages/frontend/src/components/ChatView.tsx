@@ -829,13 +829,18 @@ export default function ChatView({
       }
     };
 
-    const onRateLimit = ({ instanceId: id, resetsAt }: { instanceId: string; resetsAt?: number }) => {
+    const onRateLimit = ({ instanceId: id, status, resetsAt }: { instanceId: string; status?: string; resetsAt?: number }) => {
       if (id !== currentId) return;
+      // Only show banner when actually rate-limited, not for informational 'allowed' events
+      if (status === 'allowed' || !status) {
+        setRateLimitInfo(null);
+        return;
+      }
       setRateLimitInfo({ resetsAt });
       if (resetsAt) {
         const delay = (resetsAt * 1000) - Date.now();
-        if (delay > 0 && delay < 600_000) {
-          setTimeout(() => setRateLimitInfo(null), delay + 1000);
+        if (delay > 0) {
+          setTimeout(() => setRateLimitInfo(null), Math.min(delay + 1000, 3_600_000));
         }
       }
     };
