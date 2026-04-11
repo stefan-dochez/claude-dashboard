@@ -4,9 +4,9 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {
-  Send, Square, Loader2, ChevronDown, ChevronRight,
-  Wrench, AlertCircle, AlertTriangle, CheckCircle2, Brain, User, Bot,
-  Sparkles, Shield, CircleStop, Plus, X,
+  Loader2, ChevronDown, ChevronRight,
+  Wrench, AlertCircle, AlertTriangle, CheckCircle2, Brain,
+  Sparkles, Shield, CircleStop, Plus, X, ArrowUp,
   FileText, GitBranch, GitCommit, FileCode2,
 } from 'lucide-react';
 import { useSocket } from '../hooks/useSocket';
@@ -149,23 +149,24 @@ function MarkdownText({ text }: { text: string }) {
 
 function ThinkingBlock({ text, isActive }: { text: string; isActive: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const preview = text.slice(0, 120).replace(/\n/g, ' ');
+  const preview = text.slice(0, 150).replace(/\n/g, ' ');
 
   return (
-    <div className="my-1.5 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2">
+    <div className="my-2">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 text-left text-xs text-violet-400"
+        className="group flex w-full items-center gap-2 text-left text-xs text-tertiary transition-colors hover:text-secondary"
       >
-        <Brain className={`h-3 w-3 ${isActive ? 'animate-pulse' : ''}`} />
-        <span className="font-medium">{isActive ? 'Thinking...' : 'Thought process'}</span>
-        {expanded ? <ChevronDown className="ml-auto h-3 w-3" /> : <ChevronRight className="ml-auto h-3 w-3" />}
+        {expanded ? <ChevronDown className="h-3 w-3 text-muted" /> : <ChevronRight className="h-3 w-3 text-muted" />}
+        <span className={isActive ? 'italic text-tertiary' : 'text-muted'}>
+          {isActive ? 'Thinking...' : 'Thought process'}
+        </span>
       </button>
       {expanded ? (
-        <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap text-xs text-violet-300/70">{text}</pre>
-      ) : (
-        <p className="mt-1 truncate text-xs text-violet-300/50">{preview}{text.length > 120 ? '...' : ''}</p>
-      )}
+        <pre className="mt-1.5 max-h-60 overflow-auto whitespace-pre-wrap border-l-2 border-border-default pl-4 text-xs leading-relaxed text-muted">{text}</pre>
+      ) : !isActive ? (
+        <p className="mt-0.5 truncate pl-5 text-xs text-faint">{preview}{text.length > 150 ? '...' : ''}</p>
+      ) : null}
     </div>
   );
 }
@@ -289,19 +290,19 @@ function ToolGroupBlock({ tools }: { tools: Array<{ use: ContentBlock; result?: 
     : `${toolNames.length} tools: ${[...new Set(toolNames)].join(', ')}`;
 
   return (
-    <div className={`my-1.5 rounded-lg border px-3 py-2 ${hasError ? 'border-red-500/20 bg-red-500/5' : 'border-border-default bg-elevated/30'}`}>
+    <div className="my-2">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 text-left text-xs"
+        className="group flex w-full items-center gap-2 text-left text-xs text-tertiary transition-colors hover:text-secondary"
       >
-        <Wrench className={`h-3 w-3 ${hasError ? 'text-red-400' : 'text-blue-400'}`} />
-        <span className="min-w-0 flex-1 truncate font-medium text-secondary">{summary}</span>
+        {expanded ? <ChevronDown className="h-3 w-3 text-muted" /> : <ChevronRight className="h-3 w-3 text-muted" />}
+        <Wrench className={`h-3 w-3 ${hasError ? 'text-red-400' : 'text-muted'}`} />
+        <span className="min-w-0 flex-1 truncate text-muted">{summary}</span>
         {hasError && <AlertCircle className="h-3 w-3 shrink-0 text-red-400" />}
-        {!hasError && <CheckCircle2 className="h-3 w-3 shrink-0 text-green-500/60" />}
-        {expanded ? <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-faint" /> : <ChevronRight className="ml-auto h-3 w-3 shrink-0 text-faint" />}
+        {!hasError && <CheckCircle2 className="h-3 w-3 shrink-0 text-green-600/50" />}
       </button>
       {expanded && (
-        <div className="mt-2 flex flex-col gap-2">
+        <div className="ml-5 mt-1.5 flex flex-col gap-1.5 border-l-2 border-border-default pl-3">
           {tools.map((tool, i) => (
             <ToolDetailView key={i} tool={tool} />
           ))}
@@ -318,34 +319,30 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     [message.content, isUser],
   );
 
-  return (
-    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
-      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${isUser ? 'bg-blue-600' : 'bg-amber-600'}`}>
-        {isUser ? <User className="h-3.5 w-3.5 text-white" /> : <Bot className="h-3.5 w-3.5 text-white" />}
-      </div>
-      <div className={`min-w-0 max-w-[85%] ${isUser ? 'text-right' : ''}`}>
-        {isUser ? (
-          <div className="inline-block rounded-lg bg-input px-3 py-2 text-sm text-primary">
-            {message.content[0]?.text ?? ''}
-          </div>
-        ) : (
-          groups?.map((group, i) => {
-            switch (group.type) {
-              case 'text':
-                return <MarkdownText key={i} text={group.text ?? ''} />;
-              case 'thinking':
-                return <ThinkingBlock key={i} text={group.thinking ?? ''} isActive={false} />;
-              case 'tool_group':
-                return <ToolGroupBlock key={i} tools={group.tools ?? []} />;
-              default:
-                return null;
-            }
-          })
-        )}
-        <div className={`mt-1 text-[10px] text-faint ${isUser ? 'text-right' : ''}`}>
-          {new Date(message.timestamp).toLocaleTimeString()}
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-3xl bg-elevated px-5 py-3 text-sm leading-relaxed text-primary">
+          {message.content[0]?.text ?? ''}
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-w-0">
+      {groups?.map((group, i) => {
+        switch (group.type) {
+          case 'text':
+            return <MarkdownText key={i} text={group.text ?? ''} />;
+          case 'thinking':
+            return <ThinkingBlock key={i} text={group.thinking ?? ''} isActive={false} />;
+          case 'tool_group':
+            return <ToolGroupBlock key={i} tools={group.tools ?? []} />;
+          default:
+            return null;
+        }
+      })}
     </div>
   );
 }
@@ -365,49 +362,44 @@ function LiveWorkingBlock({
   if (!isStreaming && !sending) return null;
 
   return (
-    <div className="flex gap-3">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-600">
-        <Bot className="h-3.5 w-3.5 text-white" />
-      </div>
-      <div className="min-w-0 max-w-[85%]">
-        {/* Thinking */}
-        {thinkingText && (
-          <ThinkingBlock text={thinkingText} isActive={true} />
-        )}
+    <div className="min-w-0">
+      {/* Thinking */}
+      {thinkingText && (
+        <ThinkingBlock text={thinkingText} isActive={true} />
+      )}
 
-        {/* Streaming tool blocks */}
-        {streamingBlocks.length > 0 && (
-          <ToolGroupBlock tools={streamingBlocks
-            .filter(b => b.type === 'tool_use')
-            .map(use => ({
-              use,
-              result: streamingBlocks.find(b => b.type === 'tool_result' && b.tool_use_id === use.tool_use_id),
-            }))}
-          />
-        )}
+      {/* Streaming tool blocks */}
+      {streamingBlocks.length > 0 && (
+        <ToolGroupBlock tools={streamingBlocks
+          .filter(b => b.type === 'tool_use')
+          .map(use => ({
+            use,
+            result: streamingBlocks.find(b => b.type === 'tool_result' && b.tool_use_id === use.tool_use_id),
+          }))}
+        />
+      )}
 
-        {/* Tool progress */}
-        {toolProgress && (
-          <div className="my-1.5 flex items-center gap-2 text-xs text-muted">
-            <ToolProgressRing seconds={toolProgress.elapsedSeconds} />
-            <span className="font-mono text-secondary">{toolProgress.toolName}</span>
-            <span className="text-faint">{Math.round(toolProgress.elapsedSeconds)}s</span>
-          </div>
-        )}
+      {/* Tool progress */}
+      {toolProgress && (
+        <div className="my-2 flex items-center gap-2 text-xs text-muted">
+          <ToolProgressRing seconds={toolProgress.elapsedSeconds} />
+          <span className="font-mono text-tertiary">{toolProgress.toolName}</span>
+          <span className="text-faint">{Math.round(toolProgress.elapsedSeconds)}s</span>
+        </div>
+      )}
 
-        {/* Streaming text */}
-        {streamingText ? (
-          <div className="text-sm leading-relaxed text-primary">
-            <MarkdownText text={streamingText} />
-            <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-blue-400" />
-          </div>
-        ) : sending && !thinkingText && !toolProgress && streamingBlocks.length === 0 ? (
-          <div className="flex items-center gap-2 py-2 text-xs text-muted">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>Connecting...</span>
-          </div>
-        ) : null}
-      </div>
+      {/* Streaming text */}
+      {streamingText ? (
+        <div className="text-sm leading-relaxed text-primary">
+          <MarkdownText text={streamingText} />
+          <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-tertiary" />
+        </div>
+      ) : sending && !thinkingText && !toolProgress && streamingBlocks.length === 0 ? (
+        <div className="flex items-center gap-2 py-2 text-xs text-muted">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>Thinking...</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -420,31 +412,32 @@ function PermissionPrompt({ permission, onResolve, onApproveAll }: {
   onApproveAll: (toolName: string) => void;
 }) {
   return (
-    <div className="mx-4 mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+    <div className="mx-auto mb-3 max-w-3xl rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
       <div className="flex items-center gap-2 text-xs text-amber-400">
         <Shield className="h-3.5 w-3.5" />
-        <span className="font-medium">Permission: <span className="font-mono">{permission.toolName}</span></span>
+        <span className="font-medium">Permission required</span>
+        <span className="font-mono text-amber-400/70">{permission.toolName}</span>
       </div>
-      {permission.title && <p className="mt-1.5 text-xs text-secondary">{permission.title}</p>}
+      {permission.title && <p className="mt-2 text-sm text-secondary">{permission.title}</p>}
       {permission.description && <p className="mt-1 text-xs text-muted">{permission.description}</p>}
       <div className="mt-3 flex gap-2">
         <button
           onClick={() => onResolve(permission.toolUseId, true)}
-          className="rounded bg-green-600/80 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-green-600"
+          className="rounded-lg bg-green-600/80 px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-600"
         >
-          <span className="mr-1 text-[10px] text-white/50">1</span> Yes
+          Allow
         </button>
         <button
           onClick={() => onApproveAll(permission.toolName)}
-          className="rounded bg-blue-600/80 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-600"
+          className="rounded-lg bg-elevated px-3.5 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-hover"
         >
-          <span className="mr-1 text-[10px] text-white/50">2</span> Always
+          Always allow
         </button>
         <button
           onClick={() => onResolve(permission.toolUseId, false)}
-          className="rounded bg-elevated px-3 py-1 text-xs font-medium text-secondary transition-colors hover:bg-hover"
+          className="rounded-lg px-3.5 py-1.5 text-xs text-muted transition-colors hover:bg-hover hover:text-secondary"
         >
-          <span className="mr-1 text-[10px] text-faint">3</span> No
+          Deny
         </button>
       </div>
     </div>
@@ -462,14 +455,14 @@ function UserQuestionPrompt({ question, onAnswer }: {
 
   if (q?.options && q.options.length > 0) {
     return (
-      <div className="mx-4 mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3">
-        <p className="mb-2 text-xs text-cyan-300">{q.question}</p>
-        <div className="flex flex-wrap gap-1.5">
+      <div className="mx-auto mb-3 max-w-3xl rounded-xl border border-border-default bg-elevated/50 p-4">
+        <p className="mb-3 text-sm text-secondary">{q.question}</p>
+        <div className="flex flex-wrap gap-2">
           {q.options.map((opt, i) => (
             <button
               key={i}
               onClick={() => onAnswer(question.toolUseId, opt.label)}
-              className="rounded bg-cyan-600/20 px-2.5 py-1 text-xs text-cyan-300 transition-colors hover:bg-cyan-600/40"
+              className="rounded-lg border border-border-default bg-elevated px-3 py-1.5 text-xs text-secondary transition-colors hover:bg-hover hover:text-primary"
             >
               {opt.label}
             </button>
@@ -480,20 +473,20 @@ function UserQuestionPrompt({ question, onAnswer }: {
   }
 
   return (
-    <div className="mx-4 mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3">
-      <p className="mb-2 text-xs text-cyan-300">{q?.question ?? 'Claude has a question'}</p>
+    <div className="mx-auto mb-3 max-w-3xl rounded-xl border border-border-default bg-elevated/50 p-4">
+      <p className="mb-3 text-sm text-secondary">{q?.question ?? 'Claude has a question'}</p>
       <div className="flex gap-2">
         <input
           type="text"
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && text.trim()) { onAnswer(question.toolUseId, text.trim()); setText(''); } }}
-          className="flex-1 rounded border border-border-input bg-input px-2 py-1 text-xs text-primary outline-none focus:border-border-focus"
+          className="flex-1 rounded-lg border border-border-input bg-input px-3 py-1.5 text-sm text-primary outline-none transition-colors focus:border-border-focus"
           placeholder="Type your answer..."
         />
         <button
           onClick={() => { if (text.trim()) { onAnswer(question.toolUseId, text.trim()); setText(''); } }}
-          className="rounded bg-cyan-600/80 px-2.5 py-1 text-xs text-white hover:bg-cyan-600"
+          className="rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-root hover:opacity-80"
         >
           Send
         </button>
@@ -1103,15 +1096,12 @@ export default function ChatView({
       )}
 
       {/* Messages area */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
-        <div className="mx-auto flex max-w-3xl flex-col gap-5">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="mx-auto flex max-w-3xl flex-col gap-6">
           {messages.length === 0 && !sending && (
-            <div className="flex flex-col items-center justify-center py-20 text-faint">
-              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-elevated">
-                <Bot className="h-7 w-7" />
-              </div>
-              <p className="text-[15px] font-medium text-tertiary">Start a conversation</p>
-              <p className="mt-2 text-[13px] text-faint">Messages are sent via the Claude Agent SDK</p>
+            <div className="flex flex-col items-center justify-center py-24 text-faint">
+              <Sparkles className="mb-4 h-8 w-8 text-muted" />
+              <p className="text-[15px] text-tertiary">How can I help you?</p>
             </div>
           )}
 
@@ -1189,30 +1179,30 @@ export default function ChatView({
         />
       )}
 
-      {/* Input bar */}
-      <div className="border-t border-border-default bg-surface px-4 py-3">
+      {/* Input area */}
+      <div className="px-4 pb-4 pt-2">
         <div className="mx-auto max-w-3xl">
           {/* Context chips + code selection */}
           {(contextItems.length > 0 || codeSelection) && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {contextItems.map(item => (
-                <span key={item.value} className="flex items-center gap-1 rounded bg-elevated px-2 py-0.5 text-[11px] text-secondary">
+                <span key={item.value} className="flex items-center gap-1 rounded-full bg-elevated px-2.5 py-1 text-[11px] text-secondary">
                   {item.type === 'file' && <FileText className="h-2.5 w-2.5 text-blue-400" />}
                   {item.type === 'branch' && <GitBranch className="h-2.5 w-2.5 text-violet-400" />}
                   {item.type === 'commit' && <GitCommit className="h-2.5 w-2.5 text-amber-400" />}
                   {item.type === 'changes' && <FileCode2 className="h-2.5 w-2.5 text-green-400" />}
                   <span className="max-w-[150px] truncate">{item.label}</span>
-                  <button onClick={() => removeContextItem(item.value)} className="text-faint hover:text-secondary">
+                  <button onClick={() => removeContextItem(item.value)} className="ml-0.5 text-faint hover:text-secondary">
                     <X className="h-2.5 w-2.5" />
                   </button>
                 </span>
               ))}
               {codeSelection && (
-                <span className="flex items-center gap-1 rounded border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] text-violet-300">
+                <span className="flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[11px] text-violet-300">
                   <FileText className="h-2.5 w-2.5" />
                   <span className="max-w-[200px] truncate">{codeSelection.filePath.split('/').pop()}:{codeSelection.startLine}-{codeSelection.endLine}</span>
                   <span className="text-[9px] text-violet-300/60">{codeSelection.endLine - codeSelection.startLine + 1}L</span>
-                  <button onClick={onClearCodeSelection} className="text-violet-300/50 hover:text-violet-200">
+                  <button onClick={onClearCodeSelection} className="ml-0.5 text-violet-300/50 hover:text-violet-200">
                     <X className="h-2.5 w-2.5" />
                   </button>
                 </span>
@@ -1220,12 +1210,12 @@ export default function ChatView({
             </div>
           )}
 
-          {/* Textarea row */}
-          <div className="relative flex gap-2">
+          {/* Unified input container */}
+          <div className="relative rounded-2xl border border-border-input bg-input transition-colors focus-within:border-border-focus">
             {/* @-mention dropdown */}
             {mentionActive && mentionResults.length > 0 && (
-              <div className="absolute bottom-full left-6 right-0 z-20 mb-1">
-                <div className="overflow-hidden rounded-lg border border-border-input bg-popover shadow-xl">
+              <div className="absolute bottom-full left-4 right-4 z-20 mb-1">
+                <div className="overflow-hidden rounded-xl border border-border-input bg-popover shadow-xl">
                   <div className="max-h-48 overflow-y-auto py-1">
                     {mentionResults.map((result, i) => (
                       <button
@@ -1244,117 +1234,119 @@ export default function ChatView({
               </div>
             )}
 
-            {/* Context menu button */}
-            <div ref={contextMenuRef} className="relative shrink-0">
-              <button
-                onClick={() => { setContextMenuOpen(!contextMenuOpen); setContextMenuSection(null); }}
-                className={`mt-1.5 rounded p-1 transition-colors ${contextMenuOpen ? 'bg-elevated text-primary' : 'text-faint hover:text-secondary'}`}
-                title="Attach context"
-                disabled={isExited}
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-              {contextMenuOpen && (
-                <div className="absolute bottom-full left-0 z-50 mb-1 min-w-[200px] rounded-lg border border-border-default bg-popover py-1 shadow-lg">
-                  {!contextMenuSection ? (
-                    <>
-                      <button onClick={() => { setContextMenuSection('files'); fetchContextSection('files'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
-                        <FileText className="h-3 w-3 text-blue-400" /> Files
-                      </button>
-                      <button onClick={() => { setContextMenuSection('branches'); fetchContextSection('branches'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
-                        <GitBranch className="h-3 w-3 text-violet-400" /> Branches
-                      </button>
-                      <button onClick={() => { setContextMenuSection('commits'); fetchContextSection('commits'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
-                        <GitCommit className="h-3 w-3 text-amber-400" /> Commits
-                      </button>
-                      <button onClick={addChangesContext} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
-                        <FileCode2 className="h-3 w-3 text-green-400" /> Local changes
-                      </button>
-                    </>
-                  ) : (
-                    <div className="max-h-48 overflow-y-auto">
-                      {contextLoading ? (
-                        <div className="flex justify-center py-3"><Loader2 className="h-3 w-3 animate-spin text-faint" /></div>
-                      ) : contextSearchResults.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-faint">Nothing found</p>
-                      ) : (
-                        contextSearchResults.map(r => (
-                          <button
-                            key={r.value}
-                            onClick={() => {
-                              const typeMap = { files: 'file', branches: 'branch', commits: 'commit' } as const;
-                              addContextItem(typeMap[contextMenuSection!], r.label, r.value);
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-1 text-left text-[12px] text-tertiary hover:bg-hover hover:text-secondary"
-                          >
-                            <span className="min-w-0 truncate">{r.label}</span>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* Textarea */}
             <textarea
               ref={textareaRef}
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder={isExited ? 'Instance has exited' : 'Send a message... (Shift+Enter for newline)'}
+              placeholder={isExited ? 'Instance has exited' : 'Send a message...'}
               rows={1}
               disabled={isExited}
-              className="flex-1 resize-none rounded-lg border border-border-input bg-input px-3 py-2 text-sm text-primary placeholder-placeholder outline-none transition-colors focus:border-border-focus disabled:opacity-50"
+              className="w-full resize-none bg-transparent px-4 pb-1 pt-3 text-sm text-primary placeholder-placeholder outline-none focus-visible:outline-none disabled:opacity-50"
               style={{ minHeight: 20, maxHeight: 120 }}
             />
-          </div>
 
-          {/* Controls row */}
-          <div className="mt-2 flex items-center gap-1">
-            <Dropdown
-              value={selectedModel}
-              options={MODEL_OPTIONS}
-              onChange={setSelectedModel}
-              icon={Sparkles}
-              label="Model"
-            />
-            <Dropdown
-              value={permissionMode}
-              options={PERMISSION_OPTIONS}
-              onChange={setPermissionMode}
-              icon={Shield}
-              label="Permission mode"
-            />
-            <Dropdown
-              value={effortLevel}
-              options={EFFORT_OPTIONS}
-              onChange={setEffortLevel}
-              icon={Brain}
-              label="Effort level"
-            />
+            {/* Bottom row inside input: attach + controls + send */}
+            <div className="flex items-center gap-1 px-2 pb-2">
+              {/* Context menu button */}
+              <div ref={contextMenuRef} className="relative">
+                <button
+                  onClick={() => { setContextMenuOpen(!contextMenuOpen); setContextMenuSection(null); }}
+                  className={`rounded-lg p-1.5 transition-colors ${contextMenuOpen ? 'bg-hover text-primary' : 'text-muted hover:bg-hover hover:text-secondary'}`}
+                  title="Attach context"
+                  disabled={isExited}
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+                {contextMenuOpen && (
+                  <div className="absolute bottom-full left-0 z-50 mb-1 min-w-[200px] rounded-xl border border-border-default bg-popover py-1 shadow-lg">
+                    {!contextMenuSection ? (
+                      <>
+                        <button onClick={() => { setContextMenuSection('files'); fetchContextSection('files'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
+                          <FileText className="h-3 w-3 text-blue-400" /> Files
+                        </button>
+                        <button onClick={() => { setContextMenuSection('branches'); fetchContextSection('branches'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
+                          <GitBranch className="h-3 w-3 text-violet-400" /> Branches
+                        </button>
+                        <button onClick={() => { setContextMenuSection('commits'); fetchContextSection('commits'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
+                          <GitCommit className="h-3 w-3 text-amber-400" /> Commits
+                        </button>
+                        <button onClick={addChangesContext} className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-secondary hover:bg-hover">
+                          <FileCode2 className="h-3 w-3 text-green-400" /> Local changes
+                        </button>
+                      </>
+                    ) : (
+                      <div className="max-h-48 overflow-y-auto">
+                        {contextLoading ? (
+                          <div className="flex justify-center py-3"><Loader2 className="h-3 w-3 animate-spin text-faint" /></div>
+                        ) : contextSearchResults.length === 0 ? (
+                          <p className="px-3 py-2 text-xs text-faint">Nothing found</p>
+                        ) : (
+                          contextSearchResults.map(r => (
+                            <button
+                              key={r.value}
+                              onClick={() => {
+                                const typeMap = { files: 'file', branches: 'branch', commits: 'commit' } as const;
+                                addContextItem(typeMap[contextMenuSection!], r.label, r.value);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-1 text-left text-[12px] text-tertiary hover:bg-hover hover:text-secondary"
+                            >
+                              <span className="min-w-0 truncate">{r.label}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
-            <div className="flex-1" />
+              {/* Model / Permission / Effort selectors */}
+              <Dropdown
+                value={selectedModel}
+                options={MODEL_OPTIONS}
+                onChange={setSelectedModel}
+                icon={Sparkles}
+                label="Model"
+              />
+              <Dropdown
+                value={permissionMode}
+                options={PERMISSION_OPTIONS}
+                onChange={setPermissionMode}
+                icon={Shield}
+                label="Permission mode"
+              />
+              <Dropdown
+                value={effortLevel}
+                options={EFFORT_OPTIONS}
+                onChange={setEffortLevel}
+                icon={Brain}
+                label="Effort level"
+              />
 
-            {/* Send / Stop */}
-            <button
-              onClick={sending ? () => socket.emit('chat:interrupt', { instanceId }) : handleSend}
-              disabled={isExited || (!input.trim() && !sending)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                sending
-                  ? 'bg-red-600/80 text-white hover:bg-red-600'
-                  : input.trim()
-                    ? 'bg-blue-600 text-white hover:bg-blue-500'
-                    : 'bg-elevated text-faint'
-              } disabled:opacity-40`}
-            >
-              {sending ? (
-                <><CircleStop className="h-3.5 w-3.5" /> Stop</>
-              ) : (
-                <><Send className="h-3.5 w-3.5" /> Send</>
-              )}
-            </button>
+              <div className="flex-1" />
+
+              {/* Send / Stop */}
+              <button
+                onClick={sending ? () => socket.emit('chat:interrupt', { instanceId }) : handleSend}
+                disabled={isExited || (!input.trim() && !sending)}
+                className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors ${
+                  sending
+                    ? 'bg-red-600/80 text-white hover:bg-red-600'
+                    : input.trim()
+                      ? 'bg-primary text-root hover:opacity-80'
+                      : 'bg-elevated text-faint'
+                } disabled:opacity-30`}
+                title={sending ? 'Stop' : 'Send'}
+              >
+                {sending ? (
+                  <CircleStop className="h-4 w-4" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -2,9 +2,15 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
-## [Unreleased]
+## [0.5.0]
 
 ### Features
+
+- **Chat UI redesign (Claude Desktop style)** — Complete visual overhaul of the chat interface to match Claude Desktop's appearance. Messages no longer use avatar circles or bubble styling — user messages are right-aligned with subtle background, assistant messages are plain text. Input area is now a single unified rounded container with textarea, attach button, model/permission/effort selectors, and send button all inside. Thinking blocks and tool groups use a cleaner, more compact collapsible style with left border indicators. Empty state simplified. Permission and question prompts restyled with rounded cards.
+
+### Bug Fixes
+
+- **Focus outline on chat input** — Fixed the global `*:focus-visible` violet outline appearing on the chat textarea. Inputs and textareas now suppress the global outline since their parent containers handle focus styling via `focus-within`.
 
 - **Custom application menu** — Removed the default Electron menu bar on Windows/Linux (it served no purpose). On macOS, replaced it with a minimal menu: App (About, Hide, Quit), Edit (copy/paste for terminal), Window (Minimize, Zoom, Close).
 

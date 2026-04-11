@@ -157,3 +157,8 @@
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+textarea:focus-visible,
+input:focus-visible {
+  outline: none;
+}
