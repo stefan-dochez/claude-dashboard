@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.5.2]
+
+### Bug Fixes
+
+- **Status monitor stuck on "processing"** — Claude Code's TUI redraws the entire screen via cursor-positioning escape sequences. The previous approach stripped ANSI from a contiguous 4KB tail, producing mostly whitespace where prompt markers (`❯`, `for shortcuts`, etc.) were lost. Now uses a two-pass approach on a larger 20KB window: raw substring search for known markers, then per-line ANSI strip for config patterns and prompt characters.
+
 ## [0.5.1]
 
 ### Refactoring
