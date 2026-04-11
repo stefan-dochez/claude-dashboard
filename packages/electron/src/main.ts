@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, dialog } from 'electron';
+import { app, BrowserWindow, shell, dialog, Menu } from 'electron';
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -176,6 +176,54 @@ function killBackend() {
   backendProcess = null;
 }
 
+// --------------- Menu ---------------
+
+function setupMenu() {
+  if (!isMac) {
+    Menu.setApplicationMenu(null);
+    return;
+  }
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { role: 'close' },
+        { type: 'separator' },
+        { role: 'front' },
+      ],
+    },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 // --------------- Window ---------------
 
 function createWindow() {
@@ -233,6 +281,8 @@ app.whenReady().then(async () => {
   initLogging();
   log(`App starting — version ${app.getVersion()}, platform ${process.platform}, arch ${process.arch}`);
   log(`resourcesPath: ${process.resourcesPath}`);
+
+  setupMenu();
 
   const backendAlreadyRunning = await isPortInUse(BACKEND_PORT);
   log(`Backend already running: ${backendAlreadyRunning}`);

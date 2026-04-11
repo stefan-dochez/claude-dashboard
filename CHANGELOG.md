@@ -4,6 +4,10 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ## [Unreleased]
 
+### Features
+
+- **Custom application menu** — Removed the default Electron menu bar on Windows/Linux (it served no purpose). On macOS, replaced it with a minimal menu: App (About, Hide, Quit), Edit (copy/paste for terminal), Window (Minimize, Zoom, Close).
+
 ### Bug Fixes
 
 - **Git not found in Electron on Windows** — When the Electron app launched the backend, the inherited PATH did not include `C:\Program Files\Git\cmd`. All git commands (branch detection, worktree creation) failed silently, causing every project to show `gitBranch: null` and hiding the "New task" tab. Added Git's install directory to the extra paths in `platform.ts`, `scanner.ts`, `worktree-manager.ts`, and Electron's `getEnv()`.
