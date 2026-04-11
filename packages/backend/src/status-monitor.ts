@@ -111,26 +111,46 @@ export class StatusMonitor {
   private checkForPrompt(buffer: string): boolean {
     if (buffer.length === 0) return false;
 
-    // Take the tail, strip ANSI escapes, then test patterns against clean text
-    const tail = stripAnsi(buffer.slice(-4000));
+    // Claude Code's TUI redraws the entire screen via cursor-positioning
+    // escape sequences.  Stripping ANSI from a contiguous tail produces
+    // mostly whitespace because the positioning info is lost.
+    //
+    // Two-pass approach:
+    //   1. Search the RAW buffer for known text markers — they are present
+    //      in the byte stream even interleaved with escape sequences.
+    //   2. Fallback: split by \r (carriage return = line redraws), strip
+    //      ANSI per line, and check the resulting cleaned lines.
+    const rawTail = buffer.slice(-20000);
 
-    // Check compiled config patterns
+    // --- Pass 1: raw substring search (fast, handles TUI redraws) ---
+    if (rawTail.includes('for shortcuts')) return true;
+    if (rawTail.includes('? for help')) return true;
+    if (rawTail.includes('esc to interrupt')) return true;
+
+    // --- Pass 2: per-line strip for config patterns and prompt chars ---
+    const lines = rawTail.split('\r');
+    // Only check the last ~50 lines to keep it fast
+    const recentLines = lines.slice(-50);
+    const cleanedLines: string[] = [];
+    for (const line of recentLines) {
+      const cleaned = stripAnsi(line).trim();
+      if (cleaned.length > 0) {
+        cleanedLines.push(cleaned);
+      }
+    }
+    const cleanedText = cleanedLines.join('\n');
+
+    // Check compiled config patterns against cleaned lines
     for (const pattern of this.compiledPatterns) {
-      if (pattern.test(tail)) {
+      if (pattern.test(cleanedText)) {
         return true;
       }
     }
 
-    // Hardcoded heuristics for Claude Code TUI prompt detection:
-    // The TUI redraws the screen constantly via cursor-positioning sequences.
-    // After stripping ANSI, the buffer is a mix of partial redraws.
-    // We search for known idle markers anywhere in the tail.
-    if (tail.includes('for shortcuts')) return true;
-    if (tail.includes('? for help')) return true;
-    // Claude Code shows the Jamber cactus + prompt "❯" or ">" when idle
-    if (/[❯›>]\s{0,5}$/.test(tail)) return true;
-    // The status bar shows tool counts and model info when idle
-    if (/Jamber/.test(tail)) return true;
+    // Check for prompt character on a cleaned line
+    for (const line of cleanedLines) {
+      if (/[❯›>]\s*$/.test(line)) return true;
+    }
 
     return false;
   }

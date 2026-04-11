@@ -68,6 +68,7 @@ export function createRoutes(
     res.json({ version: appVersion });
   });
 
+
   // Platform info — used by the frontend for cross-platform path display
   router.get('/api/platform', (_req, res) => {
     res.json({ homePath: os.homedir(), platform: process.platform });
