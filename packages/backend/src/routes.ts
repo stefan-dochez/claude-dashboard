@@ -452,6 +452,75 @@ export function createRoutes(
     }
   });
 
+  // Git — commit
+  router.post('/api/git/commit', async (req, res) => {
+    const { projectPath, message, addAll } = req.body as {
+      projectPath?: string;
+      message?: string;
+      addAll?: boolean;
+    };
+    if (!projectPath || !message) {
+      res.status(400).json({ error: 'projectPath and message are required' });
+      return;
+    }
+    try {
+      if (addAll) {
+        await execAsync('git add -A', { cwd: projectPath, encoding: 'utf-8', timeout: 15000 });
+      }
+      // Use -- to separate the message from git flags
+      await execAsync(`git commit -m ${JSON.stringify(message)}`, { cwd: projectPath, encoding: 'utf-8', timeout: 30000 });
+      res.json({ ok: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Commit failed';
+      console.log('[routes] Error committing:', msg);
+      res.status(500).json({ error: msg.includes('stdout') ? 'Nothing to commit' : msg.split('\n')[0] });
+    }
+  });
+
+  // Git — push
+  router.post('/api/git/push', async (req, res) => {
+    const { projectPath, setUpstream } = req.body as { projectPath?: string; setUpstream?: boolean };
+    if (!projectPath) {
+      res.status(400).json({ error: 'projectPath is required' });
+      return;
+    }
+    try {
+      const branch = await worktreeManager.getGitBranch(projectPath);
+      const pushCmd = setUpstream && branch
+        ? `git push --set-upstream origin ${JSON.stringify(branch)}`
+        : 'git push';
+      await execAsync(pushCmd, { cwd: projectPath, encoding: 'utf-8', timeout: 60000 });
+      res.json({ ok: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Push failed';
+      console.log('[routes] Error pushing:', msg);
+      const needsUpstream = msg.includes('no upstream branch') || msg.includes('--set-upstream');
+      res.status(500).json({ error: msg.split('\n')[0], needsUpstream });
+    }
+  });
+
+  // Git — create PR via GitHub CLI
+  router.post('/api/git/create-pr', async (req, res) => {
+    const { projectPath, title, body } = req.body as { projectPath?: string; title?: string; body?: string };
+    if (!projectPath || !title) {
+      res.status(400).json({ error: 'projectPath and title are required' });
+      return;
+    }
+    try {
+      const bodyArg = body ? `--body ${JSON.stringify(body)}` : '--body ""';
+      const { stdout } = await execAsync(
+        `gh pr create --title ${JSON.stringify(title)} ${bodyArg}`,
+        { cwd: projectPath, encoding: 'utf-8', timeout: 30000 },
+      );
+      const url = stdout.trim().split('\n').pop() ?? '';
+      res.json({ ok: true, url });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'PR creation failed';
+      console.log('[routes] Error creating PR:', msg);
+      res.status(500).json({ error: msg.split('\n')[0] });
+    }
+  });
+
   // Task history
   router.get('/api/tasks/history', (_req, res) => {
     res.json(taskStore.getHistory());
@@ -504,6 +573,50 @@ export function createRoutes(
       });
       res.json(files);
     } catch {
+      res.json([]);
+    }
+  });
+
+  // Code search — search file contents with grep
+  router.get('/api/code/search', async (req, res) => {
+    const dirPath = req.query.path as string | undefined;
+    const query = req.query.q as string | undefined;
+    if (!dirPath || !query) {
+      res.status(400).json({ error: 'path and q query parameters are required' });
+      return;
+    }
+    try {
+      // Sanitize for shell safety (single quotes, backslashes)
+      const safeQuery = query.replace(/['\\]/g, '');
+      if (!safeQuery) {
+        res.json([]);
+        return;
+      }
+      const { stdout } = await execAsync(
+        `grep -rn --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.py' --include='*.go' --include='*.rs' --include='*.java' --include='*.cs' --include='*.md' --include='*.css' --include='*.html' --include='*.json' --include='*.yaml' --include='*.yml' --max-count=5 -I '${safeQuery}' . 2>/dev/null | head -200`,
+        { cwd: dirPath, encoding: 'utf-8', timeout: 10000 },
+      );
+      // Parse grep output: ./path/to/file:lineNum:lineContent
+      const resultsByFile = new Map<string, Array<{ line: number; text: string }>>();
+      for (const raw of stdout.split('\n').filter(l => l.trim())) {
+        // Match ./relative/path:lineNum:content
+        const match = raw.match(/^\.\/(.+?):(\d+):(.*)$/);
+        if (!match) continue;
+        const [, relative, lineStr, text] = match;
+        const line = parseInt(lineStr, 10);
+        if (!resultsByFile.has(relative)) {
+          resultsByFile.set(relative, []);
+        }
+        resultsByFile.get(relative)!.push({ line, text: text.substring(0, 200) });
+      }
+      const results = [...resultsByFile.entries()].slice(0, 30).map(([relative, matches]) => ({
+        file: `${dirPath}/${relative}`,
+        relative,
+        matches,
+      }));
+      res.json(results);
+    } catch {
+      // grep returns exit code 1 when no matches found
       res.json([]);
     }
   });

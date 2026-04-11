@@ -6,6 +6,18 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Features
 
+- **Resizable panels** — Sidebar and right panel (file explorer, context) are now draggable to resize. Hover the border between panels to reveal the resize handle. Sidebar clamps 200–480px, right panel 200–500px.
+
+- **Token stats in history** — History entries now show model name, input/output token counts (in thousands), and cost. Helps track resource usage across sessions.
+
+- **Kill confirmation for worktrees** — Killing an instance with a worktree now shows a 2-step confirmation: "Kill" (keep worktree) or "+wt" (kill and delete worktree). Non-worktree instances kill immediately as before.
+
+- **Git workflow in Changes tab** — Commit, push, and create PRs directly from the Changes view. Commit form with message textarea, "Stage all" checkbox, and Cmd+Enter shortcut. Push auto-detects missing upstream and retries with `--set-upstream`. PR creation with inline title/body form, returns clickable PR URL.
+
+- **File utilities extraction** — `getFileIcon()`, `detectLanguage()`, and icon/language mappings extracted to `utils/fileUtils.ts` for reuse. Added support for Dart, Lua, R, Scala, SCSS, and Less.
+
+- **Code search modal** — Full-text search across project files (Cmd+Shift+F). Debounced grep-based search with results grouped by file, line numbers, match highlighting, and keyboard navigation (arrows + Enter). Opens the selected file in the file viewer.
+
 - **Terminal session resume** — Terminal sessions now track their Claude session ID (`--session-id` at spawn). Resuming from history uses `--resume <sessionId>` to continue the conversation. Both terminal and chat sessions are persisted to the task store.
 
 - **Session history in launch modal** — New "History" tab in the launch modal shows past sessions for the selected project. Click to resume a session with its full conversation context.

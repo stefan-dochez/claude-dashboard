@@ -2,27 +2,11 @@ import { useState, useEffect } from 'react';
 import { FileText, X, Loader2 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { detectLanguage } from '../utils/fileUtils';
 
 interface FileViewerProps {
   filePath: string;
   onClose: () => void;
-}
-
-const EXT_TO_LANG: Record<string, string> = {
-  ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx',
-  json: 'json', md: 'markdown', css: 'css', html: 'html',
-  py: 'python', rs: 'rust', go: 'go', java: 'java',
-  cs: 'csharp', yaml: 'yaml', yml: 'yaml', toml: 'toml',
-  sh: 'bash', bash: 'bash', zsh: 'bash', sql: 'sql',
-  xml: 'xml', svg: 'xml', graphql: 'graphql',
-  dockerfile: 'dockerfile',
-};
-
-function getLanguage(filePath: string): string | undefined {
-  const name = filePath.split('/').pop()?.toLowerCase() ?? '';
-  if (name === 'dockerfile') return 'dockerfile';
-  const ext = name.split('.').pop() ?? '';
-  return EXT_TO_LANG[ext];
 }
 
 export default function FileViewer({ filePath, onClose }: FileViewerProps) {
@@ -32,7 +16,7 @@ export default function FileViewer({ filePath, onClose }: FileViewerProps) {
   const [size, setSize] = useState(0);
 
   const fileName = filePath.split('/').pop() ?? filePath;
-  const language = getLanguage(filePath);
+  const language = detectLanguage(filePath);
 
   useEffect(() => {
     setLoading(true);

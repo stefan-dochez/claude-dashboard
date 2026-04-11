@@ -11,6 +11,8 @@ import ChatView from './components/ChatView';
 import ChangesView from './components/ChangesView';
 import PullRequestView from './components/PullRequestView';
 import FileViewer from './components/FileViewer';
+import ResizeHandle from './components/ResizeHandle';
+import CodeSearchModal from './components/CodeSearchModal';
 import ScanPathsModal from './components/ScanPathsModal';
 import ToastContainer from './components/ToastContainer';
 import { useProjects } from './hooks/useProjects';
@@ -50,11 +52,14 @@ export default function App() {
   const [typingLocked, setTypingLocked] = useState(false);
   const { toasts, addToast, removeToast } = useToasts();
   const [scanPathsOpen, setScanPathsOpen] = useState(false);
+  const [codeSearchOpen, setCodeSearchOpen] = useState(false);
   const autoOpenedRef = useRef(false);
 
-  // Panel visibility
+  // Panel visibility & resizable widths
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
   const [rightPanel, setRightPanel] = useState<'files' | 'context' | null>(null);
+  const [rightPanelWidth, setRightPanelWidth] = useState(280);
 
   // Center tabs
   const [activeTab, setActiveTab] = useState<'main' | 'changes' | 'pr' | 'file'>('main');
@@ -268,6 +273,12 @@ export default function App() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+Shift+F — code search (works even from inputs)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setCodeSearchOpen(prev => !prev);
+        return;
+      }
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
         if (e.key === 'b') { e.preventDefault(); setSidebarOpen(prev => !prev); }
@@ -394,7 +405,15 @@ export default function App() {
           onOpenScanPaths={() => setScanPathsOpen(true)}
           collapsed={!sidebarOpen}
           onExpand={() => setSidebarOpen(true)}
+          width={sidebarWidth}
         />
+
+        {sidebarOpen && (
+          <ResizeHandle
+            side="left"
+            onResize={delta => setSidebarWidth(w => Math.max(200, Math.min(480, w + delta)))}
+          />
+        )}
 
         {/* Center — main content */}
         <main className="flex flex-1 flex-col overflow-hidden rounded-xl bg-surface">
@@ -499,12 +518,18 @@ export default function App() {
         </main>
 
         {/* Right panel — animated toggle */}
+        {selectedInstance && instanceProjectPath && rightPanel && (
+          <ResizeHandle
+            side="right"
+            onResize={delta => setRightPanelWidth(w => Math.max(200, Math.min(500, w + delta)))}
+          />
+        )}
         {selectedInstance && instanceProjectPath && (
           <div
             style={{
-              width: rightPanel ? 280 : 0,
+              width: rightPanel ? rightPanelWidth : 0,
               opacity: rightPanel ? 1 : 0,
-              transition: 'width 200ms ease-in-out, opacity 200ms ease-in-out',
+              transition: rightPanel ? undefined : 'width 200ms ease-in-out, opacity 200ms ease-in-out',
             }}
             className="shrink-0 overflow-hidden"
           >
@@ -533,6 +558,14 @@ export default function App() {
           metaProjects={config?.metaProjects ?? []}
           onSave={handleSaveScanPaths}
           onClose={() => setScanPathsOpen(false)}
+        />
+      )}
+
+      {codeSearchOpen && instanceProjectPath && (
+        <CodeSearchModal
+          projectPath={instanceProjectPath}
+          onOpenFile={handleOpenFile}
+          onClose={() => setCodeSearchOpen(false)}
         />
       )}
 

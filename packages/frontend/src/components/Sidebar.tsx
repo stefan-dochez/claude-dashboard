@@ -14,6 +14,8 @@ interface HistoryTask {
   sessionId: string | null;
   model: string | null;
   totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
   mode: 'terminal' | 'chat';
   firstPrompt: string | null;
   title: string | null;
@@ -47,6 +49,7 @@ interface SidebarProps {
   onOpenScanPaths: () => void;
   collapsed: boolean;
   onExpand: () => void;
+  width?: number;
 }
 
 const STATUS_DOT: Record<InstanceStatus, string> = {
@@ -97,6 +100,7 @@ function ProjectRow({
     return instances.length > 0 || worktrees.length > 0;
   });
   const [launchModalOpen, setLaunchModalOpen] = useState(false);
+  const [confirmKillId, setConfirmKillId] = useState<string | null>(null);
 
   const activeInstances = instances.filter(i => i.status !== 'exited');
   const hasActivity = activeInstances.length > 0 || worktrees.length > 0;
@@ -204,13 +208,45 @@ function ProjectRow({
                   {new Date(inst.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 {inst.status !== 'exited' ? (
-                  <button
-                    onClick={e => { e.stopPropagation(); onKillInstance(inst.id); }}
-                    className="shrink-0 rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
-                    title="Kill"
-                  >
-                    <Trash2 className="h-2.5 w-2.5" />
-                  </button>
+                  confirmKillId === inst.id && inst.worktreePath ? (
+                    <div className="flex shrink-0 items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => { onKillInstance(inst.id, false); setConfirmKillId(null); }}
+                        className="rounded bg-elevated px-1.5 py-0.5 text-[9px] font-medium text-secondary transition-colors hover:bg-hover"
+                        title="Kill instance only"
+                      >
+                        Kill
+                      </button>
+                      <button
+                        onClick={() => { onKillInstance(inst.id, true); setConfirmKillId(null); }}
+                        className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-medium text-rose-300 transition-colors hover:bg-rose-500/30"
+                        title="Kill and delete worktree"
+                      >
+                        +wt
+                      </button>
+                      <button
+                        onClick={() => setConfirmKillId(null)}
+                        className="rounded p-0.5 text-faint transition-colors hover:text-secondary"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (inst.worktreePath) {
+                          setConfirmKillId(inst.id);
+                        } else {
+                          onKillInstance(inst.id);
+                        }
+                      }}
+                      className="shrink-0 rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
+                      title="Kill"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </button>
+                  )
                 ) : (
                   <button
                     onClick={e => { e.stopPropagation(); onDismissInstance(inst.id); }}
@@ -277,7 +313,7 @@ export default function Sidebar({
   scanPaths, favoriteProjects, pullingProjects, checkingOutProjects, pullingAll, queuedIds,
   onRefreshProjects, onLaunchProject, onSelectInstance, onKillInstance, onDismissInstance,
   onDeleteWorktree, onToggleFavorite, onToggleMeta, onPullProject, onPullAll, onCheckoutDefault, onOpenScanPaths,
-  collapsed, onExpand,
+  collapsed, onExpand, width = 320,
 }: SidebarProps) {
   const [filter, setFilter] = useState('');
   const [selectedRoot, setSelectedRoot] = useState<string | null>(scanPaths[0] ?? null);
@@ -435,13 +471,13 @@ export default function Sidebar({
   return (
     <aside
       style={{
-        width: collapsed ? 0 : 320,
+        width: collapsed ? 0 : width,
         opacity: collapsed ? 0 : 1,
-        transition: 'width 200ms ease-in-out, opacity 200ms ease-in-out',
+        transition: collapsed ? 'width 200ms ease-in-out, opacity 200ms ease-in-out' : undefined,
       }}
       className="shrink-0 overflow-hidden rounded-xl bg-surface"
     >
-      <div className="flex h-full w-[320px] flex-col">
+      <div className="flex h-full w-full flex-col">
         {/* Workspace selector */}
         <div className="shrink-0 border-b border-border-default px-3 py-2">
           <select
@@ -586,7 +622,14 @@ export default function Sidebar({
                       </span>
                       <div className="flex items-center gap-2 text-[10px] text-faint">
                         <span className="truncate">{task.projectName}</span>
+                        {task.model && <span>{task.model.replace(/^claude-/, '').split('-')[0]}</span>}
                         {task.totalCostUsd > 0 && <span>${task.totalCostUsd.toFixed(4)}</span>}
+                        {(task.totalInputTokens > 0 || task.totalOutputTokens > 0) && (
+                          <span title="input / output tokens">
+                            {task.totalInputTokens > 0 ? `${Math.round(task.totalInputTokens / 1000)}k` : '0'}
+                            /{task.totalOutputTokens > 0 ? `${Math.round(task.totalOutputTokens / 1000)}k` : '0'}
+                          </span>
+                        )}
                         {task.endedAt && <span>{new Date(task.endedAt).toLocaleDateString()}</span>}
                       </div>
                     </div>

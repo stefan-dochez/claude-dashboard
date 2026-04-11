@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Check, FileText, FilePlus, FileX, FileQuestion, ChevronRight, ChevronDown } from 'lucide-react';
+import { RefreshCw, Check, FileText, FilePlus, FileX, FileQuestion, ChevronRight, ChevronDown, GitCommit, Upload, GitPullRequest, Loader2, ExternalLink } from 'lucide-react';
 import DiffViewer from './DiffViewer';
 import type { GitFileStatus } from '../types';
 
@@ -76,6 +76,18 @@ export default function ChangesView({ projectPath }: ChangesViewProps) {
   const [changesCollapsed, setChangesCollapsed] = useState(false);
   const [untrackedCollapsed, setUntrackedCollapsed] = useState(false);
 
+  // Commit / Push / PR state
+  const [commitMessage, setCommitMessage] = useState('');
+  const [addAll, setAddAll] = useState(true);
+  const [commitLoading, setCommitLoading] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [prFormOpen, setPrFormOpen] = useState(false);
+  const [prTitle, setPrTitle] = useState('');
+  const [prBody, setPrBody] = useState('');
+  const [prLoading, setPrLoading] = useState(false);
+  const [prUrl, setPrUrl] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
@@ -129,6 +141,74 @@ export default function ChangesView({ projectPath }: ChangesViewProps) {
     setShowAll(true);
     fetchDiff();
   };
+
+  const handleCommit = useCallback(async () => {
+    if (!commitMessage.trim()) return;
+    setCommitLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch('/api/git/commit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath, message: commitMessage.trim(), addAll }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setCommitMessage('');
+      fetchStatus();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Commit failed');
+    } finally {
+      setCommitLoading(false);
+    }
+  }, [projectPath, commitMessage, addAll, fetchStatus]);
+
+  const handlePush = useCallback(async (setUpstream = false) => {
+    setPushLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch('/api/git/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath, setUpstream }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.needsUpstream && !setUpstream) {
+          // Auto-retry with --set-upstream
+          return handlePush(true);
+        }
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Push failed');
+    } finally {
+      setPushLoading(false);
+    }
+  }, [projectPath]);
+
+  const handleCreatePR = useCallback(async () => {
+    if (!prTitle.trim()) return;
+    setPrLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch('/api/git/create-pr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath, title: prTitle.trim(), body: prBody.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setPrUrl(data.url);
+      setPrFormOpen(false);
+      setPrTitle('');
+      setPrBody('');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'PR creation failed');
+    } finally {
+      setPrLoading(false);
+    }
+  }, [projectPath, prTitle, prBody]);
 
   const trackedFiles = files.filter(f => f.status.trim() !== '??');
   const untrackedFiles = files.filter(f => f.status.trim() === '??');
@@ -244,6 +324,106 @@ export default function ChangesView({ projectPath }: ChangesViewProps) {
           </div>
         )}
       </div>
+
+      {/* Commit / Push / PR form */}
+      {!loading && files.length > 0 && (
+        <div className="shrink-0 border-b border-border-default px-2 py-2 space-y-1.5">
+          <textarea
+            value={commitMessage}
+            onChange={e => { setCommitMessage(e.target.value); setActionError(null); }}
+            placeholder="Commit message..."
+            rows={2}
+            className="w-full resize-none rounded bg-elevated/40 px-2 py-1.5 text-[12px] text-secondary placeholder-placeholder outline-none focus:bg-elevated"
+            onKeyDown={e => {
+              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                handleCommit();
+              }
+            }}
+          />
+          <div className="flex items-center gap-1.5">
+            <label className="flex items-center gap-1 text-[11px] text-muted cursor-pointer select-none">
+              <input type="checkbox" checked={addAll} onChange={e => setAddAll(e.target.checked)} className="h-3 w-3 accent-green-500" />
+              Stage all
+            </label>
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                onClick={handleCommit}
+                disabled={commitLoading || !commitMessage.trim()}
+                className="flex items-center gap-1 rounded bg-green-700/40 px-2 py-1 text-[11px] font-medium text-green-300 transition-colors hover:bg-green-700/60 disabled:opacity-40"
+              >
+                {commitLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitCommit className="h-3 w-3" />}
+                Commit
+              </button>
+              <button
+                onClick={() => handlePush()}
+                disabled={pushLoading}
+                className="flex items-center gap-1 rounded bg-blue-700/40 px-2 py-1 text-[11px] font-medium text-blue-300 transition-colors hover:bg-blue-700/60 disabled:opacity-40"
+              >
+                {pushLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                Push
+              </button>
+              <button
+                onClick={() => { setPrFormOpen(!prFormOpen); setActionError(null); }}
+                disabled={prLoading}
+                className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-40 ${
+                  prFormOpen ? 'bg-violet-700/40 text-violet-300' : 'bg-elevated text-muted hover:text-secondary'
+                }`}
+              >
+                {prLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitPullRequest className="h-3 w-3" />}
+                PR
+              </button>
+            </div>
+          </div>
+
+          {/* PR form (inline) */}
+          {prFormOpen && (
+            <div className="space-y-1.5 rounded bg-elevated/30 p-2">
+              <input
+                type="text"
+                value={prTitle}
+                onChange={e => setPrTitle(e.target.value)}
+                placeholder="PR title..."
+                className="w-full rounded bg-elevated/60 px-2 py-1 text-[12px] text-secondary placeholder-placeholder outline-none focus:bg-elevated"
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreatePR(); } }}
+              />
+              <textarea
+                value={prBody}
+                onChange={e => setPrBody(e.target.value)}
+                placeholder="Description (optional)..."
+                rows={2}
+                className="w-full resize-none rounded bg-elevated/60 px-2 py-1 text-[12px] text-secondary placeholder-placeholder outline-none focus:bg-elevated"
+              />
+              <button
+                onClick={handleCreatePR}
+                disabled={prLoading || !prTitle.trim()}
+                className="flex items-center gap-1 rounded bg-violet-700/40 px-2.5 py-1 text-[11px] font-medium text-violet-300 transition-colors hover:bg-violet-700/60 disabled:opacity-40"
+              >
+                {prLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitPullRequest className="h-3 w-3" />}
+                Create PR
+              </button>
+            </div>
+          )}
+
+          {/* PR URL result */}
+          {prUrl && (
+            <a
+              href={prUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-[11px] text-blue-400 hover:text-blue-300"
+            >
+              <ExternalLink className="h-3 w-3" />
+              {prUrl}
+            </a>
+          )}
+
+          {/* Error display */}
+          {actionError && (
+            <p className="text-[11px] text-red-400">{actionError}</p>
+          )}
+        </div>
+      )}
 
       {/* Diff panel (takes remaining space) */}
       <div className="min-h-0 flex-1 overflow-auto">
