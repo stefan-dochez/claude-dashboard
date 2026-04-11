@@ -41,6 +41,7 @@ export function getExtraPaths(): string[] {
       path.join(programFiles, 'nodejs'),
       path.join(appData, 'npm'),
       path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'nodejs'),
+      path.join(programFiles, 'Git', 'cmd'),
     ];
   }
   return [

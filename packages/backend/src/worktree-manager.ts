@@ -2,14 +2,27 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import { IS_WINDOWS, NULL_DEVICE } from './platform.js';
+import { IS_WINDOWS, NULL_DEVICE, PATH_SEP, getExtraPaths } from './platform.js';
 
 const execPromise = promisify(exec);
+
+function augmentedEnv(): Record<string, string> | undefined {
+  if (!IS_WINDOWS) return undefined;
+  const env = { ...process.env } as Record<string, string>;
+  const parts = (env.PATH ?? '').split(PATH_SEP);
+  for (const p of getExtraPaths()) {
+    if (!parts.includes(p)) parts.push(p);
+  }
+  env.PATH = parts.join(PATH_SEP);
+  return env;
+}
+
+const extraEnv = augmentedEnv();
 
 // Wrap execPromise to inject shell: true — required on Windows where cmd.exe
 // may fail with ENOENT for git commands without an explicit shell.
 function execAsync(cmd: string, opts: { encoding: BufferEncoding; cwd?: string; timeout?: number; maxBuffer?: number }) {
-  return execPromise(cmd, { ...opts, shell: IS_WINDOWS ? true as unknown as string : undefined });
+  return execPromise(cmd, { ...opts, shell: IS_WINDOWS ? true as unknown as string : undefined, ...(extraEnv ? { env: extraEnv } : {}) });
 }
 
 interface WorktreeResult {

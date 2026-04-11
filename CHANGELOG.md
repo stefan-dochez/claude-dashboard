@@ -6,6 +6,8 @@ All notable changes to Claude Dashboard since the initial commit.
 
 ### Bug Fixes
 
+- **Git not found in Electron on Windows** — When the Electron app launched the backend, the inherited PATH did not include `C:\Program Files\Git\cmd`. All git commands (branch detection, worktree creation) failed silently, causing every project to show `gitBranch: null` and hiding the "New task" tab. Added Git's install directory to the extra paths in `platform.ts`, `scanner.ts`, `worktree-manager.ts`, and Electron's `getEnv()`.
+
 - **Terminal output lost after socket reconnection** — When the WebSocket briefly disconnected (Wi-Fi hiccup, sleep/wake), the terminal would stop updating even though input still worked. Fixed by re-attaching to the PTY stream on socket reconnection. Also reordered backend attach logic to eliminate a potential output gap between history snapshot and live forwarding.
 
 ### Features

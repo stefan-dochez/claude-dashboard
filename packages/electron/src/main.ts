@@ -60,6 +60,7 @@ function getEnv(): Record<string, string> {
       path.join(appData, 'npm'),
       path.join(os.homedir(), '.local', 'bin'),
       path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'nodejs'),
+      path.join(programFiles, 'Git', 'cmd'),
     ];
     for (const p of extraPaths) {
       if (!parts.includes(p)) parts.push(p);

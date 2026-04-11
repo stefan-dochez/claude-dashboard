@@ -4,11 +4,25 @@ import os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { ConfigService } from './config.js';
-import { IS_WINDOWS } from './platform.js';
+import { IS_WINDOWS, PATH_SEP, getExtraPaths } from './platform.js';
 
 const execPromise = promisify(exec);
+
+function augmentedEnv(): Record<string, string> | undefined {
+  if (!IS_WINDOWS) return undefined;
+  const env = { ...process.env } as Record<string, string>;
+  const parts = (env.PATH ?? '').split(PATH_SEP);
+  for (const p of getExtraPaths()) {
+    if (!parts.includes(p)) parts.push(p);
+  }
+  env.PATH = parts.join(PATH_SEP);
+  return env;
+}
+
+const extraEnv = augmentedEnv();
+
 function execAsync(cmd: string, opts: { encoding: BufferEncoding; cwd?: string; timeout?: number }) {
-  return execPromise(cmd, { ...opts, shell: IS_WINDOWS ? true as unknown as string : undefined });
+  return execPromise(cmd, { ...opts, shell: IS_WINDOWS ? true as unknown as string : undefined, ...(extraEnv ? { env: extraEnv } : {}) });
 }
 
 type ProjectType = 'repo' | 'workspace' | 'monorepo';
