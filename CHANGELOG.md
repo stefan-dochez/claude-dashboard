@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.8.0]
+
+### Features
+
+- **Terminal search (Cmd+F)** — Press `Cmd+F` (or `Ctrl+F` on Windows/Linux) in the terminal to open a floating search bar. Incremental search with match highlighting powered by xterm.js `SearchAddon`. Displays current/total match count (e.g. `2/5`). Navigate matches with `Enter` (next) and `Shift+Enter` (previous). Press `Escape` or the close button to dismiss. Decorations are cleared and focus returns to the terminal on close.
+
 ## [0.7.0]
 
 ### Features

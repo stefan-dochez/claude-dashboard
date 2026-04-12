@@ -2,9 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { SearchAddon } from '@xterm/addon-search';
 import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { useSocket } from '../hooks/useSocket';
+import TerminalSearchBar from './TerminalSearchBar';
 
 interface TerminalViewProps {
   instanceId: string;
@@ -18,6 +20,8 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
   const socket = useSocket();
   const [autoScroll, setAutoScroll] = useState(true);
   const autoScrollRef = useRef(true);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -55,10 +59,14 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
 
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
+    const searchAddon = new SearchAddon();
 
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
+    term.loadAddon(searchAddon);
     term.open(containerRef.current);
+
+    searchAddonRef.current = searchAddon;
 
     fitAddon.fit();
 
@@ -180,12 +188,25 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
       term.dispose();
       termRef.current = null;
       fitRef.current = null;
+      searchAddonRef.current = null;
       // Reset typing state on unmount
       if (onTypingChange) onTypingChange(false);
     };
     // Only re-run when instanceId changes — socket is a stable singleton
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId]);
+
+  // Cmd+F / Ctrl+F to open search, Escape to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     if (termRef.current) {
@@ -195,8 +216,17 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
     }
   }, []);
 
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    searchAddonRef.current?.clearDecorations();
+    termRef.current?.focus();
+  }, []);
+
   return (
     <div className="relative h-full w-full p-3">
+      {searchOpen && searchAddonRef.current && (
+        <TerminalSearchBar searchAddon={searchAddonRef.current} onClose={closeSearch} />
+      )}
       <div
         ref={containerRef}
         className="h-full w-full overflow-hidden rounded-xl bg-codeblock p-2"
