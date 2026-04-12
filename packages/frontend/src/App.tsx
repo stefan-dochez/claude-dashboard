@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Terminal, MessageSquare, GitBranch, PanelLeft, Loader2,
-  FileCode2, GitPullRequest, FolderOpen, Info,
+  FileCode2, GitPullRequest, FolderOpen, Info, Sun, Moon,
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ContextPanel from './components/ContextPanel';
@@ -54,7 +54,9 @@ export default function App() {
   const { config, updateConfig } = useConfig();
   const { projects, loading: projectsLoading, refreshing: projectsRefreshing, refreshProjects, deleteWorktree } = useProjects();
   const { instances, spawnInstance, killInstance, dismissInstance, refetch: refetchInstances } = useInstances();
-  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(() => {
+    return localStorage.getItem('dashboard:selectedInstanceId');
+  });
   const [typingLocked, setTypingLocked] = useState(false);
   const { toasts, addToast, removeToast } = useToasts();
   const [scanPathsOpen, setScanPathsOpen] = useState(false);
@@ -67,15 +69,31 @@ export default function App() {
   const selectedInstanceIdRef = useRef(selectedInstanceId);
   selectedInstanceIdRef.current = selectedInstanceId;
 
+  // Theme
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('dashboard:theme') as 'dark' | 'light') ?? 'dark';
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.className = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0d0d0d' : '#f5f5f5');
+    localStorage.setItem('dashboard:theme', theme);
+  }, [theme]);
+  const toggleTheme = useCallback(() => setTheme(prev => prev === 'dark' ? 'light' : 'dark'), []);
+
   // Panel visibility & resizable widths
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [rightPanel, setRightPanel] = useState<'files' | 'context' | null>(null);
   const [rightPanelWidth, setRightPanelWidth] = useState(280);
 
-  // Center tabs
-  const [activeTab, setActiveTab] = useState<'main' | 'changes' | 'pr' | 'file'>('main');
-  const [openedFile, setOpenedFile] = useState<string | null>(null);
+  // Center tabs — restore last selected instance + tab from localStorage
+  const [activeTab, setActiveTab] = useState<'main' | 'changes' | 'pr' | 'file'>(() => {
+    return (localStorage.getItem('dashboard:activeTab') as 'main' | 'changes' | 'pr' | 'file') ?? 'main';
+  });
+  const [openedFile, setOpenedFile] = useState<string | null>(() => {
+    return localStorage.getItem('dashboard:openedFile');
+  });
 
   // Code selection for chat context
   const [codeSelection, setCodeSelection] = useState<{ filePath: string; startLine: number; endLine: number; code: string } | null>(null);
@@ -134,6 +152,9 @@ export default function App() {
       refreshProjects();
     }
   }, [killInstance, selectedInstanceId, refreshProjects, handleSelectInstance]);
+
+  const handleKillRef = useRef(handleKill);
+  handleKillRef.current = handleKill;
 
   const [pendingDelete, setPendingDelete] = useState<{ projectPath: string; worktreePath: string; name: string; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
   const pendingDeleteRef = useRef<{ timeoutId: ReturnType<typeof setTimeout> } | null>(null);
@@ -317,7 +338,32 @@ export default function App() {
     }, [config?.notifications, updateConfig]),
     notificationsEnabled: config?.notifications?.enabled ?? true,
     onRefreshProjects: refreshProjects,
+    theme,
+    onToggleTheme: toggleTheme,
   });
+
+  // Persist tab state to localStorage
+  useEffect(() => { localStorage.setItem('dashboard:activeTab', activeTab); }, [activeTab]);
+  useEffect(() => {
+    if (openedFile) localStorage.setItem('dashboard:openedFile', openedFile);
+    else localStorage.removeItem('dashboard:openedFile');
+  }, [openedFile]);
+  useEffect(() => {
+    if (selectedInstanceId) localStorage.setItem('dashboard:selectedInstanceId', selectedInstanceId);
+    else localStorage.removeItem('dashboard:selectedInstanceId');
+  }, [selectedInstanceId]);
+
+  // Validate restored state — clear if instance no longer exists or tab is invalid
+  useEffect(() => {
+    if (selectedInstanceId && instances.length > 0 && !instances.some(i => i.id === selectedInstanceId)) {
+      setSelectedInstanceId(null);
+      setActiveTab('main');
+      setOpenedFile(null);
+    }
+  }, [selectedInstanceId, instances]);
+  useEffect(() => {
+    if (activeTab === 'file' && !openedFile) setActiveTab('main');
+  }, [activeTab, openedFile]);
 
   // Close right panel when no instance is selected
   useEffect(() => {
@@ -349,6 +395,14 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
         e.preventDefault();
         setCostDashboardOpen(prev => !prev);
+        return;
+      }
+      // Cmd+W — kill selected instance
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === 'w') {
+        if (selectedInstanceIdRef.current) {
+          e.preventDefault();
+          handleKillRef.current(selectedInstanceIdRef.current);
+        }
         return;
       }
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -424,6 +478,13 @@ export default function App() {
             );
           })()}
           <span className={`h-2 w-2 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
+          <button
+            onClick={toggleTheme}
+            className="rounded p-1 text-faint transition-colors hover:text-secondary"
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </button>
           <button
             onClick={() => setSidebarOpen(prev => !prev)}
             className={`rounded p-1 transition-colors hover:text-secondary ${sidebarOpen ? 'text-tertiary' : 'text-faint'}`}

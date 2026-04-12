@@ -3,7 +3,7 @@ import {
   PanelLeft, FolderOpen, Info, Terminal, FileCode2,
   GitPullRequest, Search, Settings, Play, XCircle,
   Star, RefreshCw, MessageSquare, LayoutTemplate,
-  TrendingUp, Bell,
+  TrendingUp, Bell, Sun, Moon,
 } from 'lucide-react';
 import type { Command } from '../components/CommandPalette';
 import type { Instance, Project } from '../types';
@@ -47,6 +47,10 @@ interface UseCommandsOptions {
 
   // Projects
   onRefreshProjects: () => void;
+
+  // Theme
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
 export function useCommands(options: UseCommandsOptions): Command[] {
@@ -72,6 +76,8 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onToggleNotifications,
     notificationsEnabled,
     onRefreshProjects,
+    theme,
+    onToggleTheme,
   } = options;
 
   return useMemo(() => {
@@ -182,6 +188,30 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       keywords: ['reload', 'scan', 'refresh'],
       onExecute: onRefreshProjects,
     });
+
+    commands.push({
+      id: 'toggle-theme',
+      label: theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme',
+      category: 'action',
+      icon: theme === 'dark' ? Sun : Moon,
+      iconColor: theme === 'dark' ? 'text-amber-400' : 'text-blue-400',
+      keywords: ['theme', 'dark', 'light', 'mode', 'appearance'],
+      onExecute: onToggleTheme,
+    });
+
+    if (selectedInstance) {
+      commands.push({
+        id: 'kill-selected',
+        label: 'Close Current Instance',
+        description: selectedInstance.projectName,
+        category: 'action',
+        icon: XCircle,
+        iconColor: 'text-red-400',
+        shortcut: `${MOD}W`,
+        keywords: ['kill', 'close', 'stop', 'terminate', 'instance'],
+        onExecute: () => onKillInstance(selectedInstance.id),
+      });
+    }
 
     // Tab switching (only when an instance is selected)
     if (selectedInstance) {
@@ -301,6 +331,6 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onSetTab, selectedInstance,
     onOpenCodeSearch, onOpenScanPaths, onOpenTemplates,
     onOpenCostDashboard, onToggleNotifications, notificationsEnabled,
-    onRefreshProjects,
+    onRefreshProjects, theme, onToggleTheme,
   ]);
 }

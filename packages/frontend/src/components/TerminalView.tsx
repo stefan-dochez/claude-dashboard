@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { useSocket } from '../hooks/useSocket';
 
@@ -15,6 +16,8 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const socket = useSocket();
+  const [autoScroll, setAutoScroll] = useState(true);
+  const autoScrollRef = useRef(true);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -86,9 +89,22 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
     let outputEnabled = false;
     let attached = false;
 
+    // Detect user scrolling: disable auto-scroll when scrolled up, re-enable at bottom
+    const viewport = containerRef.current?.querySelector('.xterm-viewport');
+    const onScroll = () => {
+      if (!viewport) return;
+      const atBottom = viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 5;
+      autoScrollRef.current = atBottom;
+      setAutoScroll(atBottom);
+    };
+    viewport?.addEventListener('scroll', onScroll);
+
     const onOutput = ({ instanceId: id, data }: { instanceId: string; data: string }) => {
       if (id === currentInstanceId && outputEnabled) {
         term.write(data);
+        if (autoScrollRef.current) {
+          term.scrollToBottom();
+        }
       }
     };
 
@@ -155,6 +171,7 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
 
     return () => {
       clearTimeout(pendingAttachTimer);
+      viewport?.removeEventListener('scroll', onScroll);
       resizeObserver.disconnect();
       socket.off('terminal:output', onOutput);
       socket.off('terminal:history', onHistory);
@@ -170,12 +187,29 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId]);
 
+  const scrollToBottom = useCallback(() => {
+    if (termRef.current) {
+      termRef.current.scrollToBottom();
+      autoScrollRef.current = true;
+      setAutoScroll(true);
+    }
+  }, []);
+
   return (
-    <div className="h-full w-full p-3">
+    <div className="relative h-full w-full p-3">
       <div
         ref={containerRef}
         className="h-full w-full overflow-hidden rounded-xl bg-codeblock p-2"
       />
+      {!autoScroll && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-6 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-elevated/80 text-muted shadow-lg backdrop-blur transition-colors hover:bg-hover hover:text-secondary"
+          title="Scroll to bottom"
+        >
+          <ArrowDownToLine className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }

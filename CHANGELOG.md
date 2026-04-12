@@ -2,6 +2,15 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.7.0]
+
+### Features
+
+- **Dark/Light theme toggle** — Sun/Moon button in the topbar to switch between dark and light themes. Persisted in localStorage. Also available via the command palette. Terminal stays dark in both modes. Meta theme-color tag updates dynamically for correct browser/OS chrome color.
+- **Auto-scroll lock in terminal** — The terminal now detects when you scroll up and pauses auto-scrolling. A floating "scroll to bottom" button appears in the bottom-right corner. Auto-scroll re-enables when you scroll back to the bottom or click the button.
+- **Close instance shortcut (Cmd/Ctrl+W)** — Kill the currently selected instance with a single keystroke. Also available in the command palette. Works on both macOS (Cmd+W) and Windows/Linux (Ctrl+W).
+- **Tab persistence across sessions** — Selected instance, active tab, and opened file are saved to localStorage and restored on reload. Stale references (e.g. instance no longer running) are cleaned up automatically.
+
 ## [0.6.4]
 
 ### Fixes
