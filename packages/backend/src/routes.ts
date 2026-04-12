@@ -568,6 +568,121 @@ export function createRoutes(
     res.json({ templates });
   }));
 
+  // Skills — scan .claude/skills/ for slash command definitions (project + global)
+  router.get('/api/skills', asyncHandler(async (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    const fsPromises = await import('fs/promises');
+    const skills: Array<{ name: string; description: string; scope: 'project' | 'global' }> = [];
+    const seen = new Set<string>();
+
+    async function parseFrontmatter(filePath: string, fallbackName?: string): Promise<{ name: string; description: string } | null> {
+      try {
+        const content = await fsPromises.readFile(filePath, 'utf-8');
+        const match = content.match(/^---\n([\s\S]*?)\n---/);
+        if (!match) return null;
+        const fm = match[1];
+        const nameMatch = fm.match(/^name:\s*(.+)$/m);
+        // Handle both single-line and multiline YAML descriptions
+        let description = '';
+        const descSingleLine = fm.match(/^description:\s*"([^"]+)"/m) ?? fm.match(/^description:\s+([^\n>|]+)$/m);
+        if (descSingleLine) {
+          description = descSingleLine[1].trim();
+        } else {
+          // Multiline: description: > or description: |
+          const descMultiLine = fm.match(/^description:\s*[>|]\n([\s\S]*?)(?=\n\w|\n---|\n$)/m);
+          if (descMultiLine) {
+            description = descMultiLine[1].replace(/\n\s*/g, ' ').trim();
+          }
+        }
+        const name = nameMatch
+          ? nameMatch[1].trim().replace(/^"|"$/g, '')
+          : fallbackName ?? null;
+        if (!name) return null;
+        return { name, description };
+      } catch {
+        return null;
+      }
+    }
+
+    // Project skills: .claude/skills/*.md (flat files)
+    const projectSkillsDir = path.join(projectPath, '.claude', 'skills');
+    try {
+      const entries = await fsPromises.readdir(projectSkillsDir);
+      for (const entry of entries) {
+        if (!entry.endsWith('.md')) continue;
+        const parsed = await parseFrontmatter(path.join(projectSkillsDir, entry));
+        if (parsed && !seen.has(parsed.name)) {
+          seen.add(parsed.name);
+          skills.push({ ...parsed, scope: 'project' });
+        }
+      }
+    } catch { /* no project skills */ }
+
+    // Global skills: ~/.claude/skills/<name>/SKILL.md (subdirectories)
+    const globalSkillsDir = path.join(os.homedir(), '.claude', 'skills');
+    try {
+      const entries = await fsPromises.readdir(globalSkillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const parsed = await parseFrontmatter(path.join(globalSkillsDir, entry.name, 'SKILL.md'), entry.name);
+        if (parsed && !seen.has(parsed.name)) {
+          seen.add(parsed.name);
+          skills.push({ ...parsed, scope: 'global' });
+        }
+      }
+    } catch { /* no global skills */ }
+
+    // Marketplace plugins: ~/.claude/plugins/marketplaces/**/skills/*/SKILL.md
+    // Derives plugin prefix from path: .../plugins/<parts>/skills/<skill>/SKILL.md
+    const marketplacesDir = path.join(os.homedir(), '.claude', 'plugins', 'marketplaces');
+    function derivePluginPrefix(skillFilePath: string): string | null {
+      const rel = path.relative(marketplacesDir, skillFilePath);
+      const parts = rel.split(path.sep);
+      // Find "plugins" and "skills" indices to extract plugin name segments
+      const pluginsIdx = parts.indexOf('plugins');
+      const skillsIdx = parts.indexOf('skills');
+      if (pluginsIdx < 0 || skillsIdx < 0 || skillsIdx <= pluginsIdx + 1) return null;
+      const pluginParts = parts.slice(pluginsIdx + 1, skillsIdx)
+        .filter(p => !/^\d+\.\d+\.\d+$/.test(p)); // exclude version segments
+      return pluginParts.join('-') || null;
+    }
+
+    async function scanMarketplaceSkills(dir: string): Promise<void> {
+      try {
+        const entries = await fsPromises.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            const skillFile = path.join(fullPath, 'SKILL.md');
+            const parsed = await parseFrontmatter(skillFile, entry.name);
+            if (parsed) {
+              const prefix = derivePluginPrefix(skillFile);
+              const qualifiedName = prefix && !parsed.name.startsWith(prefix)
+                ? `${prefix}:${parsed.name}`
+                : parsed.name;
+              if (!seen.has(qualifiedName)) {
+                seen.add(qualifiedName);
+                skills.push({ name: qualifiedName, description: parsed.description, scope: 'global' });
+              }
+            }
+            if (fullPath.split(path.sep).length - marketplacesDir.split(path.sep).length < 8) {
+              await scanMarketplaceSkills(fullPath);
+            }
+          }
+        }
+      } catch { /* skip unreadable */ }
+    }
+    await scanMarketplaceSkills(marketplacesDir);
+
+    // Filter out example/demo plugins
+    const filtered = skills.filter(s => !s.name.startsWith('example-'));
+    res.json(filtered);
+  }));
+
   // Task history
   router.get('/api/tasks/history', (req, res) => {
     const limit = parseInt(req.query.limit as string ?? '50', 10);

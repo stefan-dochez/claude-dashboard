@@ -45,20 +45,19 @@ interface ChatViewProps {
 
 // --------------- Slash commands ---------------
 
-const SLASH_COMMANDS = [
-  { name: 'commit', description: 'Commit changes with a generated message' },
-  { name: 'review', description: 'Review code changes' },
-  { name: 'ship', description: 'Commit, push, and create a PR' },
-  { name: 'compact', description: 'Compact conversation context' },
-  { name: 'clear', description: 'Clear conversation history' },
-  { name: 'help', description: 'Show available commands' },
-  { name: 'bug', description: 'Report or investigate a bug' },
-  { name: 'test', description: 'Run or generate tests' },
-  { name: 'refactor', description: 'Refactor selected code' },
-  { name: 'explain', description: 'Explain code or concepts' },
-  { name: 'fix', description: 'Fix an error or issue' },
-  { name: 'docs', description: 'Generate documentation' },
-] as const;
+interface SlashCommand {
+  name: string;
+  description: string;
+  scope?: 'project' | 'global' | 'builtin';
+}
+
+// Built-in Claude Code commands (always available)
+// Only truly built-in CLI commands (not from files/plugins)
+const BUILTIN_COMMANDS: SlashCommand[] = [
+  { name: 'compact', description: 'Compact conversation context', scope: 'builtin' },
+  { name: 'clear', description: 'Clear conversation history', scope: 'builtin' },
+  { name: 'help', description: 'Show available commands', scope: 'builtin' },
+];
 
 // --------------- Sub-components ---------------
 
@@ -357,13 +356,28 @@ export default function ChatView({
   const [slashActive, setSlashActive] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [slashIndex, setSlashIndex] = useState(0);
+  const [projectSkills, setProjectSkills] = useState<SlashCommand[]>([]);
+
+  // Load project-specific skills from .claude/skills/
+  useEffect(() => {
+    fetch(`/api/skills?path=${encodeURIComponent(projectPath)}`)
+      .then(res => res.ok ? res.json() : [])
+      .then((skills: SlashCommand[]) => setProjectSkills(skills))
+      .catch(() => setProjectSkills([]));
+  }, [projectPath]);
+
+  const allSlashCommands = useMemo(
+    () => [...projectSkills, ...BUILTIN_COMMANDS],
+    [projectSkills],
+  );
+
   const slashResults = useMemo(() => {
     if (!slashActive) return [];
     const q = slashQuery.toLowerCase();
-    return SLASH_COMMANDS.filter(c =>
+    return allSlashCommands.filter(c =>
       c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q),
     );
-  }, [slashActive, slashQuery]);
+  }, [slashActive, slashQuery, allSlashCommands]);
 
   // Staleness recovery
   const stalenessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -767,7 +781,7 @@ export default function ChatView({
     setMentionQuery('');
   }, [input]);
 
-  const handleSlashSelect = useCallback((command: typeof SLASH_COMMANDS[number]) => {
+  const handleSlashSelect = useCallback((command: SlashCommand) => {
     setInput(`/${command.name} `);
     setSlashActive(false);
     setSlashQuery('');
@@ -1067,6 +1081,7 @@ export default function ChatView({
                     {slashResults.map((cmd, i) => (
                       <button
                         key={cmd.name}
+                        ref={el => { if (i === slashIndex) el?.scrollIntoView({ block: 'nearest' }); }}
                         onMouseDown={e => { e.preventDefault(); handleSlashSelect(cmd); }}
                         className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[12px] transition-colors ${
                           i === slashIndex ? 'bg-elevated text-primary' : 'text-tertiary hover:bg-hover'
@@ -1087,6 +1102,7 @@ export default function ChatView({
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onBlur={() => { setTimeout(() => { setSlashActive(false); setMentionActive(false); }, 150); }}
               placeholder={isExited ? 'Instance has exited' : 'Send a message...'}
               rows={1}
               disabled={isExited}

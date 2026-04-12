@@ -2,13 +2,13 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
-## [0.6.1]
+## [0.6.2]
 
 ### Features
 
 - **Copy code blocks** — Hover any syntax-highlighted code block in chat to reveal a copy button (top-right corner). Copies the raw code to clipboard with a brief checkmark confirmation.
 
-- **Slash command autocomplete** — Type `/` at the start of the chat input to see a dropdown of available Claude Code skills (`/commit`, `/ship`, `/review`, `/test`, `/fix`, etc.) with descriptions. Navigate with arrow keys, Tab/Enter to select. Commands are sent directly to the Claude SDK which handles them natively.
+- **Slash command autocomplete** — Type `/` at the start of the chat input to see a dropdown of available skills with descriptions. Navigate with arrow keys, Tab/Enter to select, click outside or Escape to dismiss. Skills are loaded dynamically from three sources: project skills (`.claude/skills/*.md`), global skills (`~/.claude/skills/`), and marketplace plugins (`~/.claude/plugins/marketplaces/`). Marketplace skills are prefixed with their plugin name (e.g. `dataintegration-bee:feature-breakdown`). Commands are sent directly to the Claude SDK.
 
 ## [0.6.0]
 
