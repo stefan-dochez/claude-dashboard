@@ -11,9 +11,10 @@ import TerminalSearchBar from './TerminalSearchBar';
 interface TerminalViewProps {
   instanceId: string;
   onTypingChange?: (typing: boolean) => void;
+  onInput?: (data: string) => void;
 }
 
-export default function TerminalView({ instanceId, onTypingChange }: TerminalViewProps) {
+export default function TerminalView({ instanceId, onTypingChange, onInput }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -22,6 +23,8 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
   const autoScrollRef = useRef(true);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const onInputRef = useRef(onInput);
+  onInputRef.current = onInput;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -76,6 +79,7 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
     // Handle user input — track typing state
     term.onData(data => {
       socket.emit('terminal:input', { instanceId: currentInstanceId, data });
+      onInputRef.current?.(data);
 
       if (onTypingChange) {
         // Enter/return releases typing lock

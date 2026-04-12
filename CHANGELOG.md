@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.11.0]
+
+### Features
+
+- **Broadcast mode** — Toggle the "Broadcast" button in the tab bar (visible in split mode with 2+ terminals) to send the same input to all split terminals simultaneously. When active, the button turns amber, each pane shows a ⚡ indicator in its header, and non-focused panes get an amber ring. Typing in the focused terminal forwards keystrokes to all other split instances via socket. Broadcast is automatically disabled when exiting split mode.
+
 ## [0.10.0]
 
 ### Features

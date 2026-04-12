@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Terminal, MessageSquare, GitBranch, PanelLeft, Loader2,
   FileCode2, GitPullRequest, FolderOpen, Info, Sun, Moon, Download,
-  Columns2, Maximize2,
+  Columns2, Maximize2, Radio,
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ContextPanel from './components/ContextPanel';
@@ -118,7 +118,10 @@ export default function App() {
 
   const exitSplitMode = useCallback(() => {
     setSplitInstanceIds([]);
+    setBroadcastEnabled(false);
   }, []);
+
+  const [broadcastEnabled, setBroadcastEnabled] = useState(false);
 
   // Clean up split when instances exit or are killed
   useEffect(() => {
@@ -624,14 +627,30 @@ export default function App() {
                 {selectedInstance.mode === 'terminal' && selectedInstance.status !== 'exited' && (
                   <>
                     {isSplitMode ? (
-                      <button
-                        onClick={exitSplitMode}
-                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-blue-400 transition-colors hover:bg-elevated/50 hover:text-blue-300"
-                        title="Exit split view"
-                      >
-                        <Maximize2 className="h-3 w-3" />
-                        Unsplit
-                      </button>
+                      <>
+                        <button
+                          onClick={exitSplitMode}
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-blue-400 transition-colors hover:bg-elevated/50 hover:text-blue-300"
+                          title="Exit split view"
+                        >
+                          <Maximize2 className="h-3 w-3" />
+                          Unsplit
+                        </button>
+                        {splitInstanceIds.length > 1 && (
+                          <button
+                            onClick={() => setBroadcastEnabled(prev => !prev)}
+                            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] transition-colors ${
+                              broadcastEnabled
+                                ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                                : 'text-muted hover:bg-elevated/50 hover:text-secondary'
+                            }`}
+                            title={broadcastEnabled ? 'Disable broadcast — stop sending input to all terminals' : 'Broadcast — send input to all terminals'}
+                          >
+                            <Radio className="h-3 w-3" />
+                            Broadcast
+                          </button>
+                        )}
+                      </>
                     ) : (
                       instances.filter(i => i.mode === 'terminal' && i.status !== 'exited').length > 1 && (
                         <button
@@ -672,6 +691,7 @@ export default function App() {
                     instanceIds={splitInstanceIds}
                     instances={instances}
                     focusedId={selectedInstance.id}
+                    broadcastEnabled={broadcastEnabled}
                     onFocus={handleSelectInstance}
                     onRemoveFromSplit={removeFromSplit}
                     onAddToSplit={addToSplit}

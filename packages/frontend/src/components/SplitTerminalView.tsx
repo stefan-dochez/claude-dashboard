@@ -1,12 +1,14 @@
 import { useState, useCallback } from 'react';
 import { X, Plus } from 'lucide-react';
 import TerminalView from './TerminalView';
+import { useSocket } from '../hooks/useSocket';
 import type { Instance } from '../types';
 
 interface SplitTerminalViewProps {
   instanceIds: string[];
   instances: Instance[];
   focusedId: string;
+  broadcastEnabled: boolean;
   onFocus: (id: string) => void;
   onRemoveFromSplit: (id: string) => void;
   onAddToSplit: (id: string) => void;
@@ -17,12 +19,14 @@ export default function SplitTerminalView({
   instanceIds,
   instances,
   focusedId,
+  broadcastEnabled,
   onFocus,
   onRemoveFromSplit,
   onAddToSplit,
   onTypingChange,
 }: SplitTerminalViewProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const socket = useSocket();
 
   const cols = instanceIds.length <= 2 ? instanceIds.length : 2;
   const gridStyle = {
@@ -42,6 +46,16 @@ export default function SplitTerminalView({
     onTypingChange?.(typing);
   }, [onTypingChange]);
 
+  // Broadcast: when focused terminal sends input, forward to all other split terminals
+  const handleBroadcastInput = useCallback((sourceId: string, data: string) => {
+    if (!broadcastEnabled) return;
+    for (const id of instanceIds) {
+      if (id !== sourceId) {
+        socket.emit('terminal:input', { instanceId: id, data });
+      }
+    }
+  }, [broadcastEnabled, instanceIds, socket]);
+
   return (
     <div className="relative h-full w-full">
       <div style={gridStyle}>
@@ -54,7 +68,9 @@ export default function SplitTerminalView({
               key={id}
               onClick={() => onFocus(id)}
               className={`relative flex flex-col overflow-hidden ${
-                isFocused ? 'ring-1 ring-blue-500/60 rounded-xl' : ''
+                isFocused ? 'ring-1 ring-blue-500/60 rounded-xl'
+                  : broadcastEnabled ? 'ring-1 ring-amber-500/40 rounded-xl'
+                  : ''
               }`}
             >
               {/* Mini header */}
@@ -62,6 +78,7 @@ export default function SplitTerminalView({
                 <span className="truncate text-[10px] text-muted">
                   {instance?.projectName ?? 'Unknown'}
                   {instance?.branchName ? ` · ${instance.branchName}` : ''}
+                  {broadcastEnabled && <span className="ml-1 text-amber-400">⚡</span>}
                 </span>
                 {instanceIds.length > 1 && (
                   <button
@@ -77,6 +94,7 @@ export default function SplitTerminalView({
                 <TerminalView
                   instanceId={id}
                   onTypingChange={isFocused ? handleTypingChange : undefined}
+                  onInput={isFocused ? (data) => handleBroadcastInput(id, data) : undefined}
                 />
               </div>
             </div>
