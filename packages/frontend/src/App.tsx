@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Terminal, MessageSquare, GitBranch, PanelLeft, Loader2,
-  FileCode2, GitPullRequest, FolderOpen, Info, Sun, Moon,
+  FileCode2, GitPullRequest, FolderOpen, Info, Sun, Moon, Download,
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ContextPanel from './components/ContextPanel';
@@ -584,6 +584,24 @@ export default function App() {
                   {label}
                 </button>
               ))}
+              {/* Right-aligned actions */}
+              <div className="ml-auto flex items-center">
+                {selectedInstance.mode === 'terminal' && selectedInstance.status !== 'exited' && (
+                  <button
+                    onClick={() => {
+                      const a = document.createElement('a');
+                      a.href = `/api/instances/${selectedInstance.id}/export?format=txt`;
+                      a.download = '';
+                      a.click();
+                    }}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-muted transition-colors hover:bg-elevated/50 hover:text-secondary"
+                    title="Export session as text"
+                  >
+                    <Download className="h-3 w-3" />
+                    Export
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

@@ -3,7 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { SearchAddon } from '@xterm/addon-search';
-import { ArrowDownToLine, Download } from 'lucide-react';
+import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { useSocket } from '../hooks/useSocket';
 import TerminalSearchBar from './TerminalSearchBar';
@@ -222,25 +222,11 @@ export default function TerminalView({ instanceId, onTypingChange }: TerminalVie
     termRef.current?.focus();
   }, []);
 
-  const exportSession = useCallback(() => {
-    const a = document.createElement('a');
-    a.href = `/api/instances/${instanceId}/export?format=txt`;
-    a.download = '';
-    a.click();
-  }, [instanceId]);
-
   return (
     <div className="relative h-full w-full p-3">
       {searchOpen && searchAddonRef.current && (
         <TerminalSearchBar searchAddon={searchAddonRef.current} onClose={closeSearch} />
       )}
-      <button
-        onClick={exportSession}
-        className="absolute top-5 left-6 z-10 flex h-7 w-7 items-center justify-center rounded-md bg-elevated/80 text-muted shadow backdrop-blur transition-colors hover:bg-hover hover:text-secondary"
-        title="Export session"
-      >
-        <Download className="h-3.5 w-3.5" />
-      </button>
       <div
         ref={containerRef}
         className="h-full w-full overflow-hidden rounded-xl bg-codeblock p-2"
