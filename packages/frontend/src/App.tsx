@@ -2,11 +2,13 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Terminal, MessageSquare, GitBranch, PanelLeft, Loader2,
   FileCode2, GitPullRequest, FolderOpen, Info, Sun, Moon, Download,
+  Columns2, Maximize2,
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ContextPanel from './components/ContextPanel';
 import FileExplorer from './components/FileExplorer';
 import TerminalView from './components/TerminalView';
+import SplitTerminalView from './components/SplitTerminalView';
 import ChatView from './components/ChatView';
 import ChangesView from './components/ChangesView';
 import PullRequestView from './components/PullRequestView';
@@ -94,6 +96,39 @@ export default function App() {
   const [openedFile, setOpenedFile] = useState<string | null>(() => {
     return localStorage.getItem('dashboard:openedFile');
   });
+
+  // Split terminal mode
+  const [splitInstanceIds, setSplitInstanceIds] = useState<string[]>([]);
+  const isSplitMode = splitInstanceIds.length >= 1;
+
+  const enterSplitMode = useCallback((firstId: string) => {
+    setSplitInstanceIds([firstId]);
+  }, []);
+
+  const addToSplit = useCallback((id: string) => {
+    setSplitInstanceIds(prev => prev.length < 4 && !prev.includes(id) ? [...prev, id] : prev);
+  }, []);
+
+  const removeFromSplit = useCallback((id: string) => {
+    setSplitInstanceIds(prev => {
+      const next = prev.filter(x => x !== id);
+      return next;
+    });
+  }, []);
+
+  const exitSplitMode = useCallback(() => {
+    setSplitInstanceIds([]);
+  }, []);
+
+  // Clean up split when instances exit or are killed
+  useEffect(() => {
+    if (splitInstanceIds.length === 0) return;
+    const aliveIds = instances.filter(i => i.status !== 'exited').map(i => i.id);
+    const filtered = splitInstanceIds.filter(id => aliveIds.includes(id));
+    if (filtered.length !== splitInstanceIds.length) {
+      setSplitInstanceIds(filtered);
+    }
+  }, [instances, splitInstanceIds]);
 
   // Code selection for chat context
   const [codeSelection, setCodeSelection] = useState<{ filePath: string; startLine: number; endLine: number; code: string } | null>(null);
@@ -585,21 +620,44 @@ export default function App() {
                 </button>
               ))}
               {/* Right-aligned actions */}
-              <div className="ml-auto flex items-center">
+              <div className="ml-auto flex items-center gap-1">
                 {selectedInstance.mode === 'terminal' && selectedInstance.status !== 'exited' && (
-                  <button
-                    onClick={() => {
-                      const a = document.createElement('a');
-                      a.href = `/api/instances/${selectedInstance.id}/export?format=txt`;
-                      a.download = '';
-                      a.click();
-                    }}
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-muted transition-colors hover:bg-elevated/50 hover:text-secondary"
-                    title="Export session as text"
-                  >
-                    <Download className="h-3 w-3" />
-                    Export
-                  </button>
+                  <>
+                    {isSplitMode ? (
+                      <button
+                        onClick={exitSplitMode}
+                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-blue-400 transition-colors hover:bg-elevated/50 hover:text-blue-300"
+                        title="Exit split view"
+                      >
+                        <Maximize2 className="h-3 w-3" />
+                        Unsplit
+                      </button>
+                    ) : (
+                      instances.filter(i => i.mode === 'terminal' && i.status !== 'exited').length > 1 && (
+                        <button
+                          onClick={() => enterSplitMode(selectedInstance.id)}
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-muted transition-colors hover:bg-elevated/50 hover:text-secondary"
+                          title="Split view — show multiple terminals"
+                        >
+                          <Columns2 className="h-3 w-3" />
+                          Split
+                        </button>
+                      )
+                    )}
+                    <button
+                      onClick={() => {
+                        const a = document.createElement('a');
+                        a.href = `/api/instances/${selectedInstance.id}/export?format=txt`;
+                        a.download = '';
+                        a.click();
+                      }}
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-muted transition-colors hover:bg-elevated/50 hover:text-secondary"
+                      title="Export session as text"
+                    >
+                      <Download className="h-3 w-3" />
+                      Export
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -609,7 +667,17 @@ export default function App() {
           <div className="flex-1 overflow-hidden">
             {selectedInstance ? (
               activeTab === 'main' ? (
-                selectedInstance.status !== 'exited' ? (
+                isSplitMode ? (
+                  <SplitTerminalView
+                    instanceIds={splitInstanceIds}
+                    instances={instances}
+                    focusedId={selectedInstance.id}
+                    onFocus={handleSelectInstance}
+                    onRemoveFromSplit={removeFromSplit}
+                    onAddToSplit={addToSplit}
+                    onTypingChange={handleTypingChange}
+                  />
+                ) : selectedInstance.status !== 'exited' ? (
                   selectedInstance.mode === 'chat' ? (
                     <ChatView
                       key={selectedInstance.id}

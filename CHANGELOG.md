@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.10.0]
+
+### Features
+
+- **Split terminal view** — Display 2-4 terminal instances side by side in a CSS grid layout. Click the "Split" button in the tab bar (visible when 2+ terminal instances are running) to enter split mode. An "Add terminal" pane with an instance picker lets you choose which instances to show. Each pane has a mini-header with project name, branch, and a close button. Click a pane to focus it (highlighted with a blue ring). "Unsplit" returns to single-terminal mode. Exited instances are automatically removed from the split.
+
 ## [0.9.1]
 
 ### Fixes
