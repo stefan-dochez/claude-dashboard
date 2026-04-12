@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.6.3]
+
+### Fixes
+
+- **Disable File Explorer & Context Info without instance** — The File Explorer (⌘E) and Context Info (⌘I) buttons in the topbar are now disabled (grayed out, non-clickable) when no instance is selected. Keyboard shortcuts are also ignored, commands are hidden from the palette, and the right panel auto-closes if the selected instance is deselected.
+
 ## [0.6.2]
 
 ### Features

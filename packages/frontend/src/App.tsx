@@ -64,6 +64,8 @@ export default function App() {
   const [pendingTemplateContent, setPendingTemplateContent] = useState<string | null>(null);
   const [costDashboardOpen, setCostDashboardOpen] = useState(false);
   const autoOpenedRef = useRef(false);
+  const selectedInstanceIdRef = useRef(selectedInstanceId);
+  selectedInstanceIdRef.current = selectedInstanceId;
 
   // Panel visibility & resizable widths
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -317,6 +319,11 @@ export default function App() {
     onRefreshProjects: refreshProjects,
   });
 
+  // Close right panel when no instance is selected
+  useEffect(() => {
+    if (!selectedInstanceId) setRightPanel(null);
+  }, [selectedInstanceId]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -347,8 +354,8 @@ export default function App() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
         if (e.key === 'b') { e.preventDefault(); setSidebarOpen(prev => !prev); }
-        if (e.key === 'e') { e.preventDefault(); setRightPanel(prev => prev === 'files' ? null : 'files'); }
-        if (e.key === 'i') { e.preventDefault(); setRightPanel(prev => prev === 'context' ? null : 'context'); }
+        if (e.key === 'e' && selectedInstanceIdRef.current) { e.preventDefault(); setRightPanel(prev => prev === 'files' ? null : 'files'); }
+        if (e.key === 'i' && selectedInstanceIdRef.current) { e.preventDefault(); setRightPanel(prev => prev === 'context' ? null : 'context'); }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -426,14 +433,16 @@ export default function App() {
           </button>
           <button
             onClick={() => setRightPanel(prev => prev === 'files' ? null : 'files')}
-            className={`rounded p-1 transition-colors hover:text-secondary ${rightPanel === 'files' ? 'text-tertiary' : 'text-faint'}`}
+            disabled={!selectedInstance}
+            className={`rounded p-1 transition-colors ${!selectedInstance ? 'cursor-not-allowed opacity-30' : `hover:text-secondary ${rightPanel === 'files' ? 'text-tertiary' : 'text-faint'}`}`}
             title="File explorer (⌘E)"
           >
             <FolderOpen className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setRightPanel(prev => prev === 'context' ? null : 'context')}
-            className={`rounded p-1 transition-colors hover:text-secondary ${rightPanel === 'context' ? 'text-tertiary' : 'text-faint'}`}
+            disabled={!selectedInstance}
+            className={`rounded p-1 transition-colors ${!selectedInstance ? 'cursor-not-allowed opacity-30' : `hover:text-secondary ${rightPanel === 'context' ? 'text-tertiary' : 'text-faint'}`}`}
             title="Context info (⌘I)"
           >
             <Info className="h-3.5 w-3.5" />

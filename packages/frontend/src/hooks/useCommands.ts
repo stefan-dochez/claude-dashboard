@@ -90,27 +90,29 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       onExecute: onToggleSidebar,
     });
 
-    commands.push({
-      id: 'toggle-files',
-      label: rightPanel === 'files' ? 'Hide File Explorer' : 'Show File Explorer',
-      category: 'action',
-      icon: FolderOpen,
-      iconColor: 'text-muted',
-      shortcut: `${MOD}E`,
-      keywords: ['file', 'explorer', 'tree', 'browse'],
-      onExecute: onToggleFiles,
-    });
+    if (selectedInstance) {
+      commands.push({
+        id: 'toggle-files',
+        label: rightPanel === 'files' ? 'Hide File Explorer' : 'Show File Explorer',
+        category: 'action',
+        icon: FolderOpen,
+        iconColor: 'text-muted',
+        shortcut: `${MOD}E`,
+        keywords: ['file', 'explorer', 'tree', 'browse'],
+        onExecute: onToggleFiles,
+      });
 
-    commands.push({
-      id: 'toggle-context',
-      label: rightPanel === 'context' ? 'Hide Context Panel' : 'Show Context Panel',
-      category: 'action',
-      icon: Info,
-      iconColor: 'text-muted',
-      shortcut: `${MOD}I`,
-      keywords: ['context', 'info', 'details', 'claude.md', 'tokens', 'cost'],
-      onExecute: onToggleContext,
-    });
+      commands.push({
+        id: 'toggle-context',
+        label: rightPanel === 'context' ? 'Hide Context Panel' : 'Show Context Panel',
+        category: 'action',
+        icon: Info,
+        iconColor: 'text-muted',
+        shortcut: `${MOD}I`,
+        keywords: ['context', 'info', 'details', 'claude.md', 'tokens', 'cost'],
+        onExecute: onToggleContext,
+      });
+    }
 
     commands.push({
       id: 'code-search',
