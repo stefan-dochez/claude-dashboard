@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.9.1]
+
+### Fixes
+
+- **Export button placement** — Moved the session export button from a floating overlay in the terminal top-left corner to the tab bar, right-aligned next to Terminal/Changes/PR tabs. Cleaner placement with no content overlap.
+
 ## [0.9.0]
 
 ### Features
