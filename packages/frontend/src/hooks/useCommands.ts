@@ -7,6 +7,11 @@ import {
 import type { Command } from '../components/CommandPalette';
 import type { Instance, Project } from '../types';
 
+// Detect platform once — use Cmd symbol on macOS, Ctrl on Windows/Linux
+const IS_MAC = navigator.platform.startsWith('Mac') || navigator.platform === 'iPhone';
+const MOD = IS_MAC ? '\u2318' : 'Ctrl+';
+const SHIFT = IS_MAC ? '\u21e7' : 'Shift+';
+
 interface UseCommandsOptions {
   // Instances
   instances: Instance[];
@@ -71,7 +76,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       category: 'action',
       icon: PanelLeft,
       iconColor: 'text-muted',
-      shortcut: '\u2318B',
+      shortcut: `${MOD}B`,
       keywords: ['panel', 'sidebar', 'toggle', 'collapse'],
       onExecute: onToggleSidebar,
     });
@@ -82,7 +87,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       category: 'action',
       icon: FolderOpen,
       iconColor: 'text-muted',
-      shortcut: '\u2318E',
+      shortcut: `${MOD}E`,
       keywords: ['file', 'explorer', 'tree', 'browse'],
       onExecute: onToggleFiles,
     });
@@ -93,7 +98,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       category: 'action',
       icon: Info,
       iconColor: 'text-muted',
-      shortcut: '\u2318I',
+      shortcut: `${MOD}I`,
       keywords: ['context', 'info', 'details', 'claude.md', 'tokens', 'cost'],
       onExecute: onToggleContext,
     });
@@ -105,7 +110,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       category: 'action',
       icon: Search,
       iconColor: 'text-blue-400',
-      shortcut: '\u2318\u21e7F',
+      shortcut: `${MOD}${SHIFT}F`,
       keywords: ['grep', 'find', 'search', 'code'],
       onExecute: onOpenCodeSearch,
     });
@@ -142,7 +147,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
         category: 'action',
         icon: isChat ? MessageSquare : Terminal,
         iconColor: 'text-muted',
-        shortcut: '\u23181',
+        shortcut: `${MOD}1`,
         keywords: ['tab', 'terminal', 'chat', 'main'],
         onExecute: () => onSetTab('main'),
       });
@@ -153,7 +158,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
         category: 'action',
         icon: FileCode2,
         iconColor: 'text-muted',
-        shortcut: '\u23182',
+        shortcut: `${MOD}2`,
         keywords: ['tab', 'changes', 'diff', 'git'],
         onExecute: () => onSetTab('changes'),
       });
@@ -164,7 +169,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
         category: 'action',
         icon: GitPullRequest,
         iconColor: 'text-muted',
-        shortcut: '\u23183',
+        shortcut: `${MOD}3`,
         keywords: ['tab', 'pr', 'pull', 'request', 'review'],
         onExecute: () => onSetTab('pr'),
       });
