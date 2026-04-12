@@ -3,14 +3,15 @@ import {
   Loader2, ChevronDown,
   AlertCircle, AlertTriangle, Brain,
   Sparkles, Shield, CircleStop, Plus, X, ArrowUp,
-  FileText, GitBranch, GitCommit, FileCode2,
+  FileText, GitBranch, GitCommit, FileCode2, LayoutTemplate,
 } from 'lucide-react';
 import { useSocket } from '../hooks/useSocket';
-import type { ChatMessage, ContentBlock, SessionInfo } from '../types';
+import type { ChatMessage, ContentBlock, SessionInfo, PromptTemplate } from '../types';
 import MarkdownText from './chat/MarkdownText';
 import ThinkingBlock from './chat/ThinkingBlock';
 import ToolGroupBlock from './chat/ToolGroupBlock';
 import MessageBubble from './chat/MessageBubble';
+import TemplatePicker from './TemplatePicker';
 
 interface ContextItem {
   type: 'file' | 'branch' | 'commit' | 'changes';
@@ -35,6 +36,11 @@ interface ChatViewProps {
   initialEffort?: string | null;
   codeSelection?: CodeSelection | null;
   onClearCodeSelection?: () => void;
+  templates?: PromptTemplate[];
+  onRecordTemplateUsage?: (id: string) => void;
+  onOpenTemplateManager?: () => void;
+  pendingTemplateContent?: string | null;
+  onClearPendingTemplate?: () => void;
 }
 
 // --------------- Sub-components ---------------
@@ -304,6 +310,8 @@ export default function ChatView({
   instanceId, projectPath, status, onTypingChange,
   initialModel, initialPermissionMode, initialEffort,
   codeSelection, onClearCodeSelection,
+  templates, onRecordTemplateUsage, onOpenTemplateManager,
+  pendingTemplateContent, onClearPendingTemplate,
 }: ChatViewProps) {
   const socket = useSocket();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -344,6 +352,24 @@ export default function ChatView({
   const [contextSearchResults, setContextSearchResults] = useState<Array<{ label: string; value: string }>>([]);
   const [contextLoading, setContextLoading] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Template picker
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+
+  // Inject template content from modal
+  useEffect(() => {
+    if (pendingTemplateContent) {
+      setInput(prev => prev ? `${prev}\n${pendingTemplateContent}` : pendingTemplateContent);
+      onClearPendingTemplate?.();
+      textareaRef.current?.focus();
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+        }
+      }, 0);
+    }
+  }, [pendingTemplateContent, onClearPendingTemplate]);
 
   // Selectors
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'claude-opus-4-6');
@@ -923,6 +949,32 @@ export default function ChatView({
 
           {/* Unified input container */}
           <div className="relative rounded-2xl border border-border-input bg-input transition-colors focus-within:border-border-focus">
+            {/* Template picker dropdown */}
+            {templatePickerOpen && templates && templates.length > 0 && (
+              <div className="absolute bottom-full left-4 right-4 z-30 mb-1">
+                <TemplatePicker
+                  templates={templates}
+                  onSelect={(content, template) => {
+                    setInput(prev => prev ? `${prev}\n${content}` : content);
+                    setTemplatePickerOpen(false);
+                    onRecordTemplateUsage?.(template.id);
+                    textareaRef.current?.focus();
+                    setTimeout(() => {
+                      if (textareaRef.current) {
+                        textareaRef.current.style.height = 'auto';
+                        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+                      }
+                    }, 0);
+                  }}
+                  onOpenManager={() => {
+                    setTemplatePickerOpen(false);
+                    onOpenTemplateManager?.();
+                  }}
+                  onClose={() => setTemplatePickerOpen(false)}
+                />
+              </div>
+            )}
+
             {/* @-mention dropdown */}
             {mentionActive && mentionResults.length > 0 && (
               <div className="absolute bottom-full left-4 right-4 z-20 mb-1">
@@ -1012,6 +1064,19 @@ export default function ChatView({
                   </div>
                 )}
               </div>
+
+              {/* Template picker button */}
+              {templates && templates.length > 0 && (
+                <button
+                  onClick={() => setTemplatePickerOpen(!templatePickerOpen)}
+                  className={`rounded-lg p-1.5 transition-colors ${templatePickerOpen ? 'bg-hover text-primary' : 'text-muted hover:bg-hover hover:text-secondary'}`}
+                  title="Insert template (⌘/)"
+                  disabled={isExited}
+                  aria-label="Insert prompt template"
+                >
+                  <LayoutTemplate className="h-4 w-4" />
+                </button>
+              )}
 
               {/* Model / Permission / Effort selectors */}
               <Dropdown

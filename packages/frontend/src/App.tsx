@@ -15,6 +15,7 @@ import ResizeHandle from './components/ResizeHandle';
 import CodeSearchModal from './components/CodeSearchModal';
 import CommandPalette from './components/CommandPalette';
 import ScanPathsModal from './components/ScanPathsModal';
+import PromptTemplatesModal from './components/PromptTemplatesModal';
 import ToastContainer from './components/ToastContainer';
 import { useProjects } from './hooks/useProjects';
 import { useInstances } from './hooks/useInstances';
@@ -23,6 +24,7 @@ import { useAttentionQueue } from './hooks/useAttentionQueue';
 import { useSocketStatus } from './hooks/useSocket';
 import { useToasts } from './hooks/useToasts';
 import { useCommands } from './hooks/useCommands';
+import { usePromptTemplates } from './hooks/usePromptTemplates';
 
 // --------------- Status Icon ---------------
 
@@ -56,6 +58,8 @@ export default function App() {
   const [scanPathsOpen, setScanPathsOpen] = useState(false);
   const [codeSearchOpen, setCodeSearchOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
+  const [pendingTemplateContent, setPendingTemplateContent] = useState<string | null>(null);
   const autoOpenedRef = useRef(false);
 
   // Panel visibility & resizable widths
@@ -271,6 +275,12 @@ export default function App() {
     ? (selectedInstance.worktreePath ?? selectedInstance.projectPath)
     : null;
 
+  // Prompt templates
+  const {
+    templates, createTemplate, updateTemplate, deleteTemplate,
+    recordUsage: recordTemplateUsage, importTemplates, exportTemplates,
+  } = usePromptTemplates(instanceProjectPath);
+
   // Command palette
   const commands = useCommands({
     instances,
@@ -290,6 +300,7 @@ export default function App() {
     selectedInstance,
     onOpenCodeSearch: useCallback(() => setCodeSearchOpen(true), []),
     onOpenScanPaths: useCallback(() => setScanPathsOpen(true), []),
+    onOpenTemplates: useCallback(() => setTemplatesModalOpen(true), []),
     onRefreshProjects: refreshProjects,
   });
 
@@ -306,6 +317,12 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
         setCodeSearchOpen(prev => !prev);
+        return;
+      }
+      // Cmd+T — prompt templates
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === 't') {
+        e.preventDefault();
+        setTemplatesModalOpen(prev => !prev);
         return;
       }
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -496,6 +513,11 @@ export default function App() {
                       initialEffort={null}
                       codeSelection={codeSelection}
                       onClearCodeSelection={() => setCodeSelection(null)}
+                      templates={templates}
+                      onRecordTemplateUsage={recordTemplateUsage}
+                      onOpenTemplateManager={() => setTemplatesModalOpen(true)}
+                      pendingTemplateContent={pendingTemplateContent}
+                      onClearPendingTemplate={() => setPendingTemplateContent(null)}
                     />
                   ) : (
                     <TerminalView
@@ -605,6 +627,24 @@ export default function App() {
           projectPath={instanceProjectPath}
           onOpenFile={handleOpenFile}
           onClose={() => setCodeSearchOpen(false)}
+        />
+      )}
+
+      {templatesModalOpen && (
+        <PromptTemplatesModal
+          templates={templates}
+          projectPath={instanceProjectPath}
+          onClose={() => setTemplatesModalOpen(false)}
+          onInsert={(template) => {
+            setTemplatesModalOpen(false);
+            recordTemplateUsage(template.id);
+            setPendingTemplateContent(template.content);
+          }}
+          onCreate={createTemplate}
+          onUpdate={updateTemplate}
+          onDelete={deleteTemplate}
+          onImport={importTemplates}
+          onExport={exportTemplates}
         />
       )}
 

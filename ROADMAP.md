@@ -8,11 +8,11 @@
 - Actions rapides : lancer instance, kill, switch tab, toggle panels
 - Extensible : chaque composant peut enregistrer ses propres commandes
 
-### 2. Templates de prompts reutilisables
-- Bibliotheque de prompts sauvegardes par projet ou globalement
-- Variables dans les templates : `{{file}}`, `{{branch}}`, `{{selection}}`
-- Import/export de templates (partage en equipe)
-- Historique des prompts les plus utilises avec auto-suggestion
+### 2. ~~Templates de prompts reutilisables~~ (done — v0.5.6)
+- ~~Bibliotheque de prompts sauvegardes par projet ou globalement~~
+- ~~Variables dans les templates : `{{file}}`, `{{branch}}`, `{{selection}}`~~
+- ~~Import/export de templates (partage en equipe)~~
+- ~~Historique des prompts les plus utilises avec auto-suggestion~~
 
 ### 3. Notifications systeme
 - Notifications macOS/Windows quand une instance passe en `waiting_input` hors focus
@@ -43,6 +43,7 @@
 - Copier des blocs de code en un clic
 - Image support : drag & drop screenshots (vision API)
 - Resume automatique des longues conversations
+- **Execution de skills via le chat** : permettre de lancer des slash commands (`/commit`, `/review-pr`, `/ship`, etc.) directement depuis l'input du chat. Autocompletion des skills disponibles avec `/`, description inline, et execution transparente comme si on etait dans le terminal Claude Code
 
 ### Git workflow
 - Auto-commit intelligent (detection fin de travail Claude + message genere)

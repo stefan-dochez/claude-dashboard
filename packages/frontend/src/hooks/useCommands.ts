@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import {
   PanelLeft, FolderOpen, Info, Terminal, FileCode2,
   GitPullRequest, Search, Settings, Play, XCircle,
-  Star, RefreshCw, MessageSquare,
+  Star, RefreshCw, MessageSquare, LayoutTemplate,
 } from 'lucide-react';
 import type { Command } from '../components/CommandPalette';
 import type { Instance, Project } from '../types';
@@ -39,6 +39,7 @@ interface UseCommandsOptions {
   // Modals
   onOpenCodeSearch: () => void;
   onOpenScanPaths: () => void;
+  onOpenTemplates: () => void;
 
   // Projects
   onRefreshProjects: () => void;
@@ -62,6 +63,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     selectedInstance,
     onOpenCodeSearch,
     onOpenScanPaths,
+    onOpenTemplates,
     onRefreshProjects,
   } = options;
 
@@ -124,6 +126,18 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       iconColor: 'text-muted',
       keywords: ['settings', 'config', 'workspace', 'scan', 'paths'],
       onExecute: onOpenScanPaths,
+    });
+
+    commands.push({
+      id: 'prompt-templates',
+      label: 'Prompt Templates',
+      description: 'Manage reusable prompt templates',
+      category: 'action',
+      icon: LayoutTemplate,
+      iconColor: 'text-blue-400',
+      shortcut: `${MOD}T`,
+      keywords: ['template', 'prompt', 'reusable', 'snippet'],
+      onExecute: onOpenTemplates,
     });
 
     commands.push({
@@ -253,6 +267,6 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     projects, favoriteProjects, onLaunchProject,
     sidebarOpen, onToggleSidebar, rightPanel, onToggleFiles, onToggleContext,
     onSetTab, selectedInstance,
-    onOpenCodeSearch, onOpenScanPaths, onRefreshProjects,
+    onOpenCodeSearch, onOpenScanPaths, onOpenTemplates, onRefreshProjects,
   ]);
 }

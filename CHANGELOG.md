@@ -2,6 +2,16 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.5.7]
+
+### Features
+
+- **Prompt Templates** — Reusable prompt template library accessible via `Cmd+T` or the template picker button in the chat input. Create, edit, duplicate, and delete templates with support for `{{variable}}` placeholders that are auto-detected and prompted before insertion. Templates can be scoped globally or per-project, with usage tracking and most-used-first sorting. Import/export templates as JSON for team sharing. Integrated into the command palette as "Prompt Templates". Full CRUD backend with persistence in `~/.claude-dashboard/config.json`.
+
+### Fixes
+
+- **Template picker click-outside race condition** — Clicking a template with variables appeared to do nothing because React flushed the state update (showing the variable fill dialog) before the document-level `mousedown` handler ran, detaching the click target from the DOM. The click-outside handler now ignores events whose target has been removed from the DOM by a React re-render.
+
 ## [0.5.5]
 
 ### Features

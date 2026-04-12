@@ -4,7 +4,9 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import type { ConfigService } from './config.js';
+import type { PromptTemplate } from './config.js';
 import type { ProjectScanner } from './scanner.js';
 import type { ProcessManager } from './process-manager.js';
 import type { StreamProcessManager } from './stream-process.js';
@@ -449,6 +451,122 @@ export function createRoutes(
       res.status(500).json({ error: msg.split('\n')[0] });
     }
   });
+
+  // Prompt templates — CRUD
+  router.get('/api/prompt-templates', asyncHandler(async (req, res) => {
+    const config = await configService.get();
+    const projectPath = req.query.projectPath as string | undefined;
+    let templates = config.promptTemplates ?? [];
+    if (projectPath) {
+      templates = templates.filter(t => t.scope === 'global' || t.projectPath === projectPath);
+    }
+    // Sort by usageCount desc (most used first)
+    templates.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
+    res.json(templates);
+  }));
+
+  router.post('/api/prompt-templates', asyncHandler(async (req, res) => {
+    const { name, description, content, variables, tags, scope, projectPath: templateProjectPath } = req.body as {
+      name?: string;
+      description?: string;
+      content?: string;
+      variables?: PromptTemplate['variables'];
+      tags?: string[];
+      scope?: 'global' | 'project';
+      projectPath?: string;
+    };
+    if (!name || !content) {
+      res.status(400).json({ error: 'name and content are required' });
+      return;
+    }
+    const now = new Date().toISOString();
+    const template: PromptTemplate = {
+      id: crypto.randomUUID(),
+      name,
+      description: description ?? '',
+      content,
+      variables: variables ?? [],
+      tags: tags ?? [],
+      scope: scope ?? 'global',
+      projectPath: scope === 'project' ? templateProjectPath : undefined,
+      usageCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const config = await configService.get();
+    const templates = [...(config.promptTemplates ?? []), template];
+    await configService.save({ promptTemplates: templates });
+    res.status(201).json(template);
+  }));
+
+  router.put('/api/prompt-templates/:id', asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const config = await configService.get();
+    const templates = [...(config.promptTemplates ?? [])];
+    const idx = templates.findIndex(t => t.id === id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Template not found' });
+      return;
+    }
+    const updates = req.body as Partial<PromptTemplate>;
+    templates[idx] = { ...templates[idx], ...updates, id, updatedAt: new Date().toISOString() };
+    await configService.save({ promptTemplates: templates });
+    res.json(templates[idx]);
+  }));
+
+  router.delete('/api/prompt-templates/:id', asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const config = await configService.get();
+    const templates = (config.promptTemplates ?? []).filter(t => t.id !== id);
+    await configService.save({ promptTemplates: templates });
+    res.json({ ok: true });
+  }));
+
+  // Bump usage count
+  router.post('/api/prompt-templates/:id/use', asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const config = await configService.get();
+    const templates = [...(config.promptTemplates ?? [])];
+    const idx = templates.findIndex(t => t.id === id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Template not found' });
+      return;
+    }
+    templates[idx] = { ...templates[idx], usageCount: (templates[idx].usageCount ?? 0) + 1 };
+    await configService.save({ promptTemplates: templates });
+    res.json(templates[idx]);
+  }));
+
+  // Import/export templates
+  router.post('/api/prompt-templates/import', asyncHandler(async (req, res) => {
+    const { templates: imported } = req.body as { templates?: PromptTemplate[] };
+    if (!Array.isArray(imported)) {
+      res.status(400).json({ error: 'templates array is required' });
+      return;
+    }
+    const config = await configService.get();
+    const existing = config.promptTemplates ?? [];
+    const existingIds = new Set(existing.map(t => t.id));
+    const now = new Date().toISOString();
+    const newTemplates = imported.map(t => ({
+      ...t,
+      id: existingIds.has(t.id) ? crypto.randomUUID() : t.id,
+      usageCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    await configService.save({ promptTemplates: [...existing, ...newTemplates] });
+    res.json({ imported: newTemplates.length });
+  }));
+
+  router.get('/api/prompt-templates/export', asyncHandler(async (_req, res) => {
+    const config = await configService.get();
+    const templates = (config.promptTemplates ?? []).map(({ usageCount, ...rest }) => ({
+      ...rest,
+      usageCount: 0,
+    }));
+    res.json({ templates });
+  }));
 
   // Task history
   router.get('/api/tasks/history', (_req, res) => {

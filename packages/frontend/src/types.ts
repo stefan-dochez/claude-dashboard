@@ -106,3 +106,23 @@ export interface AttentionQueueItem {
   projectName: string;
   enteredAt: number;
 }
+
+export interface PromptTemplateVariable {
+  name: string;
+  defaultValue?: string;
+  placeholder?: string;
+}
+
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  variables: PromptTemplateVariable[];
+  tags: string[];
+  scope: 'global' | 'project';
+  projectPath?: string;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -5,6 +5,26 @@ import os from 'os';
 const CONFIG_DIR = path.join(os.homedir(), '.claude-dashboard');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
+interface PromptTemplateVariable {
+  name: string;
+  defaultValue?: string;
+  placeholder?: string;
+}
+
+interface PromptTemplate {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  variables: PromptTemplateVariable[];
+  tags: string[];
+  scope: 'global' | 'project';
+  projectPath?: string;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface AppConfig {
   scanPaths: string[];
   metaProjects: string[];
@@ -13,6 +33,7 @@ interface AppConfig {
   port: number;
   maxInstances: number;
   favoriteProjects: string[];
+  promptTemplates: PromptTemplate[];
   statusPatterns: {
     waitingInput: string[];
   };
@@ -26,6 +47,7 @@ const DEFAULT_CONFIG: AppConfig = {
   ],
   metaProjects: [],
   favoriteProjects: [],
+  promptTemplates: [],
   projectMarkers: ['.git', 'CLAUDE.md', 'package.json', 'Cargo.toml', 'go.mod', 'pyproject.toml'],
   scanDepth: 3,
   port: 3200,
@@ -73,4 +95,4 @@ export class ConfigService {
   }
 }
 
-export type { AppConfig };
+export type { AppConfig, PromptTemplate, PromptTemplateVariable };
