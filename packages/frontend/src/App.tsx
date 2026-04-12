@@ -16,6 +16,7 @@ import CodeSearchModal from './components/CodeSearchModal';
 import CommandPalette from './components/CommandPalette';
 import ScanPathsModal from './components/ScanPathsModal';
 import PromptTemplatesModal from './components/PromptTemplatesModal';
+import CostDashboard from './components/CostDashboard';
 import ToastContainer from './components/ToastContainer';
 import { useProjects } from './hooks/useProjects';
 import { useInstances } from './hooks/useInstances';
@@ -25,6 +26,7 @@ import { useSocketStatus } from './hooks/useSocket';
 import { useToasts } from './hooks/useToasts';
 import { useCommands } from './hooks/useCommands';
 import { usePromptTemplates } from './hooks/usePromptTemplates';
+import { useNotifications } from './hooks/useNotifications';
 
 // --------------- Status Icon ---------------
 
@@ -60,6 +62,7 @@ export default function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
   const [pendingTemplateContent, setPendingTemplateContent] = useState<string | null>(null);
+  const [costDashboardOpen, setCostDashboardOpen] = useState(false);
   const autoOpenedRef = useRef(false);
 
   // Panel visibility & resizable widths
@@ -275,6 +278,10 @@ export default function App() {
     ? (selectedInstance.worktreePath ?? selectedInstance.projectPath)
     : null;
 
+  // Notifications
+  const notificationConfig = useMemo(() => config?.notifications ?? { enabled: true, sound: false }, [config?.notifications]);
+  useNotifications(instances, notificationConfig, handleSelectInstance);
+
   // Prompt templates
   const {
     templates, createTemplate, updateTemplate, deleteTemplate,
@@ -301,6 +308,12 @@ export default function App() {
     onOpenCodeSearch: useCallback(() => setCodeSearchOpen(true), []),
     onOpenScanPaths: useCallback(() => setScanPathsOpen(true), []),
     onOpenTemplates: useCallback(() => setTemplatesModalOpen(true), []),
+    onOpenCostDashboard: useCallback(() => setCostDashboardOpen(true), []),
+    onToggleNotifications: useCallback(async () => {
+      const current = config?.notifications ?? { enabled: true, sound: false };
+      await updateConfig({ notifications: { ...current, enabled: !current.enabled } });
+    }, [config?.notifications, updateConfig]),
+    notificationsEnabled: config?.notifications?.enabled ?? true,
     onRefreshProjects: refreshProjects,
   });
 
@@ -323,6 +336,12 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === 't') {
         e.preventDefault();
         setTemplatesModalOpen(prev => !prev);
+        return;
+      }
+      // Cmd+Shift+A — cost & analytics
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
+        e.preventDefault();
+        setCostDashboardOpen(prev => !prev);
         return;
       }
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -646,6 +665,10 @@ export default function App() {
           onImport={importTemplates}
           onExport={exportTemplates}
         />
+      )}
+
+      {costDashboardOpen && (
+        <CostDashboard onClose={() => setCostDashboardOpen(false)} />
       )}
 
       {pendingDelete && (

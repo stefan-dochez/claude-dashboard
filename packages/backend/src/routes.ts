@@ -569,8 +569,9 @@ export function createRoutes(
   }));
 
   // Task history
-  router.get('/api/tasks/history', (_req, res) => {
-    res.json(taskStore.getHistory());
+  router.get('/api/tasks/history', (req, res) => {
+    const limit = parseInt(req.query.limit as string ?? '50', 10);
+    res.json(taskStore.getHistory(Math.min(limit, 500)));
   });
 
   router.delete('/api/tasks/:id', async (req, res) => {

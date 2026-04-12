@@ -8,6 +8,10 @@ interface AppConfig {
   scanDepth: number;
   port: number;
   maxInstances: number;
+  notifications: {
+    enabled: boolean;
+    sound: boolean;
+  };
 }
 
 export function useConfig() {

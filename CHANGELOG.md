@@ -2,6 +2,14 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.6.0]
+
+### Features
+
+- **System Notifications** — Native OS notifications when an instance transitions to `waiting_input` while the app is not in focus. Configurable via the command palette ("Enable/Disable Notifications"). Optional sound support. App badge count shows the number of instances waiting for input (via Web Badge API). Notification settings persisted in config.
+
+- **Cost & Analytics Dashboard** — Full analytics modal accessible via `Cmd+Shift+A` or command palette. Displays: summary cards (total cost, tokens, tasks, avg cost/task), cost over time area chart, cost by project bar chart, cost by model bar chart, input/output token pie chart, and a detailed model comparison table. Filterable by time range (7d/30d/90d/all). Powered by recharts.
+
 ## [0.5.7]
 
 ### Features

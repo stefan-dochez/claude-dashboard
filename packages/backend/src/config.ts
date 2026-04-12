@@ -34,6 +34,10 @@ interface AppConfig {
   maxInstances: number;
   favoriteProjects: string[];
   promptTemplates: PromptTemplate[];
+  notifications: {
+    enabled: boolean;
+    sound: boolean;
+  };
   statusPatterns: {
     waitingInput: string[];
   };
@@ -48,6 +52,10 @@ const DEFAULT_CONFIG: AppConfig = {
   metaProjects: [],
   favoriteProjects: [],
   promptTemplates: [],
+  notifications: {
+    enabled: true,
+    sound: false,
+  },
   projectMarkers: ['.git', 'CLAUDE.md', 'package.json', 'Cargo.toml', 'go.mod', 'pyproject.toml'],
   scanDepth: 3,
   port: 3200,

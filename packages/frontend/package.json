@@ -1,6 +1,6 @@
 {
   "name": "@claude-dashboard/frontend",
-  "version": "0.5.7",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,6 +19,7 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^16.1.1",
+    "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
     "socket.io-client": "^4.8.1"
   },

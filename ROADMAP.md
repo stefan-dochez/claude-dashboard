@@ -14,10 +14,10 @@
 - ~~Import/export de templates (partage en equipe)~~
 - ~~Historique des prompts les plus utilises avec auto-suggestion~~
 
-### 3. Notifications systeme
-- Notifications macOS/Windows quand une instance passe en `waiting_input` hors focus
-- Son optionnel (configurable) pour les evenements importants
-- Badge sur l'icone Electron avec le nombre d'instances en attente
+### 3. ~~Notifications systeme~~ (done — v0.6.0)
+- ~~Notifications macOS/Windows quand une instance passe en `waiting_input` hors focus~~
+- ~~Son optionnel (configurable) pour les evenements importants~~
+- ~~Badge sur l'icone Electron avec le nombre d'instances en attente~~
 - Integration Slack : envoyer un message quand une tache est terminee
 
 ### 4. Split terminal
@@ -26,11 +26,11 @@
 - Recherche dans le terminal (Cmd+F dans le buffer xterm)
 - Export de session : sauvegarder le contenu complet en `.md` ou `.txt`
 
-### 5. Dashboard de couts et analytics
-- Cout par jour/semaine/mois (graphique)
-- Cout par projet
-- Repartition input/output tokens
-- Comparaison Opus vs Sonnet vs Haiku (cout/efficacite)
+### 5. ~~Dashboard de couts et analytics~~ (done — v0.6.0)
+- ~~Cout par jour/semaine/mois (graphique)~~
+- ~~Cout par projet~~
+- ~~Repartition input/output tokens~~
+- ~~Comparaison Opus vs Sonnet vs Haiku (cout/efficacite)~~
 - Budget alert : notification si le cout journalier depasse un seuil
 
 ---

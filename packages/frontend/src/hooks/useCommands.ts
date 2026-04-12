@@ -3,6 +3,7 @@ import {
   PanelLeft, FolderOpen, Info, Terminal, FileCode2,
   GitPullRequest, Search, Settings, Play, XCircle,
   Star, RefreshCw, MessageSquare, LayoutTemplate,
+  TrendingUp, Bell,
 } from 'lucide-react';
 import type { Command } from '../components/CommandPalette';
 import type { Instance, Project } from '../types';
@@ -40,6 +41,9 @@ interface UseCommandsOptions {
   onOpenCodeSearch: () => void;
   onOpenScanPaths: () => void;
   onOpenTemplates: () => void;
+  onOpenCostDashboard: () => void;
+  onToggleNotifications: () => void;
+  notificationsEnabled: boolean;
 
   // Projects
   onRefreshProjects: () => void;
@@ -64,6 +68,9 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onOpenCodeSearch,
     onOpenScanPaths,
     onOpenTemplates,
+    onOpenCostDashboard,
+    onToggleNotifications,
+    notificationsEnabled,
     onRefreshProjects,
   } = options;
 
@@ -138,6 +145,29 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       shortcut: `${MOD}T`,
       keywords: ['template', 'prompt', 'reusable', 'snippet'],
       onExecute: onOpenTemplates,
+    });
+
+    commands.push({
+      id: 'cost-dashboard',
+      label: 'Cost & Analytics',
+      description: 'View cost and token usage',
+      category: 'action',
+      icon: TrendingUp,
+      iconColor: 'text-green-400',
+      shortcut: `${MOD}${SHIFT}A`,
+      keywords: ['cost', 'analytics', 'tokens', 'usage', 'money', 'spending', 'dashboard'],
+      onExecute: onOpenCostDashboard,
+    });
+
+    commands.push({
+      id: 'toggle-notifications',
+      label: notificationsEnabled ? 'Disable Notifications' : 'Enable Notifications',
+      description: 'System notifications when instances need input',
+      category: 'action',
+      icon: Bell,
+      iconColor: notificationsEnabled ? 'text-amber-400' : 'text-muted',
+      keywords: ['notification', 'alert', 'bell', 'sound', 'focus'],
+      onExecute: onToggleNotifications,
     });
 
     commands.push({
@@ -267,6 +297,8 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     projects, favoriteProjects, onLaunchProject,
     sidebarOpen, onToggleSidebar, rightPanel, onToggleFiles, onToggleContext,
     onSetTab, selectedInstance,
-    onOpenCodeSearch, onOpenScanPaths, onOpenTemplates, onRefreshProjects,
+    onOpenCodeSearch, onOpenScanPaths, onOpenTemplates,
+    onOpenCostDashboard, onToggleNotifications, notificationsEnabled,
+    onRefreshProjects,
   ]);
 }
