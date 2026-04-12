@@ -2,6 +2,13 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.6.4]
+
+### Fixes
+
+- **Hide File Explorer & Context Info buttons without instance** — The File Explorer (⌘E) and Context Info (⌘I) buttons in the topbar are now completely hidden when no instance is selected, instead of being shown as disabled. Keyboard shortcuts are still ignored and the right panel auto-closes when the instance is deselected.
+- **Restructure custom skills for proper discovery** — Moved skill files into subdirectories with `SKILL.md` naming convention for correct Claude Code discovery.
+
 ## [0.6.3]
 
 ### Fixes

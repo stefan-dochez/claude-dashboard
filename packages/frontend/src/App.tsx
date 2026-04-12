@@ -431,22 +431,24 @@ export default function App() {
           >
             <PanelLeft className="h-3.5 w-3.5" />
           </button>
-          <button
-            onClick={() => setRightPanel(prev => prev === 'files' ? null : 'files')}
-            disabled={!selectedInstance}
-            className={`rounded p-1 transition-colors ${!selectedInstance ? 'cursor-not-allowed opacity-30' : `hover:text-secondary ${rightPanel === 'files' ? 'text-tertiary' : 'text-faint'}`}`}
-            title="File explorer (⌘E)"
-          >
-            <FolderOpen className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => setRightPanel(prev => prev === 'context' ? null : 'context')}
-            disabled={!selectedInstance}
-            className={`rounded p-1 transition-colors ${!selectedInstance ? 'cursor-not-allowed opacity-30' : `hover:text-secondary ${rightPanel === 'context' ? 'text-tertiary' : 'text-faint'}`}`}
-            title="Context info (⌘I)"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </button>
+          {selectedInstance && (
+            <>
+              <button
+                onClick={() => setRightPanel(prev => prev === 'files' ? null : 'files')}
+                className={`rounded p-1 transition-colors hover:text-secondary ${rightPanel === 'files' ? 'text-tertiary' : 'text-faint'}`}
+                title="File explorer (⌘E)"
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setRightPanel(prev => prev === 'context' ? null : 'context')}
+                className={`rounded p-1 transition-colors hover:text-secondary ${rightPanel === 'context' ? 'text-tertiary' : 'text-faint'}`}
+                title="Context info (⌘I)"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
