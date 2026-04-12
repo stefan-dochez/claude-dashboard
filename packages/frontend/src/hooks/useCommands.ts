@@ -3,7 +3,7 @@ import {
   PanelLeft, FolderOpen, Info, Terminal, FileCode2,
   GitPullRequest, Search, Settings, Play, XCircle,
   Star, RefreshCw, MessageSquare, LayoutTemplate,
-  TrendingUp, Bell, BellRing,
+  TrendingUp, Bell,
 } from 'lucide-react';
 import type { Command } from '../components/CommandPalette';
 import type { Instance, Project } from '../types';
@@ -43,7 +43,6 @@ interface UseCommandsOptions {
   onOpenTemplates: () => void;
   onOpenCostDashboard: () => void;
   onToggleNotifications: () => void;
-  onTestNotification: () => void;
   notificationsEnabled: boolean;
 
   // Projects
@@ -71,7 +70,6 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onOpenTemplates,
     onOpenCostDashboard,
     onToggleNotifications,
-    onTestNotification,
     notificationsEnabled,
     onRefreshProjects,
   } = options;
@@ -170,17 +168,6 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       iconColor: notificationsEnabled ? 'text-amber-400' : 'text-muted',
       keywords: ['notification', 'alert', 'bell', 'sound', 'focus'],
       onExecute: onToggleNotifications,
-    });
-
-    commands.push({
-      id: 'test-notification',
-      label: 'Test Notification',
-      description: 'Send a test OS notification to verify setup',
-      category: 'action',
-      icon: BellRing,
-      iconColor: 'text-blue-400',
-      keywords: ['notification', 'test', 'bell', 'debug', 'verify'],
-      onExecute: onTestNotification,
     });
 
     commands.push({
@@ -311,7 +298,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     sidebarOpen, onToggleSidebar, rightPanel, onToggleFiles, onToggleContext,
     onSetTab, selectedInstance,
     onOpenCodeSearch, onOpenScanPaths, onOpenTemplates,
-    onOpenCostDashboard, onToggleNotifications, onTestNotification, notificationsEnabled,
+    onOpenCostDashboard, onToggleNotifications, notificationsEnabled,
     onRefreshProjects,
   ]);
 }

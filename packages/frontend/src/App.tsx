@@ -280,7 +280,7 @@ export default function App() {
 
   // Notifications
   const notificationConfig = useMemo(() => config?.notifications ?? { enabled: true, sound: false }, [config?.notifications]);
-  const { sendTestNotification } = useNotifications(instances, notificationConfig, handleSelectInstance);
+  useNotifications(instances, notificationConfig, handleSelectInstance);
 
   // Prompt templates
   const {
@@ -313,26 +313,6 @@ export default function App() {
       const current = config?.notifications ?? { enabled: true, sound: false };
       await updateConfig({ notifications: { ...current, enabled: !current.enabled } });
     }, [config?.notifications, updateConfig]),
-    onTestNotification: useCallback(async () => {
-      const result = await sendTestNotification();
-      switch (result.status) {
-        case 'sent':
-          addToast('success', 'Notification sent', 'If you don\'t see it, check macOS System Settings > Notifications > your browser');
-          break;
-        case 'unsupported':
-          addToast('error', 'Not supported', 'Web Notifications API is not available in this browser');
-          break;
-        case 'denied':
-          addToast('error', 'Permission denied', 'Notifications are blocked. Reset in browser settings (site permissions) or macOS System Settings > Notifications');
-          break;
-        case 'dismissed':
-          addToast('info', 'Permission dismissed', 'You dismissed the permission prompt. Try again and click "Allow"');
-          break;
-        case 'error':
-          addToast('error', 'Notification failed', result.message);
-          break;
-      }
-    }, [sendTestNotification, addToast]),
     notificationsEnabled: config?.notifications?.enabled ?? true,
     onRefreshProjects: refreshProjects,
   });
