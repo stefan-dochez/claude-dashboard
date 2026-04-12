@@ -256,6 +256,31 @@ export function createRoutes(
     res.json({ ok: true });
   }));
 
+  // Export terminal session as plain text
+  const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-Za-z]|\x1b[=>NOM78cDHZ#]|\x1b\[[?]?[0-9;]*[hlsr]/g;
+
+  router.get('/api/instances/:id/export', (req, res) => {
+    const { id } = req.params;
+    const format = (req.query.format as string) || 'txt';
+
+    const instance = processManager.get(id);
+    if (!instance) {
+      res.status(404).json({ error: `Instance ${id} not found` });
+      return;
+    }
+
+    const rawBuffer = processManager.getBuffer(id);
+    const cleanText = rawBuffer.replace(ANSI_RE, '');
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const safeName = instance.projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `${safeName}_${timestamp}.${format}`;
+
+    res.setHeader('Content-Type', format === 'md' ? 'text/markdown' : 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(cleanText);
+  });
+
   // Worktrees
   router.delete('/api/worktrees', asyncHandler(async (req, res) => {
     const { projectPath, worktreePath } = req.body as { projectPath?: string; worktreePath?: string };

@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.9.0]
+
+### Features
+
+- **Export terminal session** — Download button (top-left of terminal) exports the full PTY buffer as a `.txt` file with ANSI sequences stripped. Backend endpoint `GET /api/instances/:id/export?format=txt` serves the content as an attachment with a timestamped filename (e.g. `claude-dashboard_2026-04-12T21-07-55.txt`).
+
 ## [0.8.0]
 
 ### Features
