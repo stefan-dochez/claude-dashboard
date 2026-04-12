@@ -2,6 +2,14 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.5.5]
+
+### Features
+
+- **Command Palette (⌘K)** — VS Code-style command launcher accessible from anywhere via `Cmd+K` (or `Ctrl+K` on Windows/Linux). Fuzzy search across all available actions, active instances, and projects. Supports keyboard navigation (↑↓), instant execution (Enter), and displays keyboard shortcuts inline. Categories: Actions (toggle panels, switch tabs, open modals), Instances (switch to/kill running instances), Projects (quick launch in terminal or chat mode). Favorites appear first in project results.
+
+- **Roadmap** — Added `ROADMAP.md` documenting planned features for v0.6, v0.7+, and v1.0.
+
 ## [0.5.4]
 
 ### Fixes

@@ -13,6 +13,7 @@ import PullRequestView from './components/PullRequestView';
 import FileViewer from './components/FileViewer';
 import ResizeHandle from './components/ResizeHandle';
 import CodeSearchModal from './components/CodeSearchModal';
+import CommandPalette from './components/CommandPalette';
 import ScanPathsModal from './components/ScanPathsModal';
 import ToastContainer from './components/ToastContainer';
 import { useProjects } from './hooks/useProjects';
@@ -21,6 +22,7 @@ import { useConfig } from './hooks/useConfig';
 import { useAttentionQueue } from './hooks/useAttentionQueue';
 import { useSocketStatus } from './hooks/useSocket';
 import { useToasts } from './hooks/useToasts';
+import { useCommands } from './hooks/useCommands';
 
 // --------------- Status Icon ---------------
 
@@ -53,6 +55,7 @@ export default function App() {
   const { toasts, addToast, removeToast } = useToasts();
   const [scanPathsOpen, setScanPathsOpen] = useState(false);
   const [codeSearchOpen, setCodeSearchOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const autoOpenedRef = useRef(false);
 
   // Panel visibility & resizable widths
@@ -268,9 +271,37 @@ export default function App() {
     ? (selectedInstance.worktreePath ?? selectedInstance.projectPath)
     : null;
 
+  // Command palette
+  const commands = useCommands({
+    instances,
+    selectedInstanceId,
+    onSelectInstance: handleSelectInstance,
+    onKillInstance: handleKill,
+    projects,
+    favoriteProjects,
+    onLaunchProject: handleLaunch,
+    sidebarOpen,
+    onToggleSidebar: useCallback(() => setSidebarOpen(prev => !prev), []),
+    rightPanel,
+    onToggleFiles: useCallback(() => setRightPanel(prev => prev === 'files' ? null : 'files'), []),
+    onToggleContext: useCallback(() => setRightPanel(prev => prev === 'context' ? null : 'context'), []),
+    activeTab,
+    onSetTab: setActiveTab,
+    selectedInstance,
+    onOpenCodeSearch: useCallback(() => setCodeSearchOpen(true), []),
+    onOpenScanPaths: useCallback(() => setScanPathsOpen(true), []),
+    onRefreshProjects: refreshProjects,
+  });
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+K — command palette (works even from inputs)
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(prev => !prev);
+        return;
+      }
       // Cmd+Shift+F — code search (works even from inputs)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
@@ -553,6 +584,13 @@ export default function App() {
       </div>
 
       {/* Modals */}
+      {commandPaletteOpen && (
+        <CommandPalette
+          commands={commands}
+          onClose={() => setCommandPaletteOpen(false)}
+        />
+      )}
+
       {scanPathsOpen && (
         <ScanPathsModal
           scanPaths={config?.scanPaths ?? []}
