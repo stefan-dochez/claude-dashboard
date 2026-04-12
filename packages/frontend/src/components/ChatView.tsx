@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Loader2, ChevronDown,
   AlertCircle, AlertTriangle, Brain,
@@ -42,6 +42,23 @@ interface ChatViewProps {
   pendingTemplateContent?: string | null;
   onClearPendingTemplate?: () => void;
 }
+
+// --------------- Slash commands ---------------
+
+const SLASH_COMMANDS = [
+  { name: 'commit', description: 'Commit changes with a generated message' },
+  { name: 'review', description: 'Review code changes' },
+  { name: 'ship', description: 'Commit, push, and create a PR' },
+  { name: 'compact', description: 'Compact conversation context' },
+  { name: 'clear', description: 'Clear conversation history' },
+  { name: 'help', description: 'Show available commands' },
+  { name: 'bug', description: 'Report or investigate a bug' },
+  { name: 'test', description: 'Run or generate tests' },
+  { name: 'refactor', description: 'Refactor selected code' },
+  { name: 'explain', description: 'Explain code or concepts' },
+  { name: 'fix', description: 'Fix an error or issue' },
+  { name: 'docs', description: 'Generate documentation' },
+] as const;
 
 // --------------- Sub-components ---------------
 
@@ -335,6 +352,18 @@ export default function ChatView({
   const [mentionResults, setMentionResults] = useState<Array<{ label: string; insertText: string }>>([]);
   const [mentionIndex, setMentionIndex] = useState(0);
   const mentionSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Slash command autocomplete
+  const [slashActive, setSlashActive] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  const [slashIndex, setSlashIndex] = useState(0);
+  const slashResults = useMemo(() => {
+    if (!slashActive) return [];
+    const q = slashQuery.toLowerCase();
+    return SLASH_COMMANDS.filter(c =>
+      c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q),
+    );
+  }, [slashActive, slashQuery]);
 
   // Staleness recovery
   const stalenessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -738,6 +767,13 @@ export default function ChatView({
     setMentionQuery('');
   }, [input]);
 
+  const handleSlashSelect = useCallback((command: typeof SLASH_COMMANDS[number]) => {
+    setInput(`/${command.name} `);
+    setSlashActive(false);
+    setSlashQuery('');
+    textareaRef.current?.focus();
+  }, []);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // @-mention keyboard navigation
     if (mentionActive && mentionResults.length > 0) {
@@ -750,11 +786,22 @@ export default function ChatView({
       }
       if (e.key === 'Escape') { e.preventDefault(); setMentionActive(false); setMentionQuery(''); return; }
     }
+    // Slash command keyboard navigation
+    if (slashActive && slashResults.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIndex(prev => Math.min(prev + 1, slashResults.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIndex(prev => Math.max(prev - 1, 0)); return; }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault();
+        handleSlashSelect(slashResults[slashIndex]);
+        return;
+      }
+      if (e.key === 'Escape') { e.preventDefault(); setSlashActive(false); setSlashQuery(''); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  }, [handleSend, mentionActive, mentionResults, mentionIndex, handleMentionSelect]);
+  }, [handleSend, mentionActive, mentionResults, mentionIndex, handleMentionSelect, slashActive, slashResults, slashIndex, handleSlashSelect]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -764,6 +811,21 @@ export default function ChatView({
     ta.style.height = 'auto';
     ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
     if (onTypingChange) onTypingChange(val.length > 0);
+
+    // Slash command detection — only when / is the first character
+    if (val.startsWith('/')) {
+      const query = val.slice(1).split(/\s/)[0]; // extract command name (before first space)
+      if (!val.includes(' ')) {
+        setSlashActive(true);
+        setSlashQuery(query);
+        setSlashIndex(0);
+      } else {
+        setSlashActive(false);
+      }
+    } else {
+      setSlashActive(false);
+      setSlashQuery('');
+    }
 
     // @-mention detection
     const cursorPos = e.target.selectionStart;
@@ -990,6 +1052,28 @@ export default function ChatView({
                       >
                         <FileText className="h-3 w-3 shrink-0 text-blue-400" />
                         <span className="min-w-0 truncate">{result.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Slash command dropdown */}
+            {slashActive && slashResults.length > 0 && (
+              <div className="absolute bottom-full left-4 right-4 z-20 mb-1">
+                <div className="overflow-hidden rounded-xl border border-border-input bg-popover shadow-xl">
+                  <div className="max-h-48 overflow-y-auto py-1">
+                    {slashResults.map((cmd, i) => (
+                      <button
+                        key={cmd.name}
+                        onMouseDown={e => { e.preventDefault(); handleSlashSelect(cmd); }}
+                        className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[12px] transition-colors ${
+                          i === slashIndex ? 'bg-elevated text-primary' : 'text-tertiary hover:bg-hover'
+                        }`}
+                      >
+                        <span className="shrink-0 font-mono text-violet-400">/{cmd.name}</span>
+                        <span className="min-w-0 truncate text-muted">{cmd.description}</span>
                       </button>
                     ))}
                   </div>

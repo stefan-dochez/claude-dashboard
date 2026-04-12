@@ -40,10 +40,10 @@
 ### ChatView
 - Branching de conversation (revenir en arriere, re-prompter)
 - Favoris/bookmarks sur des messages specifiques
-- Copier des blocs de code en un clic
+- ~~Copier des blocs de code en un clic~~ (done — v0.6.1)
 - Image support : drag & drop screenshots (vision API)
 - Resume automatique des longues conversations
-- **Execution de skills via le chat** : permettre de lancer des slash commands (`/commit`, `/review-pr`, `/ship`, etc.) directement depuis l'input du chat. Autocompletion des skills disponibles avec `/`, description inline, et execution transparente comme si on etait dans le terminal Claude Code
+- ~~**Execution de skills via le chat**~~ (done — v0.6.1) : ~~permettre de lancer des slash commands (`/commit`, `/review-pr`, `/ship`, etc.) directement depuis l'input du chat. Autocompletion des skills disponibles avec `/`, description inline, et execution transparente comme si on etait dans le terminal Claude Code~~
 
 ### Git workflow
 - Auto-commit intelligent (detection fin de travail Claude + message genere)

@@ -1,7 +1,29 @@
+import { useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Copy, Check } from 'lucide-react';
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, [text]);
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="absolute right-2 top-2 rounded-md bg-elevated/80 p-1 text-faint opacity-0 transition-opacity hover:text-secondary group-hover/code:opacity-100"
+      aria-label="Copy code"
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
 
 export default function MarkdownText({ text }: { text: string }) {
   return (
@@ -14,14 +36,17 @@ export default function MarkdownText({ text }: { text: string }) {
             const code = String(children).replace(/\n$/, '');
             if (match) {
               return (
-                <SyntaxHighlighter
-                  style={oneDark}
-                  language={match[1]}
-                  PreTag="div"
-                  customStyle={{ margin: '0.5rem 0', borderRadius: '0.5rem', fontSize: '0.8rem', background: 'var(--bg-codeblock)' }}
-                >
-                  {code}
-                </SyntaxHighlighter>
+                <div className="group/code relative">
+                  <CopyButton text={code} />
+                  <SyntaxHighlighter
+                    style={oneDark}
+                    language={match[1]}
+                    PreTag="div"
+                    customStyle={{ margin: '0.5rem 0', borderRadius: '0.5rem', fontSize: '0.8rem', background: 'var(--bg-codeblock)' }}
+                  >
+                    {code}
+                  </SyntaxHighlighter>
+                </div>
               );
             }
             return (

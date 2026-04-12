@@ -2,6 +2,14 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.6.1]
+
+### Features
+
+- **Copy code blocks** — Hover any syntax-highlighted code block in chat to reveal a copy button (top-right corner). Copies the raw code to clipboard with a brief checkmark confirmation.
+
+- **Slash command autocomplete** — Type `/` at the start of the chat input to see a dropdown of available Claude Code skills (`/commit`, `/ship`, `/review`, `/test`, `/fix`, etc.) with descriptions. Navigate with arrow keys, Tab/Enter to select. Commands are sent directly to the Claude SDK which handles them natively.
+
 ## [0.6.0]
 
 ### Features
