@@ -88,5 +88,55 @@ export function useNotifications(
     }
   }, [waitingCount]);
 
-  return { permission, requestPermission };
+  // Fire a test notification on demand (bypasses focus and instance checks)
+  // Returns a diagnostic result so the caller can display feedback
+  const sendTestNotification = useCallback(async (): Promise<
+    { status: 'sent' } |
+    { status: 'unsupported' } |
+    { status: 'denied' } |
+    { status: 'dismissed' } |
+    { status: 'error'; message: string }
+  > => {
+    if (typeof Notification === 'undefined') {
+      return { status: 'unsupported' };
+    }
+
+    let currentPermission = Notification.permission;
+
+    // Request permission if not yet decided
+    if (currentPermission === 'default') {
+      try {
+        currentPermission = await Notification.requestPermission();
+        setPermission(currentPermission);
+      } catch (err) {
+        return { status: 'error', message: err instanceof Error ? err.message : 'Permission request failed' };
+      }
+    }
+
+    if (currentPermission === 'denied') {
+      return { status: 'denied' };
+    }
+
+    if (currentPermission !== 'granted') {
+      return { status: 'dismissed' };
+    }
+
+    try {
+      const notification = new Notification('Claude Dashboard', {
+        body: 'Notifications are working!',
+        icon: '/favicon.svg',
+        tag: 'test-notification',
+        silent: !config?.sound,
+      });
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+      return { status: 'sent' };
+    } catch (err) {
+      return { status: 'error', message: err instanceof Error ? err.message : 'Failed to create notification' };
+    }
+  }, [config?.sound]);
+
+  return { permission, requestPermission, sendTestNotification };
 }
