@@ -1,12 +1,12 @@
 # Claude Dashboard — Roadmap
 
-## v0.6 (Prochaines priorites)
+## v0.5–v0.11 (Complete)
 
-### 1. Command Palette (Cmd+K)
-- Launcher universel a la VS Code
-- Recherche fuzzy : fichiers, instances, projets, commandes, raccourcis
-- Actions rapides : lancer instance, kill, switch tab, toggle panels
-- Extensible : chaque composant peut enregistrer ses propres commandes
+### 1. ~~Command Palette (Cmd+K)~~ (done — v0.5.5)
+- ~~Launcher universel a la VS Code~~
+- ~~Recherche fuzzy : fichiers, instances, projets, commandes, raccourcis~~
+- ~~Actions rapides : lancer instance, kill, switch tab, toggle panels~~
+- ~~Extensible : chaque composant peut enregistrer ses propres commandes~~
 
 ### 2. ~~Templates de prompts reutilisables~~ (done — v0.5.6)
 - ~~Bibliotheque de prompts sauvegardes par projet ou globalement~~
@@ -18,24 +18,28 @@
 - ~~Notifications macOS/Windows quand une instance passe en `waiting_input` hors focus~~
 - ~~Son optionnel (configurable) pour les evenements importants~~
 - ~~Badge sur l'icone Electron avec le nombre d'instances en attente~~
-- Integration Slack : envoyer un message quand une tache est terminee
+- ~~Integration Slack : envoyer un message quand une tache est terminee~~ → deplace en v0.12+
 
-### 4. Split terminal
-- Afficher 2-4 instances cote a cote (grid layout)
-- Broadcast mode : envoyer le meme input a plusieurs instances simultanement
-- Recherche dans le terminal (Cmd+F dans le buffer xterm)
-- Export de session : sauvegarder le contenu complet en `.md` ou `.txt`
+### 4. ~~Split terminal~~ (done — v0.8.0–v0.11.0)
+- ~~Afficher 2-4 instances cote a cote (grid layout)~~
+- ~~Broadcast mode : envoyer le meme input a plusieurs instances simultanement~~
+- ~~Recherche dans le terminal (Cmd+F dans le buffer xterm)~~
+- ~~Export de session : sauvegarder le contenu complet en `.md` ou `.txt`~~
 
 ### 5. ~~Dashboard de couts et analytics~~ (done — v0.6.0)
 - ~~Cout par jour/semaine/mois (graphique)~~
 - ~~Cout par projet~~
 - ~~Repartition input/output tokens~~
 - ~~Comparaison Opus vs Sonnet vs Haiku (cout/efficacite)~~
-- Budget alert : notification si le cout journalier depasse un seuil
+- ~~Budget alert : notification si le cout journalier depasse un seuil~~ → deplace en v0.12+
 
 ---
 
-## v0.7+ (Ameliorations de l'existant)
+## v0.12+ (Prochaines priorites)
+
+### Restes de v0.5–v0.11
+- Integration Slack : envoyer un message quand une tache est terminee
+- Budget alert : notification si le cout journalier depasse un seuil
 
 ### ChatView
 - Branching de conversation (revenir en arriere, re-prompter)
@@ -98,12 +102,12 @@
 
 | Amelioration | Effort | Impact |
 |---|---|---|
-| Dark/Light theme toggle | Faible | Moyen |
+| ~~Dark/Light theme toggle~~ (done — v0.7.0) | Faible | Moyen |
 | Drag & drop pour reordonner les favoris | Faible | Faible |
 | Indicateur de sante des instances (CPU/RAM via pidusage) | Faible | Moyen |
-| Auto-scroll lock/unlock dans le terminal | Faible | Moyen |
+| ~~Auto-scroll lock/unlock dans le terminal~~ (done — v0.7.0) | Faible | Moyen |
 | Zoom in/out sur le terminal (font size) | Faible | Faible |
-| Persistence des onglets ouverts entre sessions | Faible | Moyen |
-| Raccourci Cmd+W pour fermer une instance | Faible | Faible |
+| ~~Persistence des onglets ouverts entre sessions~~ (done — v0.7.0) | Faible | Moyen |
+| ~~Raccourci Cmd+W pour fermer une instance~~ (done — v0.7.0) | Faible | Faible |
 | Status bar en bas (connexion, instances actives, cout cumule) | Moyen | Eleve |
 | Accessibilite : aria-labels complets, navigation clavier | Moyen | Moyen |
