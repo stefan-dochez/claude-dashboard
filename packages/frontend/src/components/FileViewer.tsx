@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, X, Loader2, MessageSquare } from 'lucide-react';
+import { FileText, X, Loader2, MessageSquare, Code, BookOpen } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { detectLanguage } from '../utils/fileUtils';
 
 interface FileViewerProps {
@@ -16,6 +18,7 @@ export default function FileViewer({ filePath, onClose, onSendToChat }: FileView
   const [error, setError] = useState<string | null>(null);
   const [size, setSize] = useState(0);
   const [selectionInfo, setSelectionInfo] = useState<{ startLine: number; endLine: number; text: string } | null>(null);
+  const [showSource, setShowSource] = useState(false);
 
   const handleMouseUp = useCallback(() => {
     const selection = window.getSelection();
@@ -42,6 +45,7 @@ export default function FileViewer({ filePath, onClose, onSendToChat }: FileView
 
   const fileName = filePath.split('/').pop() ?? filePath;
   const language = detectLanguage(filePath);
+  const isMarkdown = language === 'markdown';
 
   useEffect(() => {
     setLoading(true);
@@ -74,6 +78,16 @@ export default function FileViewer({ filePath, onClose, onSendToChat }: FileView
         {size > 0 && (
           <span className="text-[10px] text-faint">{(size / 1024).toFixed(1)}KB</span>
         )}
+        {isMarkdown && (
+          <button
+            onClick={() => setShowSource(s => !s)}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-faint transition-colors hover:bg-elevated hover:text-secondary"
+            title={showSource ? 'Show rendered' : 'Show source'}
+          >
+            {showSource ? <BookOpen className="h-3 w-3" /> : <Code className="h-3 w-3" />}
+            {showSource ? 'Preview' : 'Source'}
+          </button>
+        )}
         {selectionInfo && onSendToChat && (
           <button
             onClick={() => {
@@ -105,6 +119,32 @@ export default function FileViewer({ filePath, onClose, onSendToChat }: FileView
         ) : error ? (
           <div className="flex h-full items-center justify-center text-xs text-red-400">
             {error}
+          </div>
+        ) : content !== null && isMarkdown && !showSource ? (
+          <div className="prose-dark p-4 text-[13px] leading-relaxed text-secondary">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code({ className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className ?? '');
+                  const inline = !className;
+                  return inline ? (
+                    <code className="rounded bg-[#1e1e2e] px-1.5 py-0.5 text-[12px] text-orange-300" {...props}>{children}</code>
+                  ) : (
+                    <SyntaxHighlighter
+                      language={match?.[1] ?? 'text'}
+                      style={oneDark}
+                      customStyle={{ margin: 0, padding: '0.75rem', background: '#1e1e2e', fontSize: '0.75rem', borderRadius: '0.375rem' }}
+                      codeTagProps={{ style: { background: 'none' } }}
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  );
+                },
+              }}
+            >
+              {content}
+            </ReactMarkdown>
           </div>
         ) : content !== null && language ? (
           <SyntaxHighlighter

@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.11.1]
+
+### Fixes
+
+- **Markdown file rendering** — FileViewer now renders `.md` files as formatted HTML (headings, tables, lists, code blocks with syntax highlighting) instead of displaying raw source. Uses `react-markdown` + `remark-gfm` for GFM table support. A Source/Preview toggle in the header lets users switch between rendered and raw views.
+
 ## [0.11.0]
 
 ### Features
