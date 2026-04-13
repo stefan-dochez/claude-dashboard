@@ -29,6 +29,7 @@ import { useToasts } from './hooks/useToasts';
 import { useCommands } from './hooks/useCommands';
 import { usePromptTemplates } from './hooks/usePromptTemplates';
 import { useNotifications } from './hooks/useNotifications';
+import { useIde } from './hooks/useIde';
 
 // --------------- Status Icon ---------------
 
@@ -61,6 +62,7 @@ export default function App() {
   });
   const [typingLocked, setTypingLocked] = useState(false);
   const { toasts, addToast, removeToast } = useToasts();
+  const { installedIdes, openInIde } = useIde();
   const [scanPathsOpen, setScanPathsOpen] = useState(false);
   const [codeSearchOpen, setCodeSearchOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -333,6 +335,21 @@ export default function App() {
     }
   }, [refreshProjects, addToast]);
 
+  const handleOpenInIde = useCallback(async (projectPath: string) => {
+    if (installedIdes.length === 0) {
+      addToast('error', 'No IDE found', 'No supported IDE detected on your system');
+      return;
+    }
+    const name = projectPath.split('/').pop() ?? projectPath;
+    try {
+      const result = await openInIde(projectPath);
+      const ideName = installedIdes.find(i => i.id === result.ide)?.name ?? result.ide;
+      addToast('success', `Opened in ${ideName}`, name);
+    } catch (err) {
+      addToast('error', 'Failed to open in IDE', err instanceof Error ? err.message : 'Unknown error');
+    }
+  }, [installedIdes, openInIde, addToast]);
+
   const selectedInstance = instances.find(i => i.id === selectedInstanceId);
 
   const instanceProjectPath = selectedInstance
@@ -577,6 +594,8 @@ export default function App() {
           onPullProject={handlePullProject}
           onPullAll={handlePullAll}
           onCheckoutDefault={handleCheckoutDefault}
+          onOpenInIde={handleOpenInIde}
+          installedIdes={installedIdes}
           onOpenScanPaths={() => setScanPathsOpen(true)}
           collapsed={!sidebarOpen}
           onExpand={() => setSidebarOpen(true)}

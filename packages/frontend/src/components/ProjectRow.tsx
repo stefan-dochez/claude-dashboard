@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, GitBranch, Play, Star, Trash2, Terminal, MessageSquare, X, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitBranch, Play, Star, Trash2, Terminal, MessageSquare, X, Layers, Code2 } from 'lucide-react';
 import LaunchModal from './LaunchModal';
 import { useSidebarActions } from '../hooks/useSidebarActions';
 import { STATUS_DOT, STATUS_LABEL } from '../constants';
@@ -16,6 +16,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
     instancesByProject, selectedInstanceId, favoriteProjects,
     onSelectInstance, onKillInstance, onDismissInstance, onLaunch,
     onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects,
+    onOpenInIde, installedIdes,
   } = useSidebarActions();
 
   const instances = instancesByProject.get(project.path) ?? [];
@@ -32,7 +33,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
 
   return (
     <>
-      <div className={`group/row flex cursor-default items-center gap-1 rounded-lg px-1.5 py-1 transition-colors hover:bg-elevated/50 ${project.type === 'monorepo' ? 'border-l-2 border-violet-500/50' : project.type === 'workspace' ? 'border-l-2 border-cyan-500/50' : ''}`} onClick={() => setLaunchModalOpen(true)}>
+      <div className={`group/row relative flex cursor-default items-center gap-1 rounded-lg px-1.5 py-1 transition-colors hover:bg-elevated/50 ${project.type === 'monorepo' ? 'border-l-2 border-violet-500/50' : project.type === 'workspace' ? 'border-l-2 border-cyan-500/50' : ''}`} onClick={() => setLaunchModalOpen(true)}>
         {hasActivity ? (
           <span
             onClick={e => { e.stopPropagation(); setExpanded(!expanded); }}
@@ -63,7 +64,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
           <span className="text-[10px] text-faint">{worktrees.length} wt</span>
         )}
 
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100">
+        <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-elevated/80 px-0.5 opacity-0 transition-opacity group-hover/row:opacity-100">
           {!hasActivity && (
             <>
               {project.type === 'repo' && (
@@ -91,6 +92,18 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
               >
                 <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
               </span>
+              {installedIdes.length > 0 && (
+                <span
+                  onClick={e => {
+                    e.stopPropagation();
+                    onOpenInIde(project.path);
+                  }}
+                  className="rounded p-0.5 text-faint transition-colors hover:text-cyan-400"
+                  title="Open in IDE"
+                >
+                  <Code2 className="h-3 w-3" />
+                </span>
+              )}
             </>
           )}
           <span

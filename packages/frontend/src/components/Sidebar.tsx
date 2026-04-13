@@ -48,6 +48,8 @@ interface SidebarProps {
   onPullProject: (projectPath: string) => void;
   onPullAll: () => void;
   onCheckoutDefault: (projectPath: string) => void;
+  onOpenInIde: (projectPath: string) => void;
+  installedIdes: Array<{ id: string; name: string; installed: boolean }>;
   onOpenScanPaths: () => void;
   collapsed: boolean;
   onExpand: () => void;
@@ -60,7 +62,9 @@ export default function Sidebar({
   projects, projectsLoading, projectsRefreshing, instances, selectedInstanceId,
   scanPaths, favoriteProjects, pullingProjects: _pullingProjects, checkingOutProjects: _checkingOutProjects, pullingAll, queuedIds: _queuedIds,
   onRefreshProjects, onLaunchProject, onSelectInstance, onKillInstance, onDismissInstance,
-  onDeleteWorktree, onToggleFavorite, onToggleMeta, onPullProject: _onPullProject, onPullAll, onCheckoutDefault: _onCheckoutDefault, onOpenScanPaths,
+  onDeleteWorktree, onToggleFavorite, onToggleMeta, onPullProject: _onPullProject, onPullAll, onCheckoutDefault: _onCheckoutDefault,
+  onOpenInIde, installedIdes,
+  onOpenScanPaths,
   collapsed, onExpand: _onExpand, width = 320,
 }: SidebarProps) {
   const [filter, setFilter] = useState('');
@@ -205,11 +209,13 @@ export default function Sidebar({
     onDeleteWorktree,
     onToggleFavorite,
     onToggleMeta,
+    onOpenInIde,
+    installedIdes,
     onRefreshProjects,
     selectedInstanceId,
     favoriteProjects,
     instancesByProject,
-  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject]);
+  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject]);
 
   const renderProject = useCallback((project: Project) => (
     <ProjectRow

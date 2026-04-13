@@ -1,6 +1,12 @@
 import { createContext } from 'react';
 import type { Instance } from '../types';
 
+interface IdeInfo {
+  id: string;
+  name: string;
+  installed: boolean;
+}
+
 interface SidebarActions {
   onSelectInstance: (id: string) => void;
   onKillInstance: (id: string, deleteWorktree?: boolean) => void;
@@ -9,6 +15,8 @@ interface SidebarActions {
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
   onToggleMeta: (projectPath: string) => void;
+  onOpenInIde: (projectPath: string) => void;
+  installedIdes: IdeInfo[];
   onRefreshProjects: () => void;
   selectedInstanceId: string | null;
   favoriteProjects: Set<string>;

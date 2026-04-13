@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useContext, createContext } from 'react';
-import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star, Download, RotateCcw, Box } from 'lucide-react';
+import { Play, GitBranch, FileText, Search, FolderGit2, Loader2, Folder, ChevronDown, ChevronRight, Trash2, Layers, List, FolderTree, Star, Download, RotateCcw, Box, Code2 } from 'lucide-react';
 import type { Project, Instance } from '../types';
 import LaunchModal from './LaunchModal';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -119,6 +119,7 @@ interface ProjectTreeContextValue {
   onToggleFavorite: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
   onCheckoutDefault: (projectPath: string) => void;
+  onOpenInIde: (projectPath: string) => void;
 }
 
 const ProjectTreeContext = createContext<ProjectTreeContextValue | null>(null);
@@ -145,10 +146,11 @@ interface ProjectListProps {
   onToggleFavorite: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
   onCheckoutDefault: (projectPath: string) => void;
+  onOpenInIde: (projectPath: string) => void;
   onRefreshProjects: () => void;
 }
 
-export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, favoriteProjects, pullingProjects, checkingOutProjects, onLaunch, onDeleteWorktree, onToggleFavorite, onPullProject, onCheckoutDefault, onRefreshProjects }: ProjectListProps) {
+export default function ProjectList({ projects, instances, loading, scanPaths, selectedRoot, favoriteProjects, pullingProjects, checkingOutProjects, onLaunch, onDeleteWorktree, onToggleFavorite, onPullProject, onCheckoutDefault, onOpenInIde, onRefreshProjects }: ProjectListProps) {
   const [filter, setFilter] = useState('');
   const [viewMode, setViewMode] = useState<'tree' | 'flat'>('tree');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -295,7 +297,8 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
     onToggleFavorite: onToggleFavorite,
     onPullProject: onPullProject,
     onCheckoutDefault: onCheckoutDefault,
-  }), [expandedProjects, activeProjectPaths, launching, worktreesByParent, favoriteProjects, pullingProjects, checkingOutProjects, toggleProjectWorktrees, handleDirectLaunch, requestDeleteWorktree, onToggleFavorite, onPullProject, onCheckoutDefault]);
+    onOpenInIde: onOpenInIde,
+  }), [expandedProjects, activeProjectPaths, launching, worktreesByParent, favoriteProjects, pullingProjects, checkingOutProjects, toggleProjectWorktrees, handleDirectLaunch, requestDeleteWorktree, onToggleFavorite, onPullProject, onCheckoutDefault, onOpenInIde]);
 
   return (
     <ProjectTreeContext.Provider value={contextValue}>
@@ -352,6 +355,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   onToggleFavorite={() => onToggleFavorite(project.path)}
                   onPull={() => onPullProject(project.path)}
                   onCheckoutDefault={() => onCheckoutDefault(project.path)}
+                  onOpenInIde={() => onOpenInIde(project.path)}
                 />
               );
             })}
@@ -385,6 +389,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   onToggleFavorite={() => onToggleFavorite(project.path)}
                   onPull={() => onPullProject(project.path)}
                   onCheckoutDefault={() => onCheckoutDefault(project.path)}
+                  onOpenInIde={() => onOpenInIde(project.path)}
                 />
               );
             })}
@@ -421,6 +426,7 @@ export default function ProjectList({ projects, instances, loading, scanPaths, s
                   onToggleFavorite={() => onToggleFavorite(project.path)}
                   onPull={() => onPullProject(project.path)}
                   onCheckoutDefault={() => onCheckoutDefault(project.path)}
+                  onOpenInIde={() => onOpenInIde(project.path)}
                 />
               ))}
               <div className="mx-2 my-1 border-t border-border-default" />
@@ -539,6 +545,7 @@ function TreeNodeList({
             onToggleFavorite={() => ctx.onToggleFavorite(node.project.path)}
             onPull={() => ctx.onPullProject(node.project.path)}
             onCheckoutDefault={() => ctx.onCheckoutDefault(node.project.path)}
+            onOpenInIde={() => ctx.onOpenInIde(node.project.path)}
           />
         );
       })}
@@ -602,6 +609,7 @@ function ProjectRow({
   onToggleFavorite,
   onPull,
   onCheckoutDefault,
+  onOpenInIde,
 }: {
   project: Project;
   worktrees: Project[];
@@ -620,6 +628,7 @@ function ProjectRow({
   onToggleFavorite?: () => void;
   onPull?: () => void;
   onCheckoutDefault?: () => void;
+  onOpenInIde?: () => void;
 }) {
   const MAIN_BRANCHES = ['main', 'master', 'develop'];
   const isOnNonMainBranch = project.gitBranch && !project.isWorktree && !MAIN_BRANCHES.includes(project.gitBranch);
@@ -744,6 +753,19 @@ function ProjectRow({
               aria-label="Delete worktree"
             >
               <Trash2 className="h-3 w-3" />
+            </button>
+          )}
+          {onOpenInIde && (
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                onOpenInIde();
+              }}
+              className="shrink-0 rounded p-1 text-faint transition-colors hover:bg-hover hover:text-cyan-400"
+              title="Open in IDE"
+              aria-label="Open in IDE"
+            >
+              <Code2 className="h-3 w-3" />
             </button>
           )}
           <button

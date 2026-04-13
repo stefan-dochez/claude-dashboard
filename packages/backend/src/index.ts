@@ -15,6 +15,7 @@ import { TaskStore } from './task-store.js';
 import { createRoutes } from './routes.js';
 import { setupSocketHandlers } from './socket.js';
 import { setupStreamSocketHandlers } from './stream-socket.js';
+import { IdeService } from './ide-service.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('server');
@@ -49,6 +50,7 @@ async function main(): Promise<void> {
   const taskStore = new TaskStore();
   await taskStore.load();
   const streamProcess = new StreamProcessManager(config);
+  const ideService = new IdeService();
   const appVersion = await readVersion();
   log.info(`Version: ${appVersion}`);
 
@@ -72,7 +74,7 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Routes
-  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion);
+  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService);
   app.use(routes);
 
   // In production, serve the frontend static files

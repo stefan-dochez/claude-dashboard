@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.12.0]
+
+### Features
+
+- **Open in IDE** — Click the code icon (`</>`) on any project in the sidebar to open it in the appropriate IDE. Auto-detects the best IDE based on project files: `.sln`/`.csproj` → Rider, `package.json`/`tsconfig.json`/`angular.json` → WebStorm, fallback → VS Code. Backend service handles IDE detection (CLI path, macOS `mdfind`, Windows `where`), with a 1-minute detection cache. Cross-platform support (macOS, Windows, Linux).
+
 ## [0.11.1]
 
 ### Fixes

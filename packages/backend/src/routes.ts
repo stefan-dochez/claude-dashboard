@@ -12,6 +12,7 @@ import type { ProcessManager } from './process-manager.js';
 import type { StreamProcessManager } from './stream-process.js';
 import type { WorktreeManager } from './worktree-manager.js';
 import type { TaskStore } from './task-store.js';
+import type { IdeService, IdeType } from './ide-service.js';
 import { TIMEOUTS, LIMITS } from './constants.js';
 import { createLogger } from './logger.js';
 
@@ -57,6 +58,7 @@ export function createRoutes(
   worktreeManager: WorktreeManager,
   taskStore: TaskStore,
   appVersion: string,
+  ideService: IdeService,
 ): Router {
   const router = Router();
 
@@ -75,6 +77,23 @@ export function createRoutes(
   router.get('/api/platform', (_req, res) => {
     res.json({ homePath: os.homedir(), platform: process.platform });
   });
+
+  // IDE — detect installed IDEs
+  router.get('/api/ide/detect', asyncHandler(async (_req, res) => {
+    const ides = await ideService.detect();
+    res.json(ides);
+  }));
+
+  // IDE — open project in IDE (auto-detects best IDE if not specified)
+  router.post('/api/ide/open', asyncHandler(async (req, res) => {
+    const { projectPath, ide } = req.body as { projectPath?: string; ide?: string };
+    if (!projectPath) {
+      res.status(400).json({ error: 'projectPath is required' });
+      return;
+    }
+    const result = await ideService.open(projectPath, ide as IdeType | undefined);
+    res.json({ ok: true, ide: result.ide });
+  }));
 
   // Config
   router.get('/api/config', asyncHandler(async (_req, res) => {
