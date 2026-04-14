@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.1]
+
+### Fixes
+
+- **Session titles without API key** — Title generation now uses the `claude` CLI (`claude -p --model haiku`) instead of the Anthropic SDK, leveraging the existing OAuth authentication. No `ANTHROPIC_API_KEY` needed. Removed the API key check from the health report.
+
 ## [0.14.0]
 
 ### Features

@@ -68,14 +68,6 @@ async function checkGhAuth(): Promise<DependencyStatus> {
   }
 }
 
-function checkEnvVar(name: string, label: string, hint: string): DependencyStatus {
-  const value = process.env[name];
-  if (value) {
-    return { name: label, ok: true, version: null, detail: 'set' };
-  }
-  return { name: label, ok: false, version: null, detail: hint };
-}
-
 export async function runHealthCheck(): Promise<HealthReport> {
   const deps = await Promise.all([
     checkBinary('git', ['--version'], s => s.replace('git version ', '')),
@@ -86,10 +78,6 @@ export async function runHealthCheck(): Promise<HealthReport> {
     }),
     checkGhAuth(),
   ]);
-
-  deps.push(
-    checkEnvVar('ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY', 'not set — session titles will be disabled'),
-  );
 
   const ok = deps.every(d => d.ok);
 
