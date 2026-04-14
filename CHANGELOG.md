@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.12.1]
+
+### Fixes
+
+- **Terminal links opening about:blank** — Clicking URLs in the xterm.js terminal opened an empty `about:blank` tab instead of the actual URL. The default WebLinksAddon handler uses `window.open()` then assigns `location.href`, which modern browsers block. Replaced with a direct `window.open(uri, '_blank', 'noopener')` call.
+
 ## [0.12.0]
 
 ### Features

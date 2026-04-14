@@ -61,7 +61,9 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
     });
 
     const fitAddon = new FitAddon();
-    const webLinksAddon = new WebLinksAddon();
+    const webLinksAddon = new WebLinksAddon((_event, uri) => {
+      window.open(uri, '_blank', 'noopener');
+    });
     const searchAddon = new SearchAddon();
 
     term.loadAddon(fitAddon);
