@@ -103,10 +103,13 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
     let outputEnabled = false;
     let attached = false;
 
-    // Detect user scrolling: disable auto-scroll when scrolled up, re-enable at bottom
+    // Detect user scrolling: disable auto-scroll when scrolled up, re-enable at bottom.
+    // Scroll events triggered by term.write() are suppressed so they don't
+    // accidentally re-enable auto-scroll while the user is reading history.
     const viewport = containerRef.current?.querySelector('.xterm-viewport');
+    let suppressScrollHandler = false;
     const onScroll = () => {
-      if (!viewport) return;
+      if (!viewport || suppressScrollHandler) return;
       const atBottom = viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 5;
       autoScrollRef.current = atBottom;
       setAutoScroll(atBottom);
@@ -115,9 +118,21 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
 
     const onOutput = ({ instanceId: id, data }: { instanceId: string; data: string }) => {
       if (id === currentInstanceId && outputEnabled) {
-        term.write(data);
         if (autoScrollRef.current) {
+          term.write(data);
           term.scrollToBottom();
+        } else {
+          // Preserve the user's scroll position while new output is written
+          suppressScrollHandler = true;
+          const savedScrollTop = viewport?.scrollTop ?? 0;
+          term.write(data, () => {
+            if (viewport) {
+              viewport.scrollTop = savedScrollTop;
+            }
+            requestAnimationFrame(() => {
+              suppressScrollHandler = false;
+            });
+          });
         }
       }
     };

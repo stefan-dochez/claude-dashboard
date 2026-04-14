@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.12.2]
+
+### Fixes
+
+- **Scroll position lost during terminal output** — When the terminal was actively writing, scrolling up was impossible because xterm's internal scroll-to-bottom on `write()` triggered the scroll handler, re-enabling auto-scroll. Now scroll events are suppressed during writes when auto-scroll is off, and the viewport position is restored after each write.
+
 ## [0.12.1]
 
 ### Fixes
