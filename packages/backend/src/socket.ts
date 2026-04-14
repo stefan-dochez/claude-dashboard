@@ -6,7 +6,11 @@ import { createLogger } from './logger.js';
 
 const log = createLogger('socket');
 
-export function setupSocketHandlers(io: Server, processManager: ProcessManager, taskStore?: TaskStore): () => void {
+interface SocketOptions {
+  generateTitles?: boolean;
+}
+
+export function setupSocketHandlers(io: Server, processManager: ProcessManager, taskStore?: TaskStore, options?: SocketOptions): () => void {
   // Track which sockets are attached to which instances
   const attachments = new Map<string, Set<string>>(); // instanceId -> Set<socketId>
 
@@ -53,7 +57,11 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
           createdAt: instance.createdAt.toISOString(),
           endedAt: null,
         });
-        generateSessionTitle(taskStore, instanceId, firstPrompt);
+        if (options?.generateTitles !== false) {
+          generateSessionTitle(taskStore, instanceId, firstPrompt, (id, title) => {
+            io.emit('instance:title', { instanceId: id, title });
+          });
+        }
       }
     }
   };

@@ -92,8 +92,15 @@ export default function Sidebar({
     fetchHistory();
     // Refresh history when an instance exits
     const onExited = () => { setTimeout(fetchHistory, 500); };
+    const onTitle = ({ instanceId, title }: { instanceId: string; title: string }) => {
+      setHistory(prev => prev.map(t => t.id === instanceId ? { ...t, title } : t));
+    };
     socket.on('instance:exited', onExited);
-    return () => { socket.off('instance:exited', onExited); };
+    socket.on('instance:title', onTitle);
+    return () => {
+      socket.off('instance:exited', onExited);
+      socket.off('instance:title', onTitle);
+    };
   }, [fetchHistory, socket]);
 
   const handleResume = useCallback(async (task: HistoryTask) => {

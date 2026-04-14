@@ -34,6 +34,7 @@ interface AppConfig {
   maxInstances: number;
   favoriteProjects: string[];
   promptTemplates: PromptTemplate[];
+  generateTitles: boolean;
   notifications: {
     enabled: boolean;
     sound: boolean;
@@ -52,6 +53,7 @@ const DEFAULT_CONFIG: AppConfig = {
   metaProjects: [],
   favoriteProjects: [],
   promptTemplates: [],
+  generateTitles: true,
   notifications: {
     enabled: true,
     sound: false,

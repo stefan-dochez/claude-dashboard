@@ -8,6 +8,7 @@ interface AppConfig {
   scanDepth: number;
   port: number;
   maxInstances: number;
+  generateTitles: boolean;
   notifications: {
     enabled: boolean;
     sound: boolean;

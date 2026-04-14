@@ -2,6 +2,13 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.2]
+
+### Fixes
+
+- **Title generation broken by invalid CLI flag** — Removed the unsupported `--max-tokens` flag from the `claude` CLI call, which caused title generation to silently fail and fall back to displaying the raw first prompt.
+- **Configurable title generation** — Title generation can now be toggled on/off via the `generateTitles` config option. Toggle available in the command palette (Cmd+K → "Title Generation").
+
 ## [0.14.1]
 
 ### Fixes

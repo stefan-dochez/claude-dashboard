@@ -3,7 +3,7 @@ import {
   PanelLeft, FolderOpen, Info, Terminal, FileCode2,
   GitPullRequest, Search, Settings, Play, XCircle,
   Star, RefreshCw, MessageSquare, LayoutTemplate,
-  TrendingUp, Bell, Sun, Moon,
+  TrendingUp, Bell, Sun, Moon, Type,
 } from 'lucide-react';
 import type { Command } from '../components/CommandPalette';
 import type { Instance, Project } from '../types';
@@ -44,6 +44,8 @@ interface UseCommandsOptions {
   onOpenCostDashboard: () => void;
   onToggleNotifications: () => void;
   notificationsEnabled: boolean;
+  onToggleTitleGeneration: () => void;
+  titleGenerationEnabled: boolean;
 
   // Projects
   onRefreshProjects: () => void;
@@ -75,6 +77,8 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onOpenCostDashboard,
     onToggleNotifications,
     notificationsEnabled,
+    onToggleTitleGeneration,
+    titleGenerationEnabled,
     onRefreshProjects,
     theme,
     onToggleTheme,
@@ -176,6 +180,17 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       iconColor: notificationsEnabled ? 'text-amber-400' : 'text-muted',
       keywords: ['notification', 'alert', 'bell', 'sound', 'focus'],
       onExecute: onToggleNotifications,
+    });
+
+    commands.push({
+      id: 'toggle-title-generation',
+      label: titleGenerationEnabled ? 'Disable Title Generation' : 'Enable Title Generation',
+      description: 'Auto-generate session titles from first prompt',
+      category: 'action',
+      icon: Type,
+      iconColor: titleGenerationEnabled ? 'text-purple-400' : 'text-muted',
+      keywords: ['title', 'generate', 'session', 'history', 'name'],
+      onExecute: onToggleTitleGeneration,
     });
 
     commands.push({
@@ -331,6 +346,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onSetTab, selectedInstance,
     onOpenCodeSearch, onOpenScanPaths, onOpenTemplates,
     onOpenCostDashboard, onToggleNotifications, notificationsEnabled,
+    onToggleTitleGeneration, titleGenerationEnabled,
     onRefreshProjects, theme, onToggleTheme,
   ]);
 }

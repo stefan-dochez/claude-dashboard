@@ -91,8 +91,9 @@ async function main(): Promise<void> {
   }
 
   // WebSocket
-  setupSocketHandlers(io, processManager, taskStore);
-  setupStreamSocketHandlers(io, streamProcess, taskStore);
+  const socketOptions = { generateTitles: config.generateTitles };
+  setupSocketHandlers(io, processManager, taskStore, socketOptions);
+  setupStreamSocketHandlers(io, streamProcess, taskStore, socketOptions);
 
   // Start status monitoring
   statusMonitor.start();

@@ -7,7 +7,11 @@ function instanceRoom(instanceId: string): string {
   return `stream:${instanceId}`;
 }
 
-export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProcessManager, taskStore?: TaskStore): () => void {
+interface StreamSocketOptions {
+  generateTitles?: boolean;
+}
+
+export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProcessManager, taskStore?: TaskStore, options?: StreamSocketOptions): () => void {
 
   // Named handlers for cleanup
   const onMessage = (instanceId: string, message: ChatMessage) => {
@@ -125,8 +129,10 @@ export function setupStreamSocketHandlers(io: Server, streamProcess: StreamProce
         const isFirstPrompt = instance && !instance.firstPrompt;
         await streamProcess.sendMessage(instanceId, prompt, { model, permissionMode, effort });
         // Generate title after the first user message
-        if (isFirstPrompt && taskStore) {
-          generateSessionTitle(taskStore, instanceId, prompt);
+        if (isFirstPrompt && taskStore && options?.generateTitles !== false) {
+          generateSessionTitle(taskStore, instanceId, prompt, (id, title) => {
+            io.emit('instance:title', { instanceId: id, title });
+          });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to send message';

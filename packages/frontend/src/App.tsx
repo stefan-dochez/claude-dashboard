@@ -403,6 +403,10 @@ export default function App() {
       await updateConfig({ notifications: { ...current, enabled: !current.enabled } });
     }, [config?.notifications, updateConfig]),
     notificationsEnabled: config?.notifications?.enabled ?? true,
+    onToggleTitleGeneration: useCallback(async () => {
+      await updateConfig({ generateTitles: !(config?.generateTitles ?? true) });
+    }, [config?.generateTitles, updateConfig]),
+    titleGenerationEnabled: config?.generateTitles ?? true,
     onRefreshProjects: refreshProjects,
     theme,
     onToggleTheme: toggleTheme,
