@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.12.3]
+
+### Fixes
+
+- **Empty sessions in history** — Sessions where no prompt was ever sent (instance spawned then killed/abandoned) were persisted in history as blank "Session" entries with no title. Now `endTask` discards sessions without a `firstPrompt`, and `load()` cleans up any existing empty sessions on startup.
+
 ## [0.12.2]
 
 ### Fixes

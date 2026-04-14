@@ -40,7 +40,13 @@ export class TaskStore {
       this.tasks = [];
     }
 
-    // Close orphaned tasks from a previous crash/unclean shutdown
+    // Clean up tasks from a previous crash/unclean shutdown:
+    // - Remove empty sessions (no firstPrompt = user never sent a message)
+    // - Close orphaned tasks that were still running
+    const before = this.tasks.length;
+    this.tasks = this.tasks.filter(t => t.firstPrompt);
+    const removed = before - this.tasks.length;
+
     let orphansFixed = 0;
     for (const task of this.tasks) {
       if (!task.endedAt) {
@@ -48,8 +54,9 @@ export class TaskStore {
         orphansFixed++;
       }
     }
-    if (orphansFixed > 0) {
-      log.info(`Closed ${orphansFixed} orphaned task(s) from previous session`);
+    if (removed > 0 || orphansFixed > 0) {
+      if (removed > 0) log.info(`Removed ${removed} empty session(s) with no user prompt`);
+      if (orphansFixed > 0) log.info(`Closed ${orphansFixed} orphaned task(s) from previous session`);
       await this.save();
     }
 
@@ -85,6 +92,12 @@ export class TaskStore {
   async endTask(id: string, stats?: { totalCostUsd: number; totalInputTokens: number; totalOutputTokens: number }): Promise<void> {
     const task = this.tasks.find(t => t.id === id);
     if (task) {
+      // Discard sessions where no prompt was ever sent
+      if (!task.firstPrompt) {
+        this.tasks = this.tasks.filter(t => t.id !== id);
+        await this.save();
+        return;
+      }
       task.endedAt = new Date().toISOString();
       if (stats) {
         task.totalCostUsd = stats.totalCostUsd;
