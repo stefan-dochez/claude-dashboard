@@ -49,6 +49,7 @@ interface SidebarProps {
   onPullAll: () => void;
   onCheckoutDefault: (projectPath: string) => void;
   onOpenInIde: (projectPath: string) => void;
+  onViewPrs: (projectPath: string) => void;
   installedIdes: Array<{ id: string; name: string; installed: boolean }>;
   onOpenScanPaths: () => void;
   collapsed: boolean;
@@ -63,7 +64,7 @@ export default function Sidebar({
   scanPaths, favoriteProjects, pullingProjects: _pullingProjects, checkingOutProjects: _checkingOutProjects, pullingAll, queuedIds: _queuedIds,
   onRefreshProjects, onLaunchProject, onSelectInstance, onKillInstance, onDismissInstance,
   onDeleteWorktree, onToggleFavorite, onToggleMeta, onPullProject: _onPullProject, onPullAll, onCheckoutDefault: _onCheckoutDefault,
-  onOpenInIde, installedIdes,
+  onOpenInIde, onViewPrs, installedIdes,
   onOpenScanPaths,
   collapsed, onExpand: _onExpand, width = 320,
 }: SidebarProps) {
@@ -201,6 +202,39 @@ export default function Sidebar({
     return shortenPath(root);
   }, [duplicateNames, scanPaths, shortenPath]);
 
+  // Fetch PR counts (filtered to "mine") for all projects in a single batch.
+  // Uses the full unfiltered project list so typing in the search box doesn't
+  // trigger unnecessary API calls.
+  const [prCounts, setPrCounts] = useState<Map<string, number>>(new Map());
+  const projectSpecs = useMemo(() => {
+    return projects.filter(p => !p.isWorktree).map(p => ({ path: p.path, type: p.type }));
+  }, [projects]);
+
+  useEffect(() => {
+    if (projectSpecs.length === 0) return;
+
+    const fetchCounts = async () => {
+      try {
+        const res = await fetch('/api/git/pr-counts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projects: projectSpecs }),
+        });
+        if (!res.ok) return;
+        const data = await res.json() as Record<string, { total: number; mine: number }>;
+        const counts = new Map<string, number>();
+        for (const [projectPath, { mine }] of Object.entries(data)) {
+          if (mine > 0) counts.set(projectPath, mine);
+        }
+        setPrCounts(counts);
+      } catch { /* ignore */ }
+    };
+
+    fetchCounts();
+    const timer = setInterval(fetchCounts, 2 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [projectSpecs]);
+
   const sidebarActions = useMemo(() => ({
     onSelectInstance,
     onKillInstance,
@@ -210,12 +244,14 @@ export default function Sidebar({
     onToggleFavorite,
     onToggleMeta,
     onOpenInIde,
+    onViewPrs,
     installedIdes,
     onRefreshProjects,
     selectedInstanceId,
     favoriteProjects,
     instancesByProject,
-  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject]);
+    prCounts,
+  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts]);
 
   const renderProject = useCallback((project: Project) => (
     <ProjectRow

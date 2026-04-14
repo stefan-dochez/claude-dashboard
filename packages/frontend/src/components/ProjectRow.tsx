@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, GitBranch, Play, Star, Trash2, Terminal, MessageSquare, X, Layers, Code2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitBranch, GitPullRequest, Play, Star, Trash2, Terminal, MessageSquare, X, Layers, Code2 } from 'lucide-react';
 import LaunchModal from './LaunchModal';
 import { useSidebarActions } from '../hooks/useSidebarActions';
 import { STATUS_DOT, STATUS_LABEL } from '../constants';
@@ -13,10 +13,10 @@ interface ProjectRowProps {
 
 export default function ProjectRow({ project, worktrees, showWorkspace }: ProjectRowProps) {
   const {
-    instancesByProject, selectedInstanceId, favoriteProjects,
+    instancesByProject, selectedInstanceId, favoriteProjects, prCounts,
     onSelectInstance, onKillInstance, onDismissInstance, onLaunch,
     onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects,
-    onOpenInIde, installedIdes,
+    onOpenInIde, onViewPrs, installedIdes,
   } = useSidebarActions();
 
   const instances = instancesByProject.get(project.path) ?? [];
@@ -30,6 +30,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
 
   const activeInstances = instances.filter(i => i.status !== 'exited');
   const hasActivity = activeInstances.length > 0 || worktrees.length > 0;
+  const prCount = prCounts.get(project.path) ?? 0;
 
   return (
     <>
@@ -63,8 +64,27 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
         {worktrees.length > 0 && (
           <span className="text-[10px] text-faint">{worktrees.length} wt</span>
         )}
+        {prCount > 0 && (
+          <span
+            onClick={e => { e.stopPropagation(); onViewPrs(project.path); }}
+            className="flex items-center gap-0.5 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-400 transition-opacity group-hover/row:opacity-0"
+            title={`${prCount} open PR${prCount > 1 ? 's' : ''}`}
+          >
+            <GitPullRequest className="h-2.5 w-2.5" />
+            {prCount}
+          </span>
+        )}
 
         <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-elevated/80 px-0.5 opacity-0 transition-opacity group-hover/row:opacity-100">
+          {prCount > 0 && (
+            <span
+              onClick={e => { e.stopPropagation(); onViewPrs(project.path); }}
+              className="rounded p-0.5 text-faint transition-colors hover:text-blue-400"
+              title="View open PRs"
+            >
+              <GitPullRequest className="h-3 w-3" />
+            </span>
+          )}
           {!hasActivity && (
             <>
               {project.type === 'repo' && (

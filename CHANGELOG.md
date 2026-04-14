@@ -2,6 +2,21 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.13.0]
+
+### Features
+
+- **Aggregated PR view** — Click the PR badge on any project to see all open pull requests. For workspaces and monorepos, PRs are aggregated across all sub-repos via a batched GitHub search API call. PR view shows title, author, repo, branch, age, and draft status, grouped by repository. Click any PR to open it on GitHub.
+- **PR count badge on all projects** — Every project in the sidebar shows a blue badge with the number of PRs assigned to you (authored, assigned, or review-requested). Badge disappears on hover, replaced by action buttons. Counts are fetched in a single batched `POST /api/git/pr-counts` endpoint.
+- **Mine / All filter** — The PR view defaults to "Mine" (PRs where you are author, assignee, or reviewer). Toggle to "All" to see every open PR. GitHub username is resolved via `gh api user` and cached server-side.
+
+### Fixes
+
+- **PR count cache** — `getPrCounts` results and GitHub slug lookups are now cached (2min TTL for counts, permanent for slugs) to avoid redundant `git remote` and API calls.
+- **Sidebar filter no longer triggers PR refetch** — PR counts are based on the full unfiltered project list, so typing in the search box no longer causes unnecessary API calls.
+- **PR button visible for active projects** — The PR hover action button is now shown regardless of whether the project has running instances.
+- **Path validation on pr-counts endpoint** — `POST /api/git/pr-counts` validates all project paths against allowed scan paths and input types.
+
 ## [0.12.3]
 
 ### Fixes

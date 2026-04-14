@@ -12,6 +12,7 @@ import SplitTerminalView from './components/SplitTerminalView';
 import ChatView from './components/ChatView';
 import ChangesView from './components/ChangesView';
 import PullRequestView from './components/PullRequestView';
+import AggregatedPrView from './components/AggregatedPrView';
 import FileViewer from './components/FileViewer';
 import ResizeHandle from './components/ResizeHandle';
 import CodeSearchModal from './components/CodeSearchModal';
@@ -69,6 +70,7 @@ export default function App() {
   const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
   const [pendingTemplateContent, setPendingTemplateContent] = useState<string | null>(null);
   const [costDashboardOpen, setCostDashboardOpen] = useState(false);
+  const [prViewProject, setPrViewProject] = useState<{ path: string; name: string } | null>(null);
   const autoOpenedRef = useRef(false);
   const selectedInstanceIdRef = useRef(selectedInstanceId);
   selectedInstanceIdRef.current = selectedInstanceId;
@@ -147,6 +149,7 @@ export default function App() {
       }
       return id;
     });
+    if (id) setPrViewProject(null);
   }, []);
 
   const handleOpenFile = useCallback((filePath: string) => {
@@ -349,6 +352,13 @@ export default function App() {
       addToast('error', 'Failed to open in IDE', err instanceof Error ? err.message : 'Unknown error');
     }
   }, [installedIdes, openInIde, addToast]);
+
+  const handleViewPrs = useCallback((projectPath: string) => {
+    const project = projects.find(p => p.path === projectPath);
+    setPrViewProject({ path: projectPath, name: project?.name ?? projectPath.split('/').pop() ?? projectPath });
+    // Deselect any instance so the main panel shows the PR view
+    setSelectedInstanceId(null);
+  }, [projects]);
 
   const selectedInstance = instances.find(i => i.id === selectedInstanceId);
 
@@ -595,6 +605,7 @@ export default function App() {
           onPullAll={handlePullAll}
           onCheckoutDefault={handleCheckoutDefault}
           onOpenInIde={handleOpenInIde}
+          onViewPrs={handleViewPrs}
           installedIdes={installedIdes}
           onOpenScanPaths={() => setScanPathsOpen(true)}
           collapsed={!sidebarOpen}
@@ -771,6 +782,12 @@ export default function App() {
                   branchName={selectedInstance.branchName}
                 />
               )
+            ) : prViewProject ? (
+              <AggregatedPrView
+                key={prViewProject.path}
+                projectPath={prViewProject.path}
+                projectName={prViewProject.name}
+              />
             ) : (
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-xs text-center">

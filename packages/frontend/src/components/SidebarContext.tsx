@@ -16,11 +16,13 @@ interface SidebarActions {
   onToggleFavorite: (projectPath: string) => void;
   onToggleMeta: (projectPath: string) => void;
   onOpenInIde: (projectPath: string) => void;
+  onViewPrs: (projectPath: string) => void;
   installedIdes: IdeInfo[];
   onRefreshProjects: () => void;
   selectedInstanceId: string | null;
   favoriteProjects: Set<string>;
   instancesByProject: Map<string, Instance[]>;
+  prCounts: Map<string, number>;
 }
 
 const SidebarActionsContext = createContext<SidebarActions | null>(null);

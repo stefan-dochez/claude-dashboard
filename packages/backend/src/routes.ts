@@ -13,6 +13,7 @@ import type { StreamProcessManager } from './stream-process.js';
 import type { WorktreeManager } from './worktree-manager.js';
 import type { TaskStore } from './task-store.js';
 import type { IdeService, IdeType } from './ide-service.js';
+import type { PrAggregator } from './pr-aggregator.js';
 import { TIMEOUTS, LIMITS } from './constants.js';
 import { createLogger } from './logger.js';
 
@@ -59,6 +60,7 @@ export function createRoutes(
   taskStore: TaskStore,
   appVersion: string,
   ideService: IdeService,
+  prAggregator: PrAggregator,
 ): Router {
   const router = Router();
 
@@ -407,6 +409,43 @@ export function createRoutes(
     }
     const result = await worktreeManager.getBranchDiff(projectPath, target);
     res.json(result);
+  }));
+
+  // Git — PR counts for all projects (batched)
+  router.post('/api/git/pr-counts', asyncHandler(async (req, res) => {
+    const { projects } = req.body as {
+      projects: Array<{ path: string; type: string }>;
+    };
+    if (!projects || !Array.isArray(projects)) {
+      res.status(400).json({ error: 'projects array is required' });
+      return;
+    }
+    // Validate all paths are within allowed scan paths
+    const config = await configService.get();
+    const roots = config.scanPaths ?? [];
+    const safeProjects = projects.filter(p =>
+      typeof p.path === 'string' && typeof p.type === 'string' && isPathAllowed(p.path, roots),
+    );
+    const counts = await prAggregator.getPrCounts(safeProjects);
+    res.json(counts);
+  }));
+
+  // Git — Aggregated PRs for workspace/monorepo
+  router.get('/api/git/prs', asyncHandler(async (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    const forceRefresh = req.query.refresh === 'true';
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    const prs = await prAggregator.getPrs(projectPath, forceRefresh);
+    res.json(prs);
+  }));
+
+  // Git — Authenticated GitHub username
+  router.get('/api/git/github-user', asyncHandler(async (_req, res) => {
+    const login = await prAggregator.getGitHubUser();
+    res.json({ login });
   }));
 
   // Git — PR info

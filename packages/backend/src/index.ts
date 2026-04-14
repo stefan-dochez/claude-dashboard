@@ -16,6 +16,7 @@ import { createRoutes } from './routes.js';
 import { setupSocketHandlers } from './socket.js';
 import { setupStreamSocketHandlers } from './stream-socket.js';
 import { IdeService } from './ide-service.js';
+import { PrAggregator } from './pr-aggregator.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('server');
@@ -51,6 +52,7 @@ async function main(): Promise<void> {
   await taskStore.load();
   const streamProcess = new StreamProcessManager(config);
   const ideService = new IdeService();
+  const prAggregator = new PrAggregator();
   const appVersion = await readVersion();
   log.info(`Version: ${appVersion}`);
 
@@ -74,7 +76,7 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Routes
-  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService);
+  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService, prAggregator);
   app.use(routes);
 
   // In production, serve the frontend static files

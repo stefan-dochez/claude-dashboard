@@ -101,6 +101,22 @@ export interface SessionInfo {
   permissionMode?: string;
 }
 
+export interface PullRequest {
+  repo: string;
+  repoName: string;
+  number: number;
+  title: string;
+  url: string;
+  author: string;
+  assignees: string[];
+  reviewers: string[];
+  branch: string;
+  baseBranch: string;
+  isDraft: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AttentionQueueItem {
   instanceId: string;
   projectName: string;
