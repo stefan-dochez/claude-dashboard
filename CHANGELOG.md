@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.3]
+
+### Fixes
+
+- **Health check and title generation fail in Electron** — `health.ts` and `title-generator.ts` did not enrich the PATH with `getExtraPaths()`, so binaries like `claude` and `gh` installed in `~/.local/bin` or `/opt/homebrew/bin` were not found when running inside the Electron app.
+
 ## [0.14.2]
 
 ### Fixes

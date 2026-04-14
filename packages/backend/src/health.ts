@@ -2,9 +2,18 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { createLogger } from './logger.js';
 import { TIMEOUTS } from './constants.js';
+import { PATH_SEP, getExtraPaths } from './platform.js';
 
 const execFileAsync = promisify(execFile);
 const log = createLogger('health');
+
+function enrichedEnv(): NodeJS.ProcessEnv {
+  const extra = getExtraPaths();
+  return {
+    ...process.env,
+    PATH: [...extra, process.env.PATH ?? ''].join(PATH_SEP),
+  };
+}
 
 export interface DependencyStatus {
   name: string;
@@ -24,7 +33,7 @@ async function checkBinary(
   parseVersion: (stdout: string) => string,
 ): Promise<DependencyStatus> {
   try {
-    const { stdout } = await execFileAsync(name, args, { timeout: TIMEOUTS.GIT_SHORT });
+    const { stdout } = await execFileAsync(name, args, { timeout: TIMEOUTS.GIT_SHORT, env: enrichedEnv() });
     const version = parseVersion(stdout.trim());
     return { name, ok: true, version, detail: null };
   } catch {
@@ -36,6 +45,7 @@ async function checkGhAuth(): Promise<DependencyStatus> {
   try {
     const { stdout } = await execFileAsync('gh', ['auth', 'status'], {
       timeout: TIMEOUTS.GH_CLI,
+      env: enrichedEnv(),
     });
     // gh auth status outputs to stderr on older versions, stdout on newer
     const output = stdout.trim();

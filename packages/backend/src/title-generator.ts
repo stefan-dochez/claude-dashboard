@@ -3,9 +3,18 @@ import { promisify } from 'util';
 import type { TaskStore } from './task-store.js';
 import { LIMITS } from './constants.js';
 import { createLogger } from './logger.js';
+import { PATH_SEP, getExtraPaths } from './platform.js';
 
 const execFileAsync = promisify(execFile);
 const log = createLogger('title-generator');
+
+function enrichedEnv(): NodeJS.ProcessEnv {
+  const extra = getExtraPaths();
+  return {
+    ...process.env,
+    PATH: [...extra, process.env.PATH ?? ''].join(PATH_SEP),
+  };
+}
 
 export async function generateSessionTitle(
   taskStore: TaskStore,
@@ -19,7 +28,7 @@ export async function generateSessionTitle(
     const { stdout } = await execFileAsync('claude', [
       '-p', prompt,
       '--model', 'haiku',
-    ], { timeout: 15000 });
+    ], { timeout: 15000, env: enrichedEnv() });
 
     const title = stdout.trim() || null;
 
