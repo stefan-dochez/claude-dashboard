@@ -14,6 +14,7 @@ import type { WorktreeManager } from './worktree-manager.js';
 import type { TaskStore } from './task-store.js';
 import type { IdeService, IdeType } from './ide-service.js';
 import type { PrAggregator } from './pr-aggregator.js';
+import { runHealthCheck } from './health.js';
 import { TIMEOUTS, LIMITS } from './constants.js';
 import { createLogger } from './logger.js';
 
@@ -64,10 +65,11 @@ export function createRoutes(
 ): Router {
   const router = Router();
 
-  // Health
-  router.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok' });
-  });
+  // Health check — dependency status
+  router.get('/api/health', asyncHandler(async (_req, res) => {
+    const report = await runHealthCheck();
+    res.json(report);
+  }));
 
   // Version — read from backend package.json at startup
   router.get('/api/version', (_req, res) => {

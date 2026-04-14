@@ -17,6 +17,7 @@ import { setupSocketHandlers } from './socket.js';
 import { setupStreamSocketHandlers } from './stream-socket.js';
 import { IdeService } from './ide-service.js';
 import { PrAggregator } from './pr-aggregator.js';
+import { runHealthCheck } from './health.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('server');
@@ -99,6 +100,11 @@ async function main(): Promise<void> {
   // Initial project scan
   scanner.scan().catch(err => {
     log.warn('Initial scan failed:', err);
+  });
+
+  // Health check at startup
+  runHealthCheck().catch(err => {
+    log.warn('Health check failed:', err);
   });
 
   // Graceful shutdown

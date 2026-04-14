@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.0]
+
+### Features
+
+- **Dependency health check** — The backend checks for required dependencies (git, claude, gh, gh auth, ANTHROPIC_API_KEY) at startup and logs their status. A new `GET /api/health` endpoint exposes the full report. On the frontend, a dismissable amber banner appears at the top if any dependency is missing, with details on how to fix each issue. The banner remembers which issues were dismissed (localStorage) and re-appears only if new issues are detected.
+
 ## [0.13.1]
 
 ### Fixes
