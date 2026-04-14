@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.13.1]
+
+### Fixes
+
+- **PR badge count inconsistent with PR view** — Badge and PR view used separate data-fetching paths (batched search vs per-project query), causing different "mine" counts. Now workspace/monorepo badge counts reuse `getPrs` (same cache as the view) so both always show consistent data. Simple repos still use a batched search for efficiency.
+
 ## [0.13.0]
 
 ### Features

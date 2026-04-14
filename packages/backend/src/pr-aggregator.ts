@@ -59,68 +59,74 @@ export class PrAggregator {
    * into a few search API calls. For workspace/monorepo projects, sub-repos
    * are discovered; for regular repos, the repo itself is used.
    */
+  /**
+   * Return PR counts for a list of projects. Reuses `getPrs` (which has its
+   * own per-project cache) so that badge counts and the PR view always show
+   * consistent data. For regular repos, resolves the slug and fetches PRs
+   * via a single batched search query.
+   */
   async getPrCounts(
     projects: Array<{ path: string; type: string }>,
-    forceRefresh = false,
   ): Promise<Record<string, { total: number; mine: number }>> {
-    if (!forceRefresh && this.countsCache && Date.now() - this.countsCache.fetchedAt < CACHE_TTL_MS) {
+    if (this.countsCache && Date.now() - this.countsCache.fetchedAt < CACHE_TTL_MS) {
       return this.countsCache.data;
     }
 
     const ghUser = await this.getGitHubUser();
+    const isMyPr = (pr: PullRequest) =>
+      ghUser && (pr.author === ghUser || pr.assignees.includes(ghUser) || pr.reviewers.includes(ghUser));
 
-    // Resolve GitHub slugs for all projects
-    const slugsByProject = new Map<string, string[]>();
-    const allSlugs = new Set<string>();
-
-    await Promise.all(projects.map(async (project) => {
-      const isParent = project.type === 'workspace' || project.type === 'monorepo';
-      const slugs: string[] = [];
-
-      if (isParent) {
-        const repos = await this.discoverGitHubRepos(project.path);
-        for (const r of repos) {
-          slugs.push(r.slug);
-          allSlugs.add(r.slug);
-        }
+    // Split projects into parent (workspace/monorepo → use getPrs) and
+    // simple repos (batch together in one search query).
+    const parentProjects: Array<{ path: string; type: string }> = [];
+    const repoProjects: Array<{ path: string; type: string }> = [];
+    for (const p of projects) {
+      if (p.type === 'workspace' || p.type === 'monorepo') {
+        parentProjects.push(p);
       } else {
-        const slug = await this.getGitHubSlug(project.path);
-        if (slug) {
-          slugs.push(slug);
-          allSlugs.add(slug);
-        }
+        repoProjects.push(p);
       }
-      slugsByProject.set(project.path, slugs);
-    }));
-
-    if (allSlugs.size === 0) return {};
-
-    // Fetch all PRs in batched search queries
-    const allPrs = await this.fetchPrsBatched([...allSlugs]);
-
-    // Build a map slug → PRs
-    const prsBySlug = new Map<string, PullRequest[]>();
-    for (const pr of allPrs) {
-      const list = prsBySlug.get(pr.repo) ?? [];
-      list.push(pr);
-      prsBySlug.set(pr.repo, list);
     }
 
-    // Compute counts per project
     const result: Record<string, { total: number; mine: number }> = {};
-    for (const [projectPath, slugs] of slugsByProject) {
-      let total = 0;
-      let mine = 0;
-      for (const slug of slugs) {
+
+    // Parent projects: reuse getPrs (same cache as the PR view)
+    await Promise.all(parentProjects.map(async (project) => {
+      const prs = await this.getPrs(project.path);
+      const mine = prs.filter(isMyPr).length;
+      result[project.path] = { total: prs.length, mine: ghUser ? mine : prs.length };
+    }));
+
+    // Simple repos: resolve slugs and batch-fetch
+    const slugToProjects = new Map<string, string[]>(); // slug → project paths
+    await Promise.all(repoProjects.map(async (project) => {
+      const slug = await this.getGitHubSlug(project.path);
+      if (slug) {
+        const paths = slugToProjects.get(slug) ?? [];
+        paths.push(project.path);
+        slugToProjects.set(slug, paths);
+      }
+    }));
+
+    if (slugToProjects.size > 0) {
+      const slugs = [...slugToProjects.keys()];
+      const allPrs = await this.fetchPrsBatched(slugs);
+
+      // Group PRs by slug
+      const prsBySlug = new Map<string, PullRequest[]>();
+      for (const pr of allPrs) {
+        const list = prsBySlug.get(pr.repo) ?? [];
+        list.push(pr);
+        prsBySlug.set(pr.repo, list);
+      }
+
+      for (const [slug, projectPaths] of slugToProjects) {
         const prs = prsBySlug.get(slug) ?? [];
-        total += prs.length;
-        if (ghUser) {
-          mine += prs.filter(pr =>
-            pr.author === ghUser || pr.assignees.includes(ghUser!) || pr.reviewers.includes(ghUser!),
-          ).length;
+        const mine = prs.filter(isMyPr).length;
+        for (const projectPath of projectPaths) {
+          result[projectPath] = { total: prs.length, mine: ghUser ? mine : prs.length };
         }
       }
-      result[projectPath] = { total, mine: ghUser ? mine : total };
     }
 
     this.countsCache = { data: result, fetchedAt: Date.now() };
