@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.4]
+
+### Fixes
+
+- **Terminal scroll position lost during output** — Replaced the pixel-based `scrollTop` save/restore with line-based buffer tracking (`viewportY`/`baseY`). The old approach broke when the scrollback buffer wrapped and evicted old lines, causing the terminal to jump. The new approach computes the exact line drift and uses `scrollToLine()` to keep the viewport anchored.
+
 ## [0.14.3]
 
 ### Fixes

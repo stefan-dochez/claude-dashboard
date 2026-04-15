@@ -122,13 +122,21 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
           term.write(data);
           term.scrollToBottom();
         } else {
-          // Preserve the user's scroll position while new output is written
+          // Preserve the user's scroll position while new output is written.
+          // Save the line-based viewport offset rather than pixel scrollTop —
+          // pixel values become invalid when the scrollback buffer wraps and
+          // old lines are evicted.
           suppressScrollHandler = true;
-          const savedScrollTop = viewport?.scrollTop ?? 0;
+          const baseBuffer = term.buffer.active.baseY;
+          const viewportLine = term.buffer.active.viewportY;
           term.write(data, () => {
-            if (viewport) {
-              viewport.scrollTop = savedScrollTop;
-            }
+            // Lines may have been pushed into scrollback; compute how many
+            // new lines were added so we can restore the same viewport line.
+            const newBase = term.buffer.active.baseY;
+            const drift = newBase - baseBuffer;
+            const targetLine = viewportLine + drift;
+            // scrollToLine expects 0-based line in the full scrollback
+            term.scrollToLine(Math.max(0, targetLine));
             requestAnimationFrame(() => {
               suppressScrollHandler = false;
             });
