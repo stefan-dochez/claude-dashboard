@@ -112,19 +112,19 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
               >
                 <Star className={`h-3 w-3 ${isFavorite ? 'fill-amber-400' : ''}`} />
               </span>
-              {installedIdes.length > 0 && (
-                <span
-                  onClick={e => {
-                    e.stopPropagation();
-                    onOpenInIde(project.path);
-                  }}
-                  className="rounded p-0.5 text-faint transition-colors hover:text-cyan-400"
-                  title="Open in IDE"
-                >
-                  <Code2 className="h-3 w-3" />
-                </span>
-              )}
             </>
+          )}
+          {installedIdes.length > 0 && (
+            <span
+              onClick={e => {
+                e.stopPropagation();
+                onOpenInIde(project.path);
+              }}
+              className="rounded p-0.5 text-faint transition-colors hover:text-cyan-400"
+              title="Open in IDE"
+            >
+              <Code2 className="h-3 w-3" />
+            </span>
           )}
           <span
             onClick={e => { e.stopPropagation(); setLaunchModalOpen(true); }}

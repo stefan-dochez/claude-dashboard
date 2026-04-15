@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.6]
+
+### Fixes
+
+- **Open in IDE button hidden on active projects** — The "Open in IDE" button was inside a `!hasActivity` conditional block, making it invisible on projects with running instances. Moved it outside so it always appears on hover.
+
 ## [0.14.5]
 
 ### Fixes
