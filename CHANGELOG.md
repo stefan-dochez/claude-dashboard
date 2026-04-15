@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.7]
+
+### Fixes
+
+- **Open in IDE opens project instead of worktree** — The "Open in IDE" button on the project row always used `project.path`, even for instances running on a worktree. Added an "Open in IDE" button on each instance row that uses `inst.worktreePath` when available, so clicking it opens the actual working directory.
+
 ## [0.14.6]
 
 ### Fixes

@@ -159,6 +159,18 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
                 <span className="shrink-0 text-[9px] text-faint">
                   {new Date(inst.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
+                {installedIdes.length > 0 && (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      onOpenInIde(inst.worktreePath ?? inst.projectPath);
+                    }}
+                    className="shrink-0 rounded p-0.5 text-faint opacity-0 transition-all hover:text-cyan-400 group-hover/inst:opacity-100"
+                    title={`Open in IDE${inst.worktreePath ? ' (worktree)' : ''}`}
+                  >
+                    <Code2 className="h-2.5 w-2.5" />
+                  </button>
+                )}
                 {inst.status !== 'exited' ? (
                   confirmKillId === inst.id && inst.worktreePath ? (
                     <div className="flex shrink-0 items-center gap-0.5" onClick={e => e.stopPropagation()}>
