@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.5]
+
+### Fixes
+
+- **Terminal scroll broken during output** — Removed the explicit `scrollToBottom()` call from the output handler, which was overriding xterm.js's native `isUserScrolling` flag and forcing the viewport back to the bottom. xterm natively preserves viewport position when the user has scrolled up; our manual scroll management was fighting against it. Simplified from ~40 lines of scroll logic to ~10.
+
 ## [0.14.4]
 
 ### Fixes

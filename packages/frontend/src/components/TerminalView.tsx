@@ -20,7 +20,6 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
   const fitRef = useRef<FitAddon | null>(null);
   const socket = useSocket();
   const [autoScroll, setAutoScroll] = useState(true);
-  const autoScrollRef = useRef(true);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const onInputRef = useRef(onInput);
@@ -103,45 +102,21 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
     let outputEnabled = false;
     let attached = false;
 
-    // Detect user scrolling: disable auto-scroll when scrolled up, re-enable at bottom.
-    // Scroll events triggered by term.write() are suppressed so they don't
-    // accidentally re-enable auto-scroll while the user is reading history.
+    // Track whether the user is at the bottom to show/hide the scroll-to-
+    // bottom button.  We do NOT call term.scrollToBottom() on output — xterm
+    // natively tracks `isUserScrolling` and preserves the viewport position
+    // when the user has scrolled up (see BufferService.scroll).
     const viewport = containerRef.current?.querySelector('.xterm-viewport');
-    let suppressScrollHandler = false;
     const onScroll = () => {
-      if (!viewport || suppressScrollHandler) return;
+      if (!viewport) return;
       const atBottom = viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 5;
-      autoScrollRef.current = atBottom;
       setAutoScroll(atBottom);
     };
     viewport?.addEventListener('scroll', onScroll);
 
     const onOutput = ({ instanceId: id, data }: { instanceId: string; data: string }) => {
       if (id === currentInstanceId && outputEnabled) {
-        if (autoScrollRef.current) {
-          term.write(data);
-          term.scrollToBottom();
-        } else {
-          // Preserve the user's scroll position while new output is written.
-          // Save the line-based viewport offset rather than pixel scrollTop —
-          // pixel values become invalid when the scrollback buffer wraps and
-          // old lines are evicted.
-          suppressScrollHandler = true;
-          const baseBuffer = term.buffer.active.baseY;
-          const viewportLine = term.buffer.active.viewportY;
-          term.write(data, () => {
-            // Lines may have been pushed into scrollback; compute how many
-            // new lines were added so we can restore the same viewport line.
-            const newBase = term.buffer.active.baseY;
-            const drift = newBase - baseBuffer;
-            const targetLine = viewportLine + drift;
-            // scrollToLine expects 0-based line in the full scrollback
-            term.scrollToLine(Math.max(0, targetLine));
-            requestAnimationFrame(() => {
-              suppressScrollHandler = false;
-            });
-          });
-        }
+        term.write(data);
       }
     };
 
@@ -240,7 +215,6 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
   const scrollToBottom = useCallback(() => {
     if (termRef.current) {
       termRef.current.scrollToBottom();
-      autoScrollRef.current = true;
       setAutoScroll(true);
     }
   }, []);
