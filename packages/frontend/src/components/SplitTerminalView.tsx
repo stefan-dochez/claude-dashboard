@@ -3,12 +3,14 @@ import { X, Plus } from 'lucide-react';
 import TerminalView from './TerminalView';
 import { useSocket } from '../hooks/useSocket';
 import type { Instance } from '../types';
+import type { TerminalThemeId } from '../terminal-themes';
 
 interface SplitTerminalViewProps {
   instanceIds: string[];
   instances: Instance[];
   focusedId: string;
   broadcastEnabled: boolean;
+  terminalTheme?: TerminalThemeId;
   onFocus: (id: string) => void;
   onRemoveFromSplit: (id: string) => void;
   onAddToSplit: (id: string) => void;
@@ -20,6 +22,7 @@ export default function SplitTerminalView({
   instances,
   focusedId,
   broadcastEnabled,
+  terminalTheme,
   onFocus,
   onRemoveFromSplit,
   onAddToSplit,
@@ -93,6 +96,7 @@ export default function SplitTerminalView({
               <div className="flex-1 overflow-hidden">
                 <TerminalView
                   instanceId={id}
+                  terminalTheme={terminalTheme}
                   onTypingChange={isFocused ? handleTypingChange : undefined}
                   onInput={isFocused ? (data) => handleBroadcastInput(id, data) : undefined}
                 />

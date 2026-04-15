@@ -9,6 +9,7 @@ interface AppConfig {
   port: number;
   maxInstances: number;
   generateTitles: boolean;
+  terminalTheme: string;
   notifications: {
     enabled: boolean;
     sound: boolean;

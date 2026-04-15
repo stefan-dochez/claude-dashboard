@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.9]
+
+### Features
+
+- **Configurable terminal theme** — Terminal color scheme is now configurable via the command palette (`Cmd+K` → "Terminal Theme"). Ships with 7 presets: Clear Dark, Clear Light, Pro, Homebrew, Novel, Ocean, and Dracula. Theme is persisted in config and updates live without restarting terminals.
+
 ## [0.14.8]
 
 ### Fixes

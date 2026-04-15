@@ -3,8 +3,10 @@ import {
   PanelLeft, FolderOpen, Info, Terminal, FileCode2,
   GitPullRequest, Search, Settings, Play, XCircle,
   Star, RefreshCw, MessageSquare, LayoutTemplate,
-  TrendingUp, Bell, Sun, Moon, Type,
+  TrendingUp, Bell, Sun, Moon, Type, Palette,
 } from 'lucide-react';
+import { TERMINAL_THEMES } from '../terminal-themes';
+import type { TerminalThemeId } from '../terminal-themes';
 import type { Command } from '../components/CommandPalette';
 import type { Instance, Project } from '../types';
 
@@ -53,6 +55,10 @@ interface UseCommandsOptions {
   // Theme
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+
+  // Terminal theme
+  terminalTheme: TerminalThemeId;
+  onSetTerminalTheme: (id: TerminalThemeId) => void;
 }
 
 export function useCommands(options: UseCommandsOptions): Command[] {
@@ -82,6 +88,8 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onRefreshProjects,
     theme,
     onToggleTheme,
+    terminalTheme,
+    onSetTerminalTheme,
   } = options;
 
   return useMemo(() => {
@@ -213,6 +221,20 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       keywords: ['theme', 'dark', 'light', 'mode', 'appearance'],
       onExecute: onToggleTheme,
     });
+
+    for (const [id, preset] of Object.entries(TERMINAL_THEMES)) {
+      const isActive = terminalTheme === id;
+      commands.push({
+        id: `terminal-theme-${id}`,
+        label: `Terminal Theme: ${preset.label}`,
+        description: isActive ? 'Active' : undefined,
+        category: 'action',
+        icon: Palette,
+        iconColor: isActive ? 'text-cyan-400' : 'text-muted',
+        keywords: ['terminal', 'theme', 'color', 'scheme', preset.label.toLowerCase()],
+        onExecute: () => onSetTerminalTheme(id as TerminalThemeId),
+      });
+    }
 
     if (selectedInstance) {
       commands.push({

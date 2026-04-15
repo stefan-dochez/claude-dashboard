@@ -32,6 +32,7 @@ import { useCommands } from './hooks/useCommands';
 import { usePromptTemplates } from './hooks/usePromptTemplates';
 import { useNotifications } from './hooks/useNotifications';
 import { useIde } from './hooks/useIde';
+import type { TerminalThemeId } from './terminal-themes';
 
 // --------------- Status Icon ---------------
 
@@ -410,6 +411,10 @@ export default function App() {
     onRefreshProjects: refreshProjects,
     theme,
     onToggleTheme: toggleTheme,
+    terminalTheme: (config?.terminalTheme ?? 'clear-dark') as TerminalThemeId,
+    onSetTerminalTheme: useCallback(async (id: TerminalThemeId) => {
+      await updateConfig({ terminalTheme: id });
+    }, [updateConfig]),
   });
 
   // Persist tab state to localStorage
@@ -728,6 +733,7 @@ export default function App() {
                     instances={instances}
                     focusedId={selectedInstance.id}
                     broadcastEnabled={broadcastEnabled}
+                    terminalTheme={config?.terminalTheme as TerminalThemeId | undefined}
                     onFocus={handleSelectInstance}
                     onRemoveFromSplit={removeFromSplit}
                     onAddToSplit={addToSplit}
@@ -756,6 +762,7 @@ export default function App() {
                     <TerminalView
                       key={selectedInstance.id}
                       instanceId={selectedInstance.id}
+                      terminalTheme={config?.terminalTheme as TerminalThemeId | undefined}
                       onTypingChange={handleTypingChange}
                     />
                   )

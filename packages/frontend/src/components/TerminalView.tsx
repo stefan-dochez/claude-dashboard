@@ -7,14 +7,17 @@ import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { useSocket } from '../hooks/useSocket';
 import TerminalSearchBar from './TerminalSearchBar';
+import { getTerminalTheme, getTerminalThemeBackground, DEFAULT_TERMINAL_THEME } from '../terminal-themes';
+import type { TerminalThemeId } from '../terminal-themes';
 
 interface TerminalViewProps {
   instanceId: string;
+  terminalTheme?: TerminalThemeId;
   onTypingChange?: (typing: boolean) => void;
   onInput?: (data: string) => void;
 }
 
-export default function TerminalView({ instanceId, onTypingChange, onInput }: TerminalViewProps) {
+export default function TerminalView({ instanceId, terminalTheme, onTypingChange, onInput }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -34,28 +37,7 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
       cursorBlink: true,
       fontSize: 13,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      theme: {
-        background: '#0a0a0a',
-        foreground: '#e5e5e5',
-        cursor: '#e5e5e5',
-        selectionBackground: '#3b3b3b',
-        black: '#0a0a0a',
-        red: '#ff5555',
-        green: '#50fa7b',
-        yellow: '#f1fa8c',
-        blue: '#6272a4',
-        magenta: '#ff79c6',
-        cyan: '#8be9fd',
-        white: '#e5e5e5',
-        brightBlack: '#555555',
-        brightRed: '#ff6e6e',
-        brightGreen: '#69ff94',
-        brightYellow: '#ffffa5',
-        brightBlue: '#d6acff',
-        brightMagenta: '#ff92df',
-        brightCyan: '#a4ffff',
-        brightWhite: '#ffffff',
-      },
+      theme: getTerminalTheme(terminalTheme ?? DEFAULT_TERMINAL_THEME),
       allowProposedApi: true,
     });
 
@@ -200,6 +182,13 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceId]);
 
+  // Update theme on the fly when terminalTheme prop changes
+  useEffect(() => {
+    if (termRef.current) {
+      termRef.current.options.theme = getTerminalTheme(terminalTheme ?? DEFAULT_TERMINAL_THEME);
+    }
+  }, [terminalTheme]);
+
   // Cmd+F / Ctrl+F to open search, Escape to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -232,7 +221,8 @@ export default function TerminalView({ instanceId, onTypingChange, onInput }: Te
       )}
       <div
         ref={containerRef}
-        className="h-full w-full overflow-hidden rounded-xl bg-codeblock p-2"
+        className="h-full w-full overflow-hidden rounded-xl p-2"
+        style={{ backgroundColor: getTerminalThemeBackground(terminalTheme ?? DEFAULT_TERMINAL_THEME) }}
       />
       {!autoScroll && (
         <button

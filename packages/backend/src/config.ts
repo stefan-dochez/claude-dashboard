@@ -39,6 +39,7 @@ interface AppConfig {
     enabled: boolean;
     sound: boolean;
   };
+  terminalTheme: string;
   statusPatterns: {
     waitingInput: string[];
   };
@@ -54,6 +55,7 @@ const DEFAULT_CONFIG: AppConfig = {
   favoriteProjects: [],
   promptTemplates: [],
   generateTitles: true,
+  terminalTheme: 'clear-dark',
   notifications: {
     enabled: true,
     sound: false,
