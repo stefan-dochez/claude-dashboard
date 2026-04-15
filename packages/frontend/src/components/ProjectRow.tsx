@@ -237,6 +237,15 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
                   {wt.gitBranch ?? wt.name}
                 </span>
                 <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/wt:opacity-100">
+                  {installedIdes.length > 0 && (
+                    <span
+                      onClick={e => { e.stopPropagation(); onOpenInIde(wt.path); }}
+                      className="rounded p-0.5 text-faint transition-colors hover:text-cyan-400"
+                      title="Open in IDE (worktree)"
+                    >
+                      <Code2 className="h-2.5 w-2.5" />
+                    </span>
+                  )}
                   <span
                     className="rounded p-0.5 text-faint transition-colors group-hover/wt:text-green-400"
                     title="Resume"

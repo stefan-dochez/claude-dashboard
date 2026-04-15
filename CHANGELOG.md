@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.14.8]
+
+### Fixes
+
+- **Open in IDE missing on worktree rows** — Added the "Open in IDE" button on worktree rows (without active instances) so users can open a worktree directory directly from the sidebar.
+
 ## [0.14.7]
 
 ### Fixes
