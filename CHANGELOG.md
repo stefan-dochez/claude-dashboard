@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.17.0]
+
+### Features
+
+- **Update available banner** — At startup, the dashboard checks GitHub for the latest release (`stefan-dochez/claude-dashboard`) and shows a dismissible banner at the top of the main panel when a newer version is published. Includes a "View release" link to the GitHub release page. Result is cached server-side for 6 hours to avoid rate-limit pressure, and per-version dismissals persist in localStorage so the banner reappears only when a new version ships. Repo can be overridden via the `UPDATE_REPO` env var.
+
 ## [0.16.0]
 
 ### Features

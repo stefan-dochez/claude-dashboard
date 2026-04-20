@@ -17,6 +17,7 @@ import { setupSocketHandlers } from './socket.js';
 import { setupStreamSocketHandlers } from './stream-socket.js';
 import { IdeService } from './ide-service.js';
 import { PrAggregator } from './pr-aggregator.js';
+import { UpdateChecker } from './update-checker.js';
 import { runHealthCheck } from './health.js';
 import { createLogger } from './logger.js';
 
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
   const prAggregator = new PrAggregator();
   const appVersion = await readVersion();
   log.info(`Version: ${appVersion}`);
+  const updateChecker = new UpdateChecker(appVersion, process.env.UPDATE_REPO);
 
   // Express + Socket.io setup
   const app = express();
@@ -77,7 +79,7 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Routes
-  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService, prAggregator);
+  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService, prAggregator, updateChecker);
   app.use(routes);
 
   // In production, serve the frontend static files

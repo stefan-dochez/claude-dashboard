@@ -14,6 +14,7 @@ import type { WorktreeManager } from './worktree-manager.js';
 import type { TaskStore } from './task-store.js';
 import type { IdeService, IdeType } from './ide-service.js';
 import type { PrAggregator } from './pr-aggregator.js';
+import type { UpdateChecker } from './update-checker.js';
 import { runHealthCheck } from './health.js';
 import { TIMEOUTS, LIMITS } from './constants.js';
 import { createLogger } from './logger.js';
@@ -62,6 +63,7 @@ export function createRoutes(
   appVersion: string,
   ideService: IdeService,
   prAggregator: PrAggregator,
+  updateChecker: UpdateChecker,
 ): Router {
   const router = Router();
 
@@ -75,6 +77,13 @@ export function createRoutes(
   router.get('/api/version', (_req, res) => {
     res.json({ version: appVersion });
   });
+
+  // Update check — GitHub latest release, cached ~6h
+  router.get('/api/update-check', asyncHandler(async (req, res) => {
+    const force = req.query.refresh === 'true';
+    const result = await updateChecker.check(force);
+    res.json(result);
+  }));
 
 
   // Platform info — used by the frontend for cross-platform path display

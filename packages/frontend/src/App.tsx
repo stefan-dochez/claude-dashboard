@@ -14,6 +14,7 @@ import ChangesView from './components/ChangesView';
 import PullRequestView from './components/PullRequestView';
 import AggregatedPrView from './components/AggregatedPrView';
 import HealthBanner from './components/HealthBanner';
+import UpdateBanner from './components/UpdateBanner';
 import FileViewer from './components/FileViewer';
 import ResizeHandle from './components/ResizeHandle';
 import CodeSearchModal from './components/CodeSearchModal';
@@ -632,6 +633,7 @@ export default function App() {
 
         {/* Center — main content */}
         <main className="flex flex-1 flex-col overflow-hidden rounded-xl bg-surface">
+          <UpdateBanner />
           <HealthBanner />
           {/* Tabs (only when instance selected) */}
           {selectedInstance && (
