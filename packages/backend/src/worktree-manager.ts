@@ -55,7 +55,12 @@ export class WorktreeManager {
       .slice(0, 60);
   }
 
-  async createWorktree(projectPath: string, taskDescription: string, branchPrefix?: string): Promise<WorktreeResult> {
+  async createWorktree(
+    projectPath: string,
+    taskDescription: string,
+    branchPrefix?: string,
+    startPoint?: string,
+  ): Promise<WorktreeResult> {
     const slug = this.slugify(taskDescription);
     if (!slug) {
       throw new Error('Task description produced an empty slug');
@@ -74,26 +79,50 @@ export class WorktreeManager {
 
     const finalBranch = suffix > 1 ? `${branchName}-${suffix}` : branchName;
 
-    // Fetch and use latest default branch as starting point
-    const defaultBranch = await this.getDefaultBranch(projectPath);
-    let startPoint = '';
-    if (defaultBranch) {
+    // Determine start point: user-provided branch, or fall back to origin/<default>
+    let resolvedStartPoint = '';
+    if (startPoint) {
+      // Fetch first so remote refs (origin/foo) are up to date
       try {
         await execAsync('git fetch origin', {
           cwd: projectPath,
           encoding: 'utf-8',
           timeout: 30000,
         });
-        startPoint = `origin/${defaultBranch}`;
-        log.info(` Using ${startPoint} as starting point`);
       } catch {
-        log.info(` Failed to fetch origin, using current HEAD`);
+        log.info(` Failed to fetch origin, continuing with local refs`);
+      }
+      try {
+        await execAsync(`git rev-parse --verify "${startPoint}"`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          timeout: 5000,
+        });
+        resolvedStartPoint = startPoint;
+        log.info(` Using ${resolvedStartPoint} as starting point`);
+      } catch {
+        throw new Error(`Start point "${startPoint}" not found`);
+      }
+    } else {
+      const defaultBranch = await this.getDefaultBranch(projectPath);
+      if (defaultBranch) {
+        try {
+          await execAsync('git fetch origin', {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            timeout: 30000,
+          });
+          resolvedStartPoint = `origin/${defaultBranch}`;
+          log.info(` Using ${resolvedStartPoint} as starting point`);
+        } catch {
+          log.info(` Failed to fetch origin, using current HEAD`);
+        }
       }
     }
 
     log.info(` Creating worktree at ${worktreePath} (branch: ${finalBranch})`);
 
-    const startArg = startPoint ? ` "${startPoint}"` : '';
+    const startArg = resolvedStartPoint ? ` "${resolvedStartPoint}"` : '';
     await execAsync(`git worktree add -b "${finalBranch}" "${worktreePath}"${startArg}`, {
       cwd: projectPath,
       encoding: 'utf-8',
@@ -103,6 +132,55 @@ export class WorktreeManager {
     log.info(` Worktree created successfully`);
 
     return { worktreePath, branchName: finalBranch };
+  }
+
+  async listStartPoints(projectPath: string): Promise<Array<{ name: string; isRemote: boolean; isDefault: boolean }>> {
+    const defaultBranch = await this.getDefaultBranch(projectPath);
+
+    const { stdout: localOut } = await execAsync('git branch --format="%(refname:short)"', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    const locals = localOut.split('\n').map(l => l.trim()).filter(Boolean);
+    const localSet = new Set(locals);
+
+    let remotes: string[] = [];
+    try {
+      const { stdout: remoteOut } = await execAsync('git branch -r --format="%(refname:short)"', {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
+      remotes = remoteOut
+        .split('\n')
+        .map(l => l.trim())
+        // Exclude HEAD pointers and bare remote names (must have a branch segment after the remote)
+        .filter(l => l && !l.endsWith('/HEAD') && l.includes('/'));
+    } catch {
+      // No remotes — not an error
+    }
+
+    const result: Array<{ name: string; isRemote: boolean; isDefault: boolean }> = [];
+    for (const name of locals) {
+      result.push({ name, isRemote: false, isDefault: name === defaultBranch });
+    }
+    for (const name of remotes) {
+      const shortName = name.replace(/^[^/]+\//, '');
+      // Skip remote branches whose short name matches a local branch (already listed)
+      if (localSet.has(shortName)) continue;
+      result.push({ name, isRemote: true, isDefault: false });
+    }
+
+    // Sort: default first, then locals alphabetically, then remotes alphabetically
+    result.sort((a, b) => {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      if (a.isRemote !== b.isRemote) return a.isRemote ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return result;
   }
 
   async getDefaultBranch(projectPath: string): Promise<string | null> {

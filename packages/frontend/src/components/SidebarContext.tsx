@@ -11,7 +11,7 @@ interface SidebarActions {
   onSelectInstance: (id: string) => void;
   onKillInstance: (id: string, deleteWorktree?: boolean) => void;
   onDismissInstance: (id: string) => void;
-  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat') => void;
+  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string, startPoint?: string) => void;
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
   onToggleMeta: (projectPath: string) => void;

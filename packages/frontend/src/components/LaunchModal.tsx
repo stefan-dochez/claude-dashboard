@@ -37,10 +37,16 @@ interface BranchInfo {
   hasWorktree: boolean;
 }
 
+interface StartPoint {
+  name: string;
+  isRemote: boolean;
+  isDefault: boolean;
+}
+
 interface LaunchModalProps {
   project: Project;
   worktrees: Project[];
-  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string) => void;
+  onLaunch: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string, startPoint?: string) => void;
   onClose: () => void;
   onRefreshProjects: () => void;
 }
@@ -58,6 +64,8 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [convertingBranch, setConvertingBranch] = useState<string | null>(null);
+  const [startPoints, setStartPoints] = useState<StartPoint[]>([]);
+  const [startPoint, setStartPoint] = useState<string>('');
   const [history, setHistory] = useState<HistoryTask[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const modalRef = useFocusTrap<HTMLDivElement>();
@@ -111,6 +119,26 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
     }
   }, [mode, branches.length, fetchBranches]);
 
+  const fetchStartPoints = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/git/start-points?path=${encodeURIComponent(project.path)}`);
+      if (!res.ok) throw new Error('Failed to fetch start points');
+      const data: StartPoint[] = await res.json();
+      setStartPoints(data);
+      const def = data.find(s => s.isDefault);
+      if (def) setStartPoint(def.name);
+    } catch (err) {
+      console.error('[LaunchModal] Error fetching start points:', err);
+      setStartPoints([]);
+    }
+  }, [project.path]);
+
+  useEffect(() => {
+    if (mode === 'new' && isGit && startPoints.length === 0) {
+      fetchStartPoints();
+    }
+  }, [mode, isGit, startPoints.length, fetchStartPoints]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -121,7 +149,9 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
 
   const handleSubmitNew = () => {
     const desc = taskDescription.trim();
-    onLaunch(project.path, desc || undefined, undefined, isGit ? branchPrefix : undefined, launchMode);
+    const defaultStartPoint = startPoints.find(s => s.isDefault)?.name;
+    const customStartPoint = isGit && startPoint && startPoint !== defaultStartPoint ? startPoint : undefined;
+    onLaunch(project.path, desc || undefined, undefined, isGit ? branchPrefix : undefined, launchMode, undefined, customStartPoint);
     onClose();
   };
 
@@ -435,6 +465,22 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
               placeholder="What's the task?"
               className="w-full rounded-md border border-border-input bg-elevated px-3 py-2 text-sm text-primary placeholder-placeholder outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
             />
+            {isGit && startPoints.length > 0 && (
+              <div className="mt-2 flex items-center gap-2">
+                <label className="text-[12px] text-muted shrink-0">Based on:</label>
+                <select
+                  value={startPoint}
+                  onChange={e => setStartPoint(e.target.value)}
+                  className="flex-1 min-w-0 rounded-md border border-border-input bg-elevated px-2 py-1 font-mono text-[12px] text-primary outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
+                >
+                  {startPoints.map(sp => (
+                    <option key={sp.name} value={sp.name}>
+                      {sp.name}{sp.isDefault ? ' (default)' : ''}{sp.isRemote ? ' [remote]' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <p className="mt-1.5 text-[12px] text-muted">
               {isGit
                 ? `Branch: ${branchPrefix}/${taskDescription.trim() ? taskDescription.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) : '...'}`

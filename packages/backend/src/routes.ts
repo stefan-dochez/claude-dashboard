@@ -129,11 +129,12 @@ export function createRoutes(
   });
 
   router.post('/api/instances', asyncHandler(async (req, res) => {
-    const { projectPath, taskDescription, detachBranch, branchPrefix, mode, sessionId: resumeSessionId } = req.body as {
+    const { projectPath, taskDescription, detachBranch, branchPrefix, startPoint, mode, sessionId: resumeSessionId } = req.body as {
       projectPath?: string;
       taskDescription?: string;
       detachBranch?: boolean;
       branchPrefix?: string;
+      startPoint?: string;
       mode?: 'terminal' | 'chat';
       sessionId?: string;
     };
@@ -162,7 +163,7 @@ export function createRoutes(
       parentProjectPath = projectPath;
       refreshProjectsInBackground(scanner);
     } else if (taskDescription && await worktreeManager.isGitRepo(projectPath)) {
-      const result = await worktreeManager.createWorktree(projectPath, taskDescription, branchPrefix);
+      const result = await worktreeManager.createWorktree(projectPath, taskDescription, branchPrefix, startPoint);
       worktreePath = result.worktreePath;
       branchName = result.branchName;
       parentProjectPath = projectPath;
@@ -331,6 +332,16 @@ export function createRoutes(
     }
     const branches = await worktreeManager.listBranches(projectPath);
     res.json(branches);
+  }));
+
+  router.get('/api/git/start-points', asyncHandler(async (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    const startPoints = await worktreeManager.listStartPoints(projectPath);
+    res.json(startPoints);
   }));
 
   router.post('/api/git/branch-to-worktree', asyncHandler(async (req, res) => {

@@ -38,7 +38,7 @@ interface SidebarProps {
   pullingAll: boolean;
   queuedIds: Set<string>;
   onRefreshProjects: () => void;
-  onLaunchProject: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string) => void;
+  onLaunchProject: (projectPath: string, taskDescription?: string, detachBranch?: boolean, branchPrefix?: string, mode?: 'terminal' | 'chat', sessionId?: string, startPoint?: string) => void;
   onSelectInstance: (id: string) => void;
   onKillInstance: (id: string, deleteWorktree?: boolean) => void;
   onDismissInstance: (id: string) => void;

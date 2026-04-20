@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.16.0]
+
+### Features
+
+- **Custom start point for new worktree** — The "New task" form now shows a "Based on:" selector listing all local branches and remote-only branches. By default, new worktrees branch off `origin/main` (unchanged); users can now pick any other branch as the starting point, enabling sub-branch workflows without manual git commands. Backend: new `GET /api/git/start-points` endpoint and `createWorktree` accepts an optional `startPoint` argument.
+
 ## [0.14.9]
 
 ### Features

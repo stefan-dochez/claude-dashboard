@@ -25,7 +25,7 @@ interface UseCommandsOptions {
   // Projects
   projects: Project[];
   favoriteProjects: Set<string>;
-  onLaunchProject: (projectPath: string, task?: string, detach?: boolean, prefix?: string, mode?: 'terminal' | 'chat', sessionId?: string) => void;
+  onLaunchProject: (projectPath: string, task?: string, detach?: boolean, prefix?: string, mode?: 'terminal' | 'chat', sessionId?: string, startPoint?: string) => void;
 
   // Panels
   sidebarOpen: boolean;
