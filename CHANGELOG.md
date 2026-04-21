@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.20.3]
+
+### Fixes
+
+- **CI green again** — The v0.20.2 commit shipped with a TypeScript parse error in `update-installer.ts`: a comment inside the shell-script template literal contained backticks (`` `name` ``) and angle brackets (`<name>`), which TS tried to interpret as a nested template literal and a generic type. Rewrote the comment with plain quotes. The local `npm run typecheck` didn't catch this because the root script only covered `backend` and `frontend`; it now also runs against `packages/electron` so the same class of miss won't slip through again. Note: v0.20.2 CI failed to publish assets, so in-app updates from 0.20.1 should jump straight to 0.20.3.
+
 ## [0.20.2]
 
 ### Fixes

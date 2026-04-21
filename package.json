@@ -1,7 +1,7 @@
 {
   "//": "Claude Dashboard — monorepo workspace for backend, frontend, and electron packages",
   "name": "claude-dashboard",
-  "version": "0.20.2",
+  "version": "0.20.3",
   "private": true,
   "workspaces": [
     "packages/backend",
@@ -14,7 +14,7 @@
     "dev:frontend": "npm run dev -w packages/frontend",
     "build": "npm run build -w packages/backend && npm run build -w packages/frontend",
     "lint": "eslint 'packages/*/src/**/*.{ts,tsx}'",
-    "typecheck": "npm run typecheck -w packages/backend && npm run typecheck -w packages/frontend",
+    "typecheck": "npm run typecheck -w packages/backend && npm run typecheck -w packages/frontend && npm run typecheck -w packages/electron",
     "electron:dev": "bash scripts/electron-dev.sh",
     "electron:dev:app": "npm run dev -w packages/electron",
     "electron:build": "npm run build && bash scripts/prepare-backend.sh && npm run build -w packages/electron && npm run package -w packages/electron"

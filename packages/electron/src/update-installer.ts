@@ -106,10 +106,10 @@ cp -R "$SRC_APP" "${esc(appBundlePath)}" || {
 }
 xattr -dr com.apple.quarantine "${esc(appBundlePath)}" 2>/dev/null || true
 
-# Relaunch BEFORE cleanups so that a detach/rm failure can't prevent startup.
-# Use the bundle path directly (open <path>) rather than `open -a <name>`
-# because LaunchServices may not have re-indexed the fresh bundle yet, and
-# app.getName() returns the npm `name` field unless `productName` is set.
+# Relaunch BEFORE cleanups so that a detach/rm failure cannot prevent startup.
+# Use the bundle path directly (open PATH) rather than open -a NAME, because
+# LaunchServices may not have re-indexed the fresh bundle yet, and
+# app.getName() returns the npm "name" field unless "productName" is set.
 echo "[updater $(date)] relaunching ${esc(appBundlePath)}"
 if ! open "${esc(appBundlePath)}"; then
   echo "[updater $(date)] open by path failed, retrying after 1s"
