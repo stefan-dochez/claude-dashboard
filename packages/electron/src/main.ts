@@ -1,9 +1,10 @@
-import { app, BrowserWindow, shell, dialog, Menu } from 'electron';
+import { app, BrowserWindow, shell, dialog, Menu, ipcMain } from 'electron';
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as os from 'os';
+import { installUpdate } from './update-installer';
 
 const isDev = process.argv.includes('--dev');
 const BACKEND_PORT = 3200;
@@ -258,6 +259,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
@@ -279,6 +281,31 @@ function createWindow() {
   });
 }
 
+// --------------- Update installer IPC ---------------
+
+let updateInProgress = false;
+
+function registerUpdateIpc() {
+  ipcMain.handle('update:install', async (_e, args: { assetUrl: string; assetName: string }) => {
+    if (updateInProgress) {
+      throw new Error('Update already in progress');
+    }
+    updateInProgress = true;
+    try {
+      log(`Update install requested: ${args.assetName}`);
+      await installUpdate(args.assetUrl, args.assetName, (channel, payload) => {
+        mainWindow?.webContents.send(channel, payload);
+      });
+    } catch (err) {
+      updateInProgress = false;
+      const message = err instanceof Error ? err.message : String(err);
+      log(`Update install failed: ${message}`);
+      mainWindow?.webContents.send('update:status', { phase: 'error', message });
+      throw err;
+    }
+  });
+}
+
 // --------------- App lifecycle ---------------
 
 function isPortInUse(port: number): Promise<boolean> {
@@ -297,6 +324,7 @@ app.whenReady().then(async () => {
   log(`resourcesPath: ${process.resourcesPath}`);
 
   setupMenu();
+  registerUpdateIpc();
 
   const backendAlreadyRunning = await isPortInUse(BACKEND_PORT);
   log(`Backend already running: ${backendAlreadyRunning}`);

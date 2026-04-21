@@ -7,6 +7,12 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const ERROR_CACHE_TTL_MS = 60 * 1000;
 const FETCH_TIMEOUT_MS = 5000;
 
+export interface UpdateAsset {
+  name: string;
+  url: string;
+  size: number;
+}
+
 export interface UpdateCheckResult {
   currentVersion: string;
   latestVersion: string | null;
@@ -15,6 +21,14 @@ export interface UpdateCheckResult {
   publishedAt: string | null;
   checkedAt: string;
   error: string | null;
+  /** Download asset for the current platform/arch (macOS DMG or Windows EXE). Null if no match. */
+  asset: UpdateAsset | null;
+}
+
+interface GitHubAsset {
+  name: string;
+  browser_download_url: string;
+  size: number;
 }
 
 interface GitHubRelease {
@@ -23,6 +37,34 @@ interface GitHubRelease {
   published_at: string;
   draft: boolean;
   prerelease: boolean;
+  assets: GitHubAsset[];
+}
+
+/**
+ * Pick the release asset that matches the current platform/arch.
+ * macOS arm64 → `*-arm64.dmg`; macOS x64 → `*-x64.dmg` or plain `*.dmg`;
+ * Windows → `*.exe` (NSIS installer produced by electron-builder).
+ */
+function pickAsset(assets: GitHubAsset[]): UpdateAsset | null {
+  const isMac = process.platform === 'darwin';
+  const isWin = process.platform === 'win32';
+  const arch = process.arch;
+
+  const matches = assets.filter(a => {
+    const name = a.name.toLowerCase();
+    if (isMac) {
+      if (!name.endsWith('.dmg')) return false;
+      if (arch === 'arm64') return name.includes('arm64');
+      if (arch === 'x64') return name.includes('x64') || !name.includes('arm64');
+      return false;
+    }
+    if (isWin) return name.endsWith('.exe');
+    return false;
+  });
+  if (matches.length === 0) return null;
+  // Prefer exact arch match when multiple candidates
+  const best = matches[0];
+  return { name: best.name, url: best.browser_download_url, size: best.size };
 }
 
 /** Compare semver-ish strings ("v1.2.3" == "1.2.3"). Prerelease suffixes are stripped. */
@@ -75,6 +117,7 @@ export class UpdateChecker {
           publishedAt: null,
           checkedAt: new Date().toISOString(),
           error: message,
+          asset: null,
         };
         this.cached = errorResult;
         this.cachedAt = Date.now();
@@ -115,6 +158,7 @@ export class UpdateChecker {
         publishedAt: release.published_at,
         checkedAt: new Date().toISOString(),
         error: null,
+        asset: updateAvailable ? pickAsset(release.assets ?? []) : null,
       };
     } finally {
       clearTimeout(timer);

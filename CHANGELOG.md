@@ -2,6 +2,18 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.19.0]
+
+### Features
+
+- **In-app auto-updater** — The update banner now offers an "Install & restart" button that downloads the new release asset from GitHub and applies the update in place — no more manual DMG mount/copy dance. Only shown when running inside the packaged Electron app and when the release has a matching asset for the current platform/arch (macOS arm64/x64 DMG, Windows x64 NSIS exe). The banner shows a progress bar during download and a phase indicator (Downloading → Preparing → Restarting). On failure, a fallback link lets the user download the asset manually from the GitHub release.
+
+  **How it works (macOS, unsigned)** — `electron-updater` / Squirrel.Mac require a valid code signature, which rules them out for unsigned builds. Instead, the main process writes a detached bash script that: (1) waits for the current app PID to exit, (2) mounts the DMG, (3) moves the old `.app` aside as a backup, (4) copies the new bundle into the same install path (resolved dynamically from `process.execPath`, so `~/Applications` works as well as `/Applications`), (5) strips `com.apple.quarantine` to avoid Gatekeeper re-prompts, (6) detaches the volume and cleans up, (7) relaunches via `open -a`. If the copy fails, the backup is restored.
+
+  **Windows** — launches the NSIS installer produced by electron-builder with `/S` (silent) as a detached process; it kills the old instance, installs the new version, and relaunches itself.
+
+  **Plumbing** — new `preload.ts` exposes `window.electronAPI.update` via `contextBridge` (contextIsolation stays on, no nodeIntegration). `update-installer.ts` handles HTTPS download with redirect following (GitHub asset URLs redirect to a signed CDN URL) and streams progress to the renderer via IPC. `update-checker.ts` now returns a platform/arch-matched `asset: { name, url, size } | null` alongside the release metadata.
+
 ## [0.18.2]
 
 ### UI
