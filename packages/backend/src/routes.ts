@@ -16,6 +16,7 @@ import type { IdeService, IdeType } from './ide-service.js';
 import type { PrAggregator } from './pr-aggregator.js';
 import type { UpdateChecker } from './update-checker.js';
 import type { PluginsManager } from './plugins-manager.js';
+import { readChangelogSince } from './changelog-reader.js';
 import { runHealthCheck } from './health.js';
 import { TIMEOUTS, LIMITS } from './constants.js';
 import { createLogger } from './logger.js';
@@ -85,6 +86,16 @@ export function createRoutes(
     const force = req.query.refresh === 'true';
     const result = await updateChecker.check(force);
     res.json(result);
+  }));
+
+  // Changelog entries in the range (since, currentVersion]. If `since` is
+  // omitted, returns only the entry for the current version.
+  router.get('/api/changelog', asyncHandler(async (req, res) => {
+    const since = typeof req.query.since === 'string' && req.query.since.length > 0
+      ? req.query.since
+      : null;
+    const entries = await readChangelogSince(since, appVersion);
+    res.json({ currentVersion: appVersion, entries });
   }));
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@claude-dashboard/electron",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "private": true,
   "description": "Desktop app for Claude Dashboard",
   "author": "Claude Dashboard",
@@ -48,6 +48,10 @@
       {
         "from": "assets",
         "to": "icon"
+      },
+      {
+        "from": "../../CHANGELOG.md",
+        "to": "CHANGELOG.md"
       }
     ],
     "mac": {

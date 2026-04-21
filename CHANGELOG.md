@@ -2,6 +2,14 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.20.0]
+
+### Features
+
+- **"What's new" modal after an update** — The first time the app launches under a new version, a modal shows the changelog delta since the previously-seen version. If you jump across multiple versions (e.g. 0.18.2 → 0.20.0), every intermediate section is rendered, not just the latest. Markdown is rendered with `react-markdown` + `remark-gfm` and styled inline (no new deps). Dismissing the modal persists the current version to `localStorage['dashboard:last-seen-version']`, so it only reappears after the *next* bump. First-ever launch silently records the version without showing anything. Disabled in Vite dev mode to avoid firing on every bump during local development.
+
+  **Plumbing** — backend has a new `GET /api/changelog?since=<version>` endpoint that reads `CHANGELOG.md`, parses `## [X.Y.Z]` sections, and filters by semver to return entries strictly greater than `since` and less-or-equal to the running backend version. `CHANGELOG.md` is now bundled as an electron-builder `extraResource`, and the main process passes `CHANGELOG_PATH` as an env var so the packaged backend knows where to read from. In dev mode the reader falls back to the repo-root path.
+
 ## [0.19.0]
 
 ### Features

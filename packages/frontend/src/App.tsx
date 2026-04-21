@@ -24,6 +24,7 @@ import PromptTemplatesModal from './components/PromptTemplatesModal';
 import PluginsModal from './components/PluginsModal';
 import CostDashboard from './components/CostDashboard';
 import ToastContainer from './components/ToastContainer';
+import WhatsNewModal, { type ChangelogEntry } from './components/WhatsNewModal';
 import { useProjects } from './hooks/useProjects';
 import { useInstances } from './hooks/useInstances';
 import { useConfig } from './hooks/useConfig';
@@ -76,6 +77,7 @@ export default function App() {
   const [pendingTemplateContent, setPendingTemplateContent] = useState<string | null>(null);
   const [costDashboardOpen, setCostDashboardOpen] = useState(false);
   const [prViewProject, setPrViewProject] = useState<{ path: string; name: string } | null>(null);
+  const [whatsNew, setWhatsNew] = useState<{ currentVersion: string; previousVersion: string | null; entries: ChangelogEntry[] } | null>(null);
   const autoOpenedRef = useRef(false);
   const selectedInstanceIdRef = useRef(selectedInstanceId);
   selectedInstanceIdRef.current = selectedInstanceId;
@@ -91,6 +93,50 @@ export default function App() {
     localStorage.setItem('dashboard:theme', theme);
   }, [theme]);
   const toggleTheme = useCallback(() => setTheme(prev => prev === 'dark' ? 'light' : 'dark'), []);
+
+  // "What's new" modal — show once after an app version bump. Compares the
+  // current backend version against localStorage and fetches the changelog
+  // delta. Skipped in dev (would fire on every bump).
+  useEffect(() => {
+    if (import.meta.env.DEV) return;
+    const LAST_SEEN_KEY = 'dashboard:last-seen-version';
+    let cancelled = false;
+    (async () => {
+      try {
+        const versionRes = await fetch('/api/version');
+        if (!versionRes.ok) return;
+        const { version } = await versionRes.json() as { version: string };
+        if (cancelled || !version) return;
+        const lastSeen = localStorage.getItem(LAST_SEEN_KEY);
+        if (lastSeen === version) return;
+        if (lastSeen === null) {
+          // First launch — just record the version without showing the modal.
+          localStorage.setItem(LAST_SEEN_KEY, version);
+          return;
+        }
+        const res = await fetch(`/api/changelog?since=${encodeURIComponent(lastSeen)}`);
+        if (!res.ok) return;
+        const { entries } = await res.json() as { currentVersion: string; entries: ChangelogEntry[] };
+        if (cancelled) return;
+        if (entries.length === 0) {
+          // No changelog delta — silently ack the version bump.
+          localStorage.setItem(LAST_SEEN_KEY, version);
+          return;
+        }
+        setWhatsNew({ currentVersion: version, previousVersion: lastSeen, entries });
+      } catch {
+        // Silent: don't spam user if the backend is briefly unavailable.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleDismissWhatsNew = useCallback(() => {
+    if (whatsNew) {
+      localStorage.setItem('dashboard:last-seen-version', whatsNew.currentVersion);
+    }
+    setWhatsNew(null);
+  }, [whatsNew]);
 
   // Panel visibility & resizable widths
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -912,6 +958,15 @@ export default function App() {
 
       {pluginsModalOpen && (
         <PluginsModal onClose={() => setPluginsModalOpen(false)} />
+      )}
+
+      {whatsNew && (
+        <WhatsNewModal
+          currentVersion={whatsNew.currentVersion}
+          previousVersion={whatsNew.previousVersion}
+          entries={whatsNew.entries}
+          onClose={handleDismissWhatsNew}
+        />
       )}
 
       {pendingDelete && (

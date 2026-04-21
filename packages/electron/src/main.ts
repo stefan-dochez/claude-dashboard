@@ -127,6 +127,7 @@ function startBackend(): ChildProcess {
       NODE_ENV: 'production',
       PORT: String(BACKEND_PORT),
       FRONTEND_PATH: path.join(process.resourcesPath, 'frontend'),
+      CHANGELOG_PATH: path.join(process.resourcesPath, 'CHANGELOG.md'),
     };
     // spawn with absolute path, no shell — avoids "Program Files" space issue
     return spawn(nodeBin, [indexJs], { cwd, env: prodEnv, stdio: 'pipe' });
