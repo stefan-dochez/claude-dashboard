@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.17.1]
+
+### Features
+
+- **View menu with DevTools & Reload** — Added a native "View" menu (macOS) exposing Reload (`Cmd+R`), Force Reload (`Cmd+Shift+R`), Toggle Developer Tools (`Cmd+Opt+I`), zoom controls, and fullscreen. Makes renderer-side diagnostics possible in packaged builds without a dev setup.
+
 ## [0.17.0]
 
 ### Features
