@@ -126,6 +126,9 @@ export class StatusMonitor {
     if (rawTail.includes('for shortcuts')) return true;
     if (rawTail.includes('? for help')) return true;
     if (rawTail.includes('esc to interrupt')) return true;
+    // Mode-cycle hint in the footer — present at the prompt in all modes
+    // (default / accept-edits / plan), disappears during generation.
+    if (rawTail.includes('shift+tab to cycle')) return true;
 
     // --- Pass 2: per-line strip for config patterns and prompt chars ---
     const lines = rawTail.split('\r');

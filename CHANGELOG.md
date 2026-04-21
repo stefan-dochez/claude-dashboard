@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.17.3]
+
+### Fixes
+
+- **Status stuck on "processing"** — Added `"shift+tab to cycle"` to the list of prompt markers matched by the status monitor. Recent Claude CLI versions no longer emit the previously-matched strings (`"for shortcuts"`, `"? for help"`) at the idle prompt, so the detector never saw the instance return to `waiting_input` and the blue spinner stayed up indefinitely. The mode-cycle hint is present at the prompt in all modes (default / accept-edits / plan) and disappears during generation, making it a stable signal.
+
 ## [0.17.2]
 
 ### Fixes
