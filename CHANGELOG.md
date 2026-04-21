@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.20.2]
+
+### Fixes
+
+- **In-app updater didn't relaunch the app after install** — The swap script ended with `open -a "$(app.getName())"`, but `app.getName()` returned the npm `name` field (`@claude-dashboard/electron`) instead of the user-facing `productName`, so LaunchServices responded with `Unable to find application named '@claude-dashboard/electron'` and the app stayed closed after an update. Two complementary fixes: (1) set `productName: "Claude Dashboard"` at the top level of `packages/electron/package.json` so `app.getName()` returns the right value everywhere, and (2) rework the swap script to use `open "${appBundlePath}"` (direct path, no name lookup) before the cleanup steps — with a retry after 1s and an `open -a` fallback — so a detach/rm failure can't block the relaunch either. Log output is in `~/.claude-dashboard/logs/updater.log`.
+
 ## [0.20.1]
 
 ### Features
