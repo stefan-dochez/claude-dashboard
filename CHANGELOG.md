@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.17.2]
+
+### Fixes
+
+- **Terminal frozen after DECRQM sequence** — Switched the frontend Vite minifier from esbuild to Terser. esbuild's aggressive DCE of transpiled `const enum` declarations was stripping the outer `var V;` while keeping the IIFE `(void 0 || (n = {}))` that references it, causing a `ReferenceError: n is not defined` at runtime inside xterm's `requestMode`/DECRQM handler. The symptom was a silently frozen terminal in packaged builds only: user input still reached the PTY but `term.write()` crashed on the first DECRQM reply, so no output was ever rendered.
+
 ## [0.17.1]
 
 ### Features
