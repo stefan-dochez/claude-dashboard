@@ -15,6 +15,7 @@ import type { TaskStore } from './task-store.js';
 import type { IdeService, IdeType } from './ide-service.js';
 import type { PrAggregator } from './pr-aggregator.js';
 import type { UpdateChecker } from './update-checker.js';
+import type { PluginsManager } from './plugins-manager.js';
 import { runHealthCheck } from './health.js';
 import { TIMEOUTS, LIMITS } from './constants.js';
 import { createLogger } from './logger.js';
@@ -64,6 +65,7 @@ export function createRoutes(
   ideService: IdeService,
   prAggregator: PrAggregator,
   updateChecker: UpdateChecker,
+  pluginsManager: PluginsManager,
 ): Router {
   const router = Router();
 
@@ -117,6 +119,88 @@ export function createRoutes(
   router.put('/api/config', asyncHandler(async (req, res) => {
     const updated = await configService.save(req.body);
     res.json(updated);
+  }));
+
+  // Plugins — wraps the `claude plugin` CLI
+  router.get('/api/plugins', asyncHandler(async (_req, res) => {
+    const data = await pluginsManager.listAll();
+    res.json(data);
+  }));
+
+  router.post('/api/plugins/marketplaces', asyncHandler(async (req, res) => {
+    const { source } = req.body as { source?: string };
+    if (!source) {
+      res.status(400).json({ error: 'source is required' });
+      return;
+    }
+    await pluginsManager.addMarketplace(source);
+    res.json({ ok: true });
+  }));
+
+  router.delete('/api/plugins/marketplaces/:name', asyncHandler(async (req, res) => {
+    await pluginsManager.removeMarketplace(req.params.name);
+    res.json({ ok: true });
+  }));
+
+  router.post('/api/plugins/marketplaces/update', asyncHandler(async (req, res) => {
+    const { name } = req.body as { name?: string };
+    await pluginsManager.updateMarketplaces(name);
+    res.json({ ok: true });
+  }));
+
+  router.post('/api/plugins/install', asyncHandler(async (req, res) => {
+    const { pluginId } = req.body as { pluginId?: string };
+    if (!pluginId) {
+      res.status(400).json({ error: 'pluginId is required' });
+      return;
+    }
+    await pluginsManager.installPlugin(pluginId);
+    res.json({ ok: true });
+  }));
+
+  router.post('/api/plugins/update', asyncHandler(async (req, res) => {
+    const { pluginId } = req.body as { pluginId?: string };
+    if (!pluginId) {
+      res.status(400).json({ error: 'pluginId is required' });
+      return;
+    }
+    await pluginsManager.updatePlugin(pluginId);
+    res.json({ ok: true });
+  }));
+
+  router.post('/api/plugins/enable', asyncHandler(async (req, res) => {
+    const { pluginId } = req.body as { pluginId?: string };
+    if (!pluginId) {
+      res.status(400).json({ error: 'pluginId is required' });
+      return;
+    }
+    await pluginsManager.enablePlugin(pluginId);
+    res.json({ ok: true });
+  }));
+
+  router.post('/api/plugins/disable', asyncHandler(async (req, res) => {
+    const { pluginId } = req.body as { pluginId?: string };
+    if (!pluginId) {
+      res.status(400).json({ error: 'pluginId is required' });
+      return;
+    }
+    await pluginsManager.disablePlugin(pluginId);
+    res.json({ ok: true });
+  }));
+
+  router.delete('/api/plugins/:pluginId', asyncHandler(async (req, res) => {
+    await pluginsManager.uninstallPlugin(req.params.pluginId);
+    res.json({ ok: true });
+  }));
+
+  router.get('/api/plugins/readme', asyncHandler(async (req, res) => {
+    const installPath = req.query.installPath as string | undefined;
+    if (!installPath) {
+      res.status(400).json({ error: 'installPath is required' });
+      return;
+    }
+    const { content, filename } = await pluginsManager.getPluginReadme(installPath);
+    res.json({ content, filename });
   }));
 
   // Projects

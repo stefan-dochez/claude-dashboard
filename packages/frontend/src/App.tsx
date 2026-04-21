@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Terminal, MessageSquare, GitBranch, PanelLeft, Loader2,
   FileCode2, GitPullRequest, FolderOpen, Info, Sun, Moon, Download,
-  Columns2, Maximize2, Radio,
+  Columns2, Maximize2, Radio, Package,
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ContextPanel from './components/ContextPanel';
@@ -21,6 +21,7 @@ import CodeSearchModal from './components/CodeSearchModal';
 import CommandPalette from './components/CommandPalette';
 import ScanPathsModal from './components/ScanPathsModal';
 import PromptTemplatesModal from './components/PromptTemplatesModal';
+import PluginsModal from './components/PluginsModal';
 import CostDashboard from './components/CostDashboard';
 import ToastContainer from './components/ToastContainer';
 import { useProjects } from './hooks/useProjects';
@@ -71,6 +72,7 @@ export default function App() {
   const [codeSearchOpen, setCodeSearchOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
+  const [pluginsModalOpen, setPluginsModalOpen] = useState(false);
   const [pendingTemplateContent, setPendingTemplateContent] = useState<string | null>(null);
   const [costDashboardOpen, setCostDashboardOpen] = useState(false);
   const [prViewProject, setPrViewProject] = useState<{ path: string; name: string } | null>(null);
@@ -400,6 +402,7 @@ export default function App() {
     onOpenScanPaths: useCallback(() => setScanPathsOpen(true), []),
     onOpenTemplates: useCallback(() => setTemplatesModalOpen(true), []),
     onOpenCostDashboard: useCallback(() => setCostDashboardOpen(true), []),
+    onOpenPlugins: useCallback(() => setPluginsModalOpen(true), []),
     onToggleNotifications: useCallback(async () => {
       const current = config?.notifications ?? { enabled: true, sound: false };
       await updateConfig({ notifications: { ...current, enabled: !current.enabled } });
@@ -560,6 +563,13 @@ export default function App() {
             title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           >
             {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            onClick={() => setPluginsModalOpen(true)}
+            className="rounded p-1 text-faint transition-colors hover:text-secondary"
+            title="Plugins"
+          >
+            <Package className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setSidebarOpen(prev => !prev)}
@@ -898,6 +908,10 @@ export default function App() {
 
       {costDashboardOpen && (
         <CostDashboard onClose={() => setCostDashboardOpen(false)} />
+      )}
+
+      {pluginsModalOpen && (
+        <PluginsModal onClose={() => setPluginsModalOpen(false)} />
       )}
 
       {pendingDelete && (

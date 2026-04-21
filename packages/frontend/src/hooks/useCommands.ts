@@ -3,7 +3,7 @@ import {
   PanelLeft, FolderOpen, Info, Terminal, FileCode2,
   GitPullRequest, Search, Settings, Play, XCircle,
   Star, RefreshCw, MessageSquare, LayoutTemplate,
-  TrendingUp, Bell, Sun, Moon, Type, Palette,
+  TrendingUp, Bell, Sun, Moon, Type, Palette, Package,
 } from 'lucide-react';
 import { TERMINAL_THEMES } from '../terminal-themes';
 import type { TerminalThemeId } from '../terminal-themes';
@@ -44,6 +44,7 @@ interface UseCommandsOptions {
   onOpenScanPaths: () => void;
   onOpenTemplates: () => void;
   onOpenCostDashboard: () => void;
+  onOpenPlugins: () => void;
   onToggleNotifications: () => void;
   notificationsEnabled: boolean;
   onToggleTitleGeneration: () => void;
@@ -81,6 +82,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onOpenScanPaths,
     onOpenTemplates,
     onOpenCostDashboard,
+    onOpenPlugins,
     onToggleNotifications,
     notificationsEnabled,
     onToggleTitleGeneration,
@@ -177,6 +179,17 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       shortcut: `${MOD}${SHIFT}A`,
       keywords: ['cost', 'analytics', 'tokens', 'usage', 'money', 'spending', 'dashboard'],
       onExecute: onOpenCostDashboard,
+    });
+
+    commands.push({
+      id: 'plugins-manager',
+      label: 'Plugins: Open manager',
+      description: 'Browse, install, and manage Claude plugins',
+      category: 'action',
+      icon: Package,
+      iconColor: 'text-violet-400',
+      keywords: ['plugin', 'plugins', 'marketplace', 'install', 'skill', 'package'],
+      onExecute: onOpenPlugins,
     });
 
     commands.push({
@@ -367,7 +380,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     sidebarOpen, onToggleSidebar, rightPanel, onToggleFiles, onToggleContext,
     onSetTab, selectedInstance,
     onOpenCodeSearch, onOpenScanPaths, onOpenTemplates,
-    onOpenCostDashboard, onToggleNotifications, notificationsEnabled,
+    onOpenCostDashboard, onOpenPlugins, onToggleNotifications, notificationsEnabled,
     onToggleTitleGeneration, titleGenerationEnabled,
     onRefreshProjects, theme, onToggleTheme,
   ]);

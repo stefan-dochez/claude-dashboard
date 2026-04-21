@@ -142,3 +142,45 @@ export interface PromptTemplate {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Marketplace {
+  name: string;
+  source: string;
+  repo?: string;
+  url?: string;
+  path?: string;
+  installLocation: string;
+}
+
+export interface InstalledPlugin {
+  id: string;
+  name: string;
+  marketplaceName: string;
+  version: string;
+  scope: 'user' | 'project';
+  enabled: boolean;
+  installPath: string;
+  installedAt: string;
+  lastUpdated: string;
+  errors?: string[];
+  description?: string;
+}
+
+export interface AvailablePlugin {
+  pluginId: string;
+  name: string;
+  description: string;
+  marketplaceName: string;
+  source: unknown;
+  installCount?: number;
+  author?: { name?: string };
+  keywords?: string[];
+  category?: string;
+  isInstalled: boolean;
+}
+
+export interface PluginsListResponse {
+  marketplaces: Marketplace[];
+  installed: InstalledPlugin[];
+  available: AvailablePlugin[];
+}

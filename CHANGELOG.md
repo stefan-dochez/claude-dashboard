@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.18.0]
+
+### Features
+
+- **Plugins manager** — New modal that wraps the `claude plugin` CLI so you can manage marketplaces and plugins without dropping to a terminal. Lists all configured marketplaces as removable pills (with an `Add` input that takes `owner/repo`, a git URL, or a local path) and an `Update all` button. Two-column body: available plugins on the left (filterable per marketplace, full-text search across name/description/keywords) and installed plugins on the right. Each installed plugin shows its version, scope, last-updated time, install errors surfaced by the CLI, and a single-click `Enabled/Disabled` toggle. `Install`, `Update`, and `Uninstall` actions are wired through the CLI and the list refreshes automatically on success. `View README` opens the plugin's README.md (or `.claude-plugin/plugin.json` fallback) in a preview sub-modal. Accessible via a Package icon in the topbar and a `Plugins: Open manager` entry in the command palette (⌘K). User-scope only for the MVP; project-scope plugins are listed but not actionable here.
+
 ## [0.17.3]
 
 ### Fixes
