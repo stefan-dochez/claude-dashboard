@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowUpCircle, X, Download, AlertCircle } from 'lucide-react';
 import type { UpdateProgress, UpdateStatus } from '../types/electron';
+import { usePlatform } from '../hooks/usePlatform';
 
 interface UpdateAsset {
   name: string;
@@ -40,8 +41,14 @@ export default function UpdateBanner() {
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { platform } = usePlatform();
 
-  const canInstall = Boolean(window.electronAPI?.isElectron && update?.asset);
+  // In-app install is currently only validated on macOS. On Windows the
+  // download + NSIS `/S` path is untested and known to have gaps (no auto-
+  // relaunch, oneClick:false wizard still shows). Fall back to "View release"
+  // there until the Windows flow is hardened.
+  const isSupportedPlatform = platform?.platform === 'darwin';
+  const canInstall = Boolean(window.electronAPI?.isElectron && update?.asset && isSupportedPlatform);
 
   useEffect(() => {
     fetch('/api/update-check')

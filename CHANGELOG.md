@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.20.4]
+
+### Fixes
+
+- **"Install & restart" hidden on non-macOS** — The in-app install flow has only been validated on macOS. On Windows the current implementation (`spawn` the NSIS installer with `/S` then quit) has known gaps: the `oneClick: false` wizard still shows, the app is not relaunched automatically, and file locks can race with the uninstall-and-replace step. Until the Windows flow is hardened (likely via a PowerShell helper script analogous to the macOS bash one), the update banner on non-macOS platforms only shows "View release", letting users download the installer manually. The dormant Windows code path in `update-installer.ts` is kept in place so it can be re-enabled once tested.
+
 ## [0.20.3]
 
 ### Fixes
