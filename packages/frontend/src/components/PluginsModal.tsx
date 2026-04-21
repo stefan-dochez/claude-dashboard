@@ -193,9 +193,11 @@ function AvailablePluginCard({ plugin, busy, onInstall, onView, installedPath }:
   );
 }
 
+type InstalledAction = 'enable' | 'disable' | 'update' | 'uninstall';
+
 interface InstalledPluginCardProps {
   plugin: InstalledPlugin;
-  busy: boolean;
+  busyAction: InstalledAction | null;
   onEnable: () => void;
   onDisable: () => void;
   onUpdate: () => void;
@@ -204,8 +206,9 @@ interface InstalledPluginCardProps {
 }
 
 function InstalledPluginCard({
-  plugin, busy, onEnable, onDisable, onUpdate, onUninstall, onView,
+  plugin, busyAction, onEnable, onDisable, onUpdate, onUninstall, onView,
 }: InstalledPluginCardProps) {
+  const busy = busyAction !== null;
   const hasErrors = plugin.errors && plugin.errors.length > 0;
   return (
     <div className={`mb-1.5 flex flex-col gap-1.5 rounded-lg border p-3 transition-colors ${
@@ -227,8 +230,12 @@ function InstalledPluginCard({
           }`}
           title={plugin.enabled ? 'Click to disable' : 'Click to enable'}
         >
-          <Power className="h-2.5 w-2.5" />
-          {plugin.enabled ? 'Enabled' : 'Disabled'}
+          {busyAction === 'enable' || busyAction === 'disable' ? (
+            <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+          ) : (
+            <Power className="h-2.5 w-2.5" />
+          )}
+          {busyAction === 'enable' ? 'Enabling…' : busyAction === 'disable' ? 'Disabling…' : plugin.enabled ? 'Enabled' : 'Disabled'}
         </button>
       </div>
       {plugin.description && (
@@ -261,8 +268,8 @@ function InstalledPluginCard({
           disabled={busy}
           className="inline-flex items-center gap-1 rounded-md border border-border-input bg-elevated px-2.5 py-1 text-[11px] text-primary transition-colors hover:bg-hover disabled:opacity-50"
         >
-          <RefreshCw className={`h-3 w-3 ${busy ? 'animate-spin' : ''}`} />
-          Update
+          <RefreshCw className={`h-3 w-3 ${busyAction === 'update' ? 'animate-spin' : ''}`} />
+          {busyAction === 'update' ? 'Updating…' : 'Update'}
         </button>
         <button
           onClick={() => onView(plugin.installPath)}
@@ -277,8 +284,12 @@ function InstalledPluginCard({
           className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
           title="Uninstall"
         >
-          <Trash2 className="h-3 w-3" />
-          Uninstall
+          {busyAction === 'uninstall' ? (
+            <RefreshCw className="h-3 w-3 animate-spin" />
+          ) : (
+            <Trash2 className="h-3 w-3" />
+          )}
+          {busyAction === 'uninstall' ? 'Uninstalling…' : 'Uninstall'}
         </button>
       </div>
     </div>
@@ -288,7 +299,7 @@ function InstalledPluginCard({
 export default function PluginsModal({ onClose }: PluginsModalProps) {
   const modalRef = useFocusTrap<HTMLDivElement>();
   const {
-    marketplaces, installed, available, loading, error,
+    marketplaces, installed, available, loading, refreshing, error,
     addMarketplace, removeMarketplace, updateMarketplaces,
     installPlugin, uninstallPlugin, updatePlugin,
     enablePlugin, disablePlugin, getReadme,
@@ -299,7 +310,7 @@ export default function PluginsModal({ onClose }: PluginsModalProps) {
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all');
   const [availableSearch, setAvailableSearch] = useState('');
   const [installedSearch, setInstalledSearch] = useState('');
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<{ id: string; action: 'install' | InstalledAction } | null>(null);
   const [toast, setToast] = useState<{ kind: 'info' | 'error'; msg: string } | null>(null);
   const [readmeModal, setReadmeModal] = useState<{ name: string; installPath: string } | null>(null);
 
@@ -352,15 +363,20 @@ export default function PluginsModal({ onClose }: PluginsModalProps) {
     }
   }, [updateMarketplaces, showError]);
 
-  const withBusy = useCallback(async (id: string, fn: () => Promise<void>, successMsg?: string) => {
-    setBusyId(id);
+  const withBusy = useCallback(async (
+    id: string,
+    action: 'install' | InstalledAction,
+    fn: () => Promise<void>,
+    successMsg?: string,
+  ) => {
+    setBusy({ id, action });
     try {
       await fn();
       if (successMsg) setToast({ kind: 'info', msg: successMsg });
     } catch (e) {
       showError(e);
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
   }, [showError]);
 
@@ -407,6 +423,12 @@ export default function PluginsModal({ onClose }: PluginsModalProps) {
               Plugins
             </h2>
             <span className="ml-3 text-[11px] text-faint">Browse, install, and manage Claude Code plugins from your configured marketplaces</span>
+            {refreshing && (
+              <span className="ml-3 inline-flex items-center gap-1.5 text-[11px] text-muted">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Refreshing…
+              </span>
+            )}
             <button
               onClick={onClose}
               className="ml-auto rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-primary"
@@ -504,9 +526,9 @@ export default function PluginsModal({ onClose }: PluginsModalProps) {
                       <AvailablePluginCard
                         key={plugin.pluginId}
                         plugin={plugin}
-                        busy={busyId === plugin.pluginId}
+                        busy={busy?.id === plugin.pluginId && busy.action === 'install'}
                         installedPath={installedPathById.get(plugin.pluginId)}
-                        onInstall={() => withBusy(plugin.pluginId, () => installPlugin(plugin.pluginId), `Installed ${plugin.name}`)}
+                        onInstall={() => withBusy(plugin.pluginId, 'install', () => installPlugin(plugin.pluginId), `Installed ${plugin.name}`)}
                         onView={(installPath) => setReadmeModal({ name: plugin.name, installPath })}
                       />
                     ))
@@ -539,11 +561,11 @@ export default function PluginsModal({ onClose }: PluginsModalProps) {
                       <InstalledPluginCard
                         key={plugin.id}
                         plugin={plugin}
-                        busy={busyId === plugin.id}
-                        onEnable={() => withBusy(plugin.id, () => enablePlugin(plugin.id), `Enabled ${plugin.name}`)}
-                        onDisable={() => withBusy(plugin.id, () => disablePlugin(plugin.id), `Disabled ${plugin.name}`)}
-                        onUpdate={() => withBusy(plugin.id, () => updatePlugin(plugin.id), `Updated ${plugin.name}`)}
-                        onUninstall={() => withBusy(plugin.id, () => uninstallPlugin(plugin.id), `Uninstalled ${plugin.name}`)}
+                        busyAction={busy?.id === plugin.id && busy.action !== 'install' ? busy.action : null}
+                        onEnable={() => withBusy(plugin.id, 'enable', () => enablePlugin(plugin.id), `Enabled ${plugin.name}`)}
+                        onDisable={() => withBusy(plugin.id, 'disable', () => disablePlugin(plugin.id), `Disabled ${plugin.name}`)}
+                        onUpdate={() => withBusy(plugin.id, 'update', () => updatePlugin(plugin.id), `Updated ${plugin.name}`)}
+                        onUninstall={() => withBusy(plugin.id, 'uninstall', () => uninstallPlugin(plugin.id), `Uninstalled ${plugin.name}`)}
                         onView={(installPath) => setReadmeModal({ name: plugin.name, installPath })}
                       />
                     ))

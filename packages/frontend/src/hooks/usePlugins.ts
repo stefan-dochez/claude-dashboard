@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Marketplace, InstalledPlugin, AvailablePlugin, PluginsListResponse } from '../types';
 
 async function parseJsonError(res: Response, fallback: string): Promise<string> {
@@ -24,10 +24,13 @@ export function usePlugins(enabled: boolean) {
   const [installed, setInstalled] = useState<InstalledPlugin[]>([]);
   const [available, setAvailable] = useState<AvailablePlugin[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
 
   const fetchAll = useCallback(async () => {
-    setLoading(true);
+    if (hasLoadedRef.current) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/plugins');
@@ -36,10 +39,12 @@ export function usePlugins(enabled: boolean) {
       setMarketplaces(data.marketplaces);
       setInstalled(data.installed);
       setAvailable(data.available);
+      hasLoadedRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch plugins');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -100,6 +105,7 @@ export function usePlugins(enabled: boolean) {
     installed,
     available,
     loading,
+    refreshing,
     error,
     refetch: fetchAll,
     addMarketplace,

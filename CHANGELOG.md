@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.18.2]
+
+### UI
+
+- **Plugins manager — smoother mutation feedback** — Install/uninstall/update/enable/disable no longer wipe the modal body with a centered "Loading…" during the post-mutation refetch. The list stays visible, a discreet "Refreshing…" indicator appears in the header, and the specific action button shows its own spinner + label (`Installing…`, `Uninstalling…`, `Updating…`, `Enabling…`, `Disabling…`). Internally, `usePlugins` now distinguishes initial `loading` from subsequent `refreshing`, and the modal tracks `{ id, action }` instead of a shared `busyId`.
+
 ## [0.18.1]
 
 ### Fixes
