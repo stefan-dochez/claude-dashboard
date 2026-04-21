@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles, X, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -7,6 +7,7 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 export interface ChangelogEntry {
   version: string;
   content: string;
+  releaseUrl?: string;
 }
 
 interface WhatsNewModalProps {
@@ -60,6 +61,18 @@ export default function WhatsNewModal({ currentVersion, previousVersion, entries
               <section key={entry.version} className="mb-6 last:mb-0">
                 <h3 className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-primary">
                   <span className="font-mono text-violet-400">v{entry.version}</span>
+                  {entry.releaseUrl && (
+                    <a
+                      href={entry.releaseUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-normal text-muted transition-colors hover:bg-elevated hover:text-primary"
+                      title="View release on GitHub"
+                    >
+                      <ExternalLink className="h-2.5 w-2.5" />
+                      GitHub
+                    </a>
+                  )}
                 </h3>
                 <div className="text-[13px] leading-relaxed text-secondary">
                   <ReactMarkdown
@@ -91,10 +104,25 @@ export default function WhatsNewModal({ currentVersion, previousVersion, entries
           )}
         </div>
 
-        <div className="flex items-center justify-end border-t border-border-default px-5 py-3">
+        <div className="flex items-center border-t border-border-default px-5 py-3">
+          {(() => {
+            const latest = entries[entries.length - 1];
+            if (!latest?.releaseUrl) return null;
+            return (
+              <a
+                href={latest.releaseUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[11px] text-muted transition-colors hover:text-primary"
+              >
+                <ExternalLink className="h-3 w-3" />
+                View full release notes on GitHub
+              </a>
+            );
+          })()}
           <button
             onClick={onClose}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-500"
+            className="ml-auto rounded-md bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-500"
           >
             Got it
           </button>

@@ -89,13 +89,19 @@ export function createRoutes(
   }));
 
   // Changelog entries in the range (since, currentVersion]. If `since` is
-  // omitted, returns only the entry for the current version.
+  // omitted, returns only the entry for the current version. Each entry is
+  // enriched with the GitHub release URL for its tag.
   router.get('/api/changelog', asyncHandler(async (req, res) => {
     const since = typeof req.query.since === 'string' && req.query.since.length > 0
       ? req.query.since
       : null;
     const entries = await readChangelogSince(since, appVersion);
-    res.json({ currentVersion: appVersion, entries });
+    const repo = updateChecker.getRepo();
+    const enriched = entries.map(e => ({
+      ...e,
+      releaseUrl: `https://github.com/${repo}/releases/tag/v${e.version}`,
+    }));
+    res.json({ currentVersion: appVersion, entries: enriched });
   }));
 
 

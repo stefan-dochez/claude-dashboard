@@ -91,6 +91,11 @@ export class UpdateChecker {
     this.repo = repo ?? DEFAULT_REPO;
   }
 
+  /** Repo identifier in `owner/name` form — used to build per-version release URLs. */
+  getRepo(): string {
+    return this.repo;
+  }
+
   async check(force = false): Promise<UpdateCheckResult> {
     if (!force && this.cached && Date.now() - this.cachedAt < this.cachedTtl) {
       return this.cached;

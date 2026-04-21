@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.20.1]
+
+### Features
+
+- **"View release on GitHub" links in the What's new modal** — Each version header in the modal now has a small `GitHub` chip that opens the corresponding release page in a new tab, and the modal footer has a `View full release notes on GitHub` link pointing to the latest entry. Useful when the inline changelog is truncated and you want the full commit list, assets, or social preview. Backend: `/api/changelog` now enriches each entry with a `releaseUrl` built from the repo configured on `UpdateChecker` (reused via a new `getRepo()` getter, so the URL stays consistent with `UPDATE_REPO` overrides).
+
 ## [0.20.0]
 
 ### Features
