@@ -3,9 +3,18 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import { createLogger } from './logger.js';
+import { PATH_SEP, getExtraPaths } from './platform.js';
 
 const log = createLogger('plugins-manager');
 const execAsync = promisify(exec);
+
+function enrichedEnv(): NodeJS.ProcessEnv {
+  const extra = getExtraPaths();
+  return {
+    ...process.env,
+    PATH: [...extra, process.env.PATH ?? ''].join(PATH_SEP),
+  };
+}
 
 /** Default timeout for `claude plugin` CLI calls. Some network-backed ops (install/update) can take longer. */
 const CLI_TIMEOUT_MS = 120_000;
@@ -96,7 +105,7 @@ interface RawAvailable {
 export class PluginsManager {
   private async runCli(args: string, timeoutMs = CLI_TIMEOUT_MS): Promise<string> {
     try {
-      const { stdout } = await execAsync(`claude plugin ${args}`, { timeout: timeoutMs });
+      const { stdout } = await execAsync(`claude plugin ${args}`, { timeout: timeoutMs, env: enrichedEnv() });
       return stdout;
     } catch (err) {
       const e = err as { stderr?: string; message?: string };

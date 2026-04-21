@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.18.1]
+
+### Fixes
+
+- **Plugins manager fails with `claude: command not found` in Electron** — `plugins-manager.ts` invoked `claude plugin ...` via `exec` without enriching the child-process `PATH` with `getExtraPaths()`, so the binary installed in `/opt/homebrew/bin` (or `~/.local/bin`) was not resolved when the backend ran inside the packaged Electron app. Same class of bug previously fixed on `health.ts` and `title-generator.ts`.
+
 ## [0.18.0]
 
 ### Features
