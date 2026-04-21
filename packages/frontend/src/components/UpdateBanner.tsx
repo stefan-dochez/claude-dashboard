@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowUpCircle, X, Download, AlertCircle } from 'lucide-react';
 import type { UpdateProgress, UpdateStatus } from '../types/electron';
 import { usePlatform } from '../hooks/usePlatform';
@@ -21,6 +21,8 @@ interface UpdateCheckResult {
 }
 
 const DISMISSED_KEY = 'dashboard:update-dismissed';
+const POLL_INTERVAL_MS = 30 * 60 * 1000;
+const FOCUS_MIN_INTERVAL_MS = 10 * 60 * 1000;
 
 function formatMB(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -50,17 +52,45 @@ export default function UpdateBanner() {
   const isSupportedPlatform = platform?.platform === 'darwin';
   const canInstall = Boolean(window.electronAPI?.isElectron && update?.asset && isSupportedPlatform);
 
-  useEffect(() => {
-    fetch('/api/update-check')
-      .then(r => r.json())
-      .then((result: UpdateCheckResult) => {
-        if (!result.updateAvailable || !result.latestVersion) return;
-        const dismissed = localStorage.getItem(DISMISSED_KEY);
-        if (dismissed === result.latestVersion) return;
-        setUpdate(result);
-      })
-      .catch(() => {}); // silent: don't spam user if offline or API down
+  const lastCheckRef = useRef(0);
+
+  const checkForUpdate = useCallback(async () => {
+    try {
+      const res = await fetch('/api/update-check');
+      if (!res.ok) return;
+      const result = await res.json() as UpdateCheckResult;
+      lastCheckRef.current = Date.now();
+      if (!result.updateAvailable || !result.latestVersion) {
+        // No update (or app was updated past the previously-available version):
+        // clear the banner so stale state doesn't linger.
+        setUpdate(null);
+        return;
+      }
+      const dismissed = localStorage.getItem(DISMISSED_KEY);
+      if (dismissed === result.latestVersion) return;
+      setUpdate(result);
+    } catch {
+      // Silent: don't spam user if offline or API down.
+    }
   }, []);
+
+  // Initial check + periodic polling. Also re-check on window focus if the
+  // last check is more than FOCUS_MIN_INTERVAL_MS old — catches the case where
+  // the app sat in the background for hours and a new release shipped.
+  useEffect(() => {
+    checkForUpdate();
+    const interval = setInterval(checkForUpdate, POLL_INTERVAL_MS);
+    const onFocus = () => {
+      if (Date.now() - lastCheckRef.current > FOCUS_MIN_INTERVAL_MS) {
+        checkForUpdate();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [checkForUpdate]);
 
   useEffect(() => {
     if (!installing || !window.electronAPI) return;

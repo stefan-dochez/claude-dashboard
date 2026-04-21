@@ -2,6 +2,14 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.20.5]
+
+### Features
+
+- **Periodic update check** — The update banner no longer only checks at startup. It now polls `/api/update-check` every 30 minutes, and additionally re-checks whenever the window regains focus if the last check is more than 10 minutes old. That catches the common case where the app has been sitting in the background for hours and a new release shipped in the meantime — you come back to the app and see the banner almost immediately instead of having to restart. If a poll returns "no update available" while a banner is showing (e.g. you just installed the update in-app), the banner now clears itself so stale state doesn't linger.
+
+  **Backend** — `update-checker` cache TTL shortened from 6h to 1h so that the frontend polls have a chance to pick up a new release within the hour without every poll hitting the GitHub API. Error responses still cache for 1 minute to keep retries cheap when offline.
+
 ## [0.20.4]
 
 ### Fixes

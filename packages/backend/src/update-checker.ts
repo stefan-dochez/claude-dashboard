@@ -3,7 +3,7 @@ import { createLogger } from './logger.js';
 const log = createLogger('update-checker');
 
 const DEFAULT_REPO = 'stefan-dochez/claude-dashboard';
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 60 * 1000;
 const ERROR_CACHE_TTL_MS = 60 * 1000;
 const FETCH_TIMEOUT_MS = 5000;
 
