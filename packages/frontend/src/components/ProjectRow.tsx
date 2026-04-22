@@ -158,79 +158,83 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
                 <span className={`min-w-0 flex-1 truncate text-[11px] ${isSelected ? 'text-primary' : 'text-tertiary'}`}>
                   {inst.taskDescription ?? inst.branchName ?? STATUS_LABEL[inst.status]}
                 </span>
-                {instStatus && (
-                  <CiStatusBadge
-                    status={instStatus}
-                    onClick={e => {
-                      e.stopPropagation();
-                      if (instStatus.prUrl) window.open(instStatus.prUrl, '_blank', 'noopener');
-                    }}
-                  />
-                )}
-                <span className="shrink-0 text-[9px] text-faint">
+                <span className="w-[28px] shrink-0 text-right text-[9px] text-faint">
                   {new Date(inst.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
-                {installedIdes.length > 0 && (
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      onOpenInIde(inst.worktreePath ?? inst.projectPath);
-                    }}
-                    className="shrink-0 rounded p-0.5 text-faint opacity-0 transition-all hover:text-cyan-400 group-hover/inst:opacity-100"
-                    title={`Open in IDE${inst.worktreePath ? ' (worktree)' : ''}`}
-                  >
-                    <Code2 className="h-2.5 w-2.5" />
-                  </button>
-                )}
-                {inst.status !== 'exited' ? (
-                  confirmKillId === inst.id && inst.worktreePath ? (
-                    <div className="flex shrink-0 items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                      <button
-                        onClick={() => { onKillInstance(inst.id, false); setConfirmKillId(null); }}
-                        className="rounded bg-elevated px-1.5 py-0.5 text-[9px] font-medium text-secondary transition-colors hover:bg-hover"
-                        title="Kill instance only"
-                      >
-                        Kill
-                      </button>
-                      <button
-                        onClick={() => { onKillInstance(inst.id, true); setConfirmKillId(null); }}
-                        className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-medium text-rose-300 transition-colors hover:bg-rose-500/30"
-                        title="Kill and delete worktree"
-                      >
-                        +wt
-                      </button>
-                      <button
-                        onClick={() => setConfirmKillId(null)}
-                        className="rounded p-0.5 text-faint transition-colors hover:text-secondary"
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </button>
-                    </div>
-                  ) : (
+                <span className="inline-flex h-3 w-3 shrink-0 items-center justify-center">
+                  {instStatus && (
+                    <CiStatusBadge
+                      status={instStatus}
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (instStatus.prUrl) window.open(instStatus.prUrl, '_blank', 'noopener');
+                      }}
+                    />
+                  )}
+                </span>
+                <div className="flex min-w-[54px] shrink-0 items-center justify-end gap-0.5">
+                  {installedIdes.length > 0 && (
                     <button
                       onClick={e => {
                         e.stopPropagation();
-                        if (inst.worktreePath) {
-                          setConfirmKillId(inst.id);
-                        } else {
-                          onKillInstance(inst.id);
-                        }
+                        onOpenInIde(inst.worktreePath ?? inst.projectPath);
                       }}
-                      className="shrink-0 rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
-                      title="Kill"
+                      className="rounded p-0.5 text-faint opacity-0 transition-all hover:text-cyan-400 group-hover/inst:opacity-100"
+                      title={`Open in IDE${inst.worktreePath ? ' (worktree)' : ''}`}
+                    >
+                      <Code2 className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                  {inst.status !== 'exited' ? (
+                    confirmKillId === inst.id && inst.worktreePath ? (
+                      <div className="flex shrink-0 items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => { onKillInstance(inst.id, false); setConfirmKillId(null); }}
+                          className="rounded bg-elevated px-1.5 py-0.5 text-[9px] font-medium text-secondary transition-colors hover:bg-hover"
+                          title="Kill instance only"
+                        >
+                          Kill
+                        </button>
+                        <button
+                          onClick={() => { onKillInstance(inst.id, true); setConfirmKillId(null); }}
+                          className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-medium text-rose-300 transition-colors hover:bg-rose-500/30"
+                          title="Kill and delete worktree"
+                        >
+                          +wt
+                        </button>
+                        <button
+                          onClick={() => setConfirmKillId(null)}
+                          className="rounded p-0.5 text-faint transition-colors hover:text-secondary"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (inst.worktreePath) {
+                            setConfirmKillId(inst.id);
+                          } else {
+                            onKillInstance(inst.id);
+                          }
+                        }}
+                        className="rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
+                        title="Kill"
+                      >
+                        <Trash2 className="h-2.5 w-2.5" />
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      onClick={e => { e.stopPropagation(); onDismissInstance(inst.id); }}
+                      className="rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
+                      title="Remove"
                     >
                       <Trash2 className="h-2.5 w-2.5" />
                     </button>
-                  )
-                ) : (
-                  <button
-                    onClick={e => { e.stopPropagation(); onDismissInstance(inst.id); }}
-                    className="shrink-0 rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
-                    title="Remove"
-                  >
-                    <Trash2 className="h-2.5 w-2.5" />
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
             );
           })}
@@ -249,16 +253,21 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
                 <span className="min-w-0 flex-1 truncate text-[11px] text-faint transition-colors group-hover/wt:text-tertiary">
                   {wt.gitBranch ?? wt.name}
                 </span>
-                {wtStatus && (
-                  <CiStatusBadge
-                    status={wtStatus}
-                    onClick={e => {
-                      e.stopPropagation();
-                      if (wtStatus.prUrl) window.open(wtStatus.prUrl, '_blank', 'noopener');
-                    }}
-                  />
-                )}
-                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/wt:opacity-100">
+                {/* Empty slot matching the session-row timestamp width so the
+                    CI badge lands in the same x-position on both row types. */}
+                <span className="w-[28px] shrink-0" aria-hidden />
+                <span className="inline-flex h-3 w-3 shrink-0 items-center justify-center">
+                  {wtStatus && (
+                    <CiStatusBadge
+                      status={wtStatus}
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (wtStatus.prUrl) window.open(wtStatus.prUrl, '_blank', 'noopener');
+                      }}
+                    />
+                  )}
+                </span>
+                <div className="flex min-w-[54px] shrink-0 items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover/wt:opacity-100">
                   {installedIdes.length > 0 && (
                     <span
                       onClick={e => { e.stopPropagation(); onOpenInIde(wt.path); }}

@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.21.3]
+
+### UX
+
+- **CI badges aligned between session and worktree rows** — Session rows had a timestamp between the branch name and the CI badge; worktree rows didn't, so the two badges landed at different x-offsets and looked randomly placed when expanded under the same project. Both row types now share the same right-hand column layout: a fixed-width `w-[28px]` slot for the metadata (timestamp on sessions, empty spacer on worktrees), a `w-3` slot for the badge, and a shared `min-w-[54px]` slot for the hover actions. Both CI badges now sit in the same column regardless of the row type, and the differing action-button counts (IDE+kill on sessions vs. IDE+play+delete on worktrees) no longer pull the badges left/right.
+
 ## [0.21.2]
 
 ### Fixes
