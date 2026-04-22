@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.20.7]
+
+### Fixes
+
+- **Escape sequences polluting session history prompts** — After v0.20.6 enabled the WebGL renderer, xterm.js started responding to DECRQM mode queries (e.g. `CSI ? 2026 $ p` for synchronized output). The response `ESC[?2026;2$y` was sent through the terminal input stream, and the backend's escape-stripping regex in `process-manager.trackInput` only covered parameter bytes (`0-9 ; ?`) and finals (`a-zA-Z~`) — it didn't match intermediate bytes like `$` (0x24), so DECRQM responses slipped through and got prefixed to the captured `firstUserPrompt`. Broadened the regex to the full CSI grammar: `ESC [ <params 0x30-0x3F>* <intermediates 0x20-0x2F>* <final 0x40-0x7E>`. Existing history entries created between v0.20.6 and this release will still show the prefix — new sessions are clean.
+
 ## [0.20.6]
 
 ### Fixes

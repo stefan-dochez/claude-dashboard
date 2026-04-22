@@ -316,10 +316,11 @@ export class ProcessManager extends EventEmitter {
   }
 
   private trackInput(handle: PtyHandle, data: string): void {
-    // Strip terminal escape sequences before processing
-    // Removes: CSI sequences (\x1b[...X), OSC sequences (\x1b]...ST),
-    // bracketed paste markers, and other ANSI escapes
-    const cleaned = data.replace(/\x1b\[[0-9;?]*[a-zA-Z~]/g, '')
+    // Strip terminal escape sequences before processing.
+    // CSI grammar: ESC [ <param bytes 0x30-0x3F>* <intermediate bytes 0x20-0x2F>* <final 0x40-0x7E>.
+    // Intermediates matter: DECRQM responses like ESC[?2026;2$y contain a `$` (0x24)
+    // that an overly narrow regex would leave behind, polluting the input buffer.
+    const cleaned = data.replace(/\x1b\[[\x30-\x3F]*[\x20-\x2F]*[\x40-\x7E]/g, '')
       .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
       .replace(/\x1b[^[\]]/g, '');
 
