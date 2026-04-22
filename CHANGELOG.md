@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.22.2]
+
+### Fixes
+
+- **`gh not found in PATH` in Electron on Windows** — Creating a PR or fetching its URL from the Changes tab failed because `routes.ts` used a bare `promisify(exec)` without enriching the child-process PATH, and `getExtraPaths()` didn't list GitHub CLI's install directory. When the backend runs inside the packaged Electron app on Windows, it doesn't always inherit the user's full login PATH, so `gh pr view` / `gh pr create` (and `git commit` / `git push`) returned ENOENT. Added `C:\Program Files\GitHub CLI`, the x86 variant, and `LocalAppData\Programs\GitHub CLI` to `getExtraPaths()`, and wrapped `execAsync` in `routes.ts` with the same augmented-env + `shell: true` pattern already used in `scanner.ts` and `worktree-manager.ts`. Same class of bug previously fixed on `health.ts`, `title-generator.ts`, and `plugins-manager.ts`.
+
 ## [0.22.1]
 
 ### Performance

@@ -35,13 +35,18 @@ export function shortenHomePath(fullPath: string): string {
 export function getExtraPaths(): string[] {
   if (IS_WINDOWS) {
     const programFiles = process.env.ProgramFiles ?? 'C:\\Program Files';
+    const programFilesX86 = process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)';
     const appData = process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming');
+    const localAppData = process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local');
     return [
       path.join(os.homedir(), '.local', 'bin'),
       path.join(programFiles, 'nodejs'),
       path.join(appData, 'npm'),
       path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'nodejs'),
       path.join(programFiles, 'Git', 'cmd'),
+      path.join(programFiles, 'GitHub CLI'),
+      path.join(programFilesX86, 'GitHub CLI'),
+      path.join(localAppData, 'Programs', 'GitHub CLI'),
     ];
   }
   return [
