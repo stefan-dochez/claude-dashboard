@@ -113,6 +113,14 @@ export class TaskStore {
     await this.save();
   }
 
+  async removeByWorktreePath(worktreePath: string): Promise<number> {
+    const before = this.tasks.length;
+    this.tasks = this.tasks.filter(t => t.worktreePath !== worktreePath);
+    const removed = before - this.tasks.length;
+    if (removed > 0) await this.save();
+    return removed;
+  }
+
   async updateTitle(id: string, title: string): Promise<void> {
     const task = this.tasks.find(t => t.id === id);
     if (task) {

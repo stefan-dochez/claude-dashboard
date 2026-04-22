@@ -2,6 +2,18 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.22.0]
+
+### Features
+
+- **Pick a previous session when clicking a worktree** — Clicking a standalone worktree row used to spawn a brand-new Claude instance unconditionally, even when that worktree already had prior sessions worth resuming. Clicking now checks the task history for completed sessions tied to that worktree (`worktreePath === wt.path && sessionId`): if there are none, it still launches directly as before; if there is at least one, it opens a small `WorktreeResumeModal` with a green "New session" button on top and the list of previous sessions below (title / date / cost), each clickable to resume. History is read from the state already loaded by the sidebar — no extra fetch. The shared `HistoryTask` type moved to `types.ts` (was duplicated between `Sidebar.tsx` and `LaunchModal.tsx`) and the sidebar now exposes `history` + `onResumeHistory` through `SidebarActionsContext`.
+
+### UX
+
+- **Power icon to close sessions, trash reserved for deletion** — The "kill session" button on active worktree sessions opened a three-button confirm flow ("Kill" / "+wt" / cancel), conflating two different destructive actions behind the same trash icon. The kill button is now a `Power` icon on every active session (main or worktree), clicks immediately close the session with no confirmation, and never offers to delete the worktree. The trash icon is now exclusively for deleting a *standalone* worktree (one with no active session) and keeps its existing 5-second undo toast. The `confirmKillId` state and its UI are gone.
+
+- **Deleting a worktree also deletes its history** — A leftover pile of history entries pointing at a no-longer-existing worktree was noise the user couldn't dismiss without clicking each one. `DELETE /api/worktrees` now calls `TaskStore.removeByWorktreePath(worktreePath)` after the worktree is removed and emits a `history:changed` socket event; the sidebar listens for that event and refetches the history so the entries disappear from the UI immediately. `createRoutes` takes the socket.io server as a new argument to make the broadcast possible.
+
 ## [0.21.5]
 
 ### UX

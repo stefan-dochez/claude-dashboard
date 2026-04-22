@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
+import type { Server as SocketServer } from 'socket.io';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
@@ -69,6 +70,7 @@ export function createRoutes(
   ciStatusService: CiStatusService,
   updateChecker: UpdateChecker,
   pluginsManager: PluginsManager,
+  io: SocketServer,
 ): Router {
   const router = Router();
 
@@ -431,6 +433,11 @@ export function createRoutes(
     }
 
     await worktreeManager.removeWorktree(projectPath, worktreePath);
+    const removedTasks = await taskStore.removeByWorktreePath(worktreePath);
+    if (removedTasks > 0) {
+      log.info(`Removed ${removedTasks} history task(s) tied to worktree ${worktreePath}`);
+      io.emit('history:changed');
+    }
     refreshProjectsInBackground(scanner);
     res.json({ ok: true });
   }));

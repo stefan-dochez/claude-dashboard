@@ -1,25 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap, MessageSquare, Terminal } from 'lucide-react';
-import type { Project } from '../types';
+import type { Project, HistoryTask } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const MAIN_BRANCHES = ['main', 'master', 'develop'];
-
-interface HistoryTask {
-  id: string;
-  projectPath: string;
-  projectName: string;
-  worktreePath: string | null;
-  sessionId: string | null;
-  mode: 'terminal' | 'chat';
-  firstPrompt: string | null;
-  title: string | null;
-  taskDescription: string | null;
-  branchName: string | null;
-  totalCostUsd: number;
-  createdAt: string;
-  endedAt: string | null;
-}
 
 const BRANCH_PREFIXES = [
   { value: 'feat', label: 'feat/' },

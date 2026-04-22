@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, GitBranch, GitPullRequest, Play, Star, Trash2, Terminal, MessageSquare, X, Layers, Code2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, GitBranch, GitPullRequest, Play, Power, Star, Trash2, Terminal, MessageSquare, Layers, Code2 } from 'lucide-react';
 import LaunchModal from './LaunchModal';
+import WorktreeResumeModal from './WorktreeResumeModal';
 import { useSidebarActions } from '../hooks/useSidebarActions';
 import { STATUS_DOT, STATUS_LABEL } from '../constants';
 import type { Project, BranchStatus } from '../types';
@@ -45,6 +46,7 @@ interface ProjectRowProps {
 export default function ProjectRow({ project, worktrees, showWorkspace }: ProjectRowProps) {
   const {
     instancesByProject, selectedInstanceId, favoriteProjects, prCounts, branchStatuses,
+    history, onResumeHistory,
     onSelectInstance, onKillInstance, onDismissInstance, onLaunch,
     onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects,
     onOpenInIde, onViewPrs, installedIdes,
@@ -57,7 +59,28 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
     return instances.length > 0 || worktrees.length > 0;
   });
   const [launchModalOpen, setLaunchModalOpen] = useState(false);
-  const [confirmKillId, setConfirmKillId] = useState<string | null>(null);
+  const [resumeWorktree, setResumeWorktree] = useState<Project | null>(null);
+
+  // Only resumable sessions (with a sessionId) matter here. Group by worktree path.
+  const sessionsByWorktree = useMemo(() => {
+    const map = new Map<string, typeof history>();
+    for (const t of history) {
+      if (!t.sessionId || !t.worktreePath) continue;
+      const list = map.get(t.worktreePath) ?? [];
+      list.push(t);
+      map.set(t.worktreePath, list);
+    }
+    return map;
+  }, [history]);
+
+  const handleWorktreeClick = (wt: Project) => {
+    const sessions = sessionsByWorktree.get(wt.path) ?? [];
+    if (sessions.length === 0) {
+      onLaunch(wt.path);
+    } else {
+      setResumeWorktree(wt);
+    }
+  };
 
   const activeInstances = instances.filter(i => i.status !== 'exited');
   const hasActivity = activeInstances.length > 0 || worktrees.length > 0;
@@ -208,45 +231,13 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
                     </button>
                   )}
                   {inst.status !== 'exited' ? (
-                    confirmKillId === inst.id && inst.worktreePath ? (
-                      <div className="flex shrink-0 items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => { onKillInstance(inst.id, false); setConfirmKillId(null); }}
-                          className="rounded bg-elevated px-1.5 py-0.5 text-[9px] font-medium text-secondary transition-colors hover:bg-hover"
-                          title="Kill instance only"
-                        >
-                          Kill
-                        </button>
-                        <button
-                          onClick={() => { onKillInstance(inst.id, true); setConfirmKillId(null); }}
-                          className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-medium text-rose-300 transition-colors hover:bg-rose-500/30"
-                          title="Kill and delete worktree"
-                        >
-                          +wt
-                        </button>
-                        <button
-                          onClick={() => setConfirmKillId(null)}
-                          className="rounded p-0.5 text-faint transition-colors hover:text-secondary"
-                        >
-                          <X className="h-2.5 w-2.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          if (inst.worktreePath) {
-                            setConfirmKillId(inst.id);
-                          } else {
-                            onKillInstance(inst.id);
-                          }
-                        }}
-                        className="rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
-                        title="Kill"
-                      >
-                        <Trash2 className="h-2.5 w-2.5" />
-                      </button>
-                    )
+                    <button
+                      onClick={e => { e.stopPropagation(); onKillInstance(inst.id); }}
+                      className="rounded p-0.5 text-faint opacity-0 transition-all hover:text-rose-300 group-hover/inst:opacity-100"
+                      title="Close session"
+                    >
+                      <Power className="h-2.5 w-2.5" />
+                    </button>
                   ) : (
                     <button
                       onClick={e => { e.stopPropagation(); onDismissInstance(inst.id); }}
@@ -268,7 +259,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
               return (
               <div
                 key={wt.path}
-                onClick={() => onLaunch(wt.path)}
+                onClick={() => handleWorktreeClick(wt)}
                 title={ciTooltip(wtStatus)}
                 className={`group/wt flex cursor-default items-center gap-1.5 rounded px-2 py-1 transition-colors hover:bg-elevated/50 ${ciBorderClasses(wtStatus)}`}
               >
@@ -313,6 +304,16 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
           onLaunch={onLaunch}
           onClose={() => setLaunchModalOpen(false)}
           onRefreshProjects={onRefreshProjects}
+        />
+      )}
+
+      {resumeWorktree && (
+        <WorktreeResumeModal
+          worktree={resumeWorktree}
+          sessions={sessionsByWorktree.get(resumeWorktree.path) ?? []}
+          onNewSession={path => onLaunch(path)}
+          onResume={onResumeHistory}
+          onClose={() => setResumeWorktree(null)}
         />
       )}
     </>

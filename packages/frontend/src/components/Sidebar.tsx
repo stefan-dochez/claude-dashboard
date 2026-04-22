@@ -2,28 +2,9 @@ import { RefreshCw, Settings, Download, ChevronDown, ChevronRight, Search, Loade
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { usePlatform } from '../hooks/usePlatform';
-import type { Project, Instance, BranchStatus } from '../types';
+import type { Project, Instance, BranchStatus, HistoryTask } from '../types';
 import { SidebarActionsContext } from './SidebarContext';
 import ProjectRow from './ProjectRow';
-
-interface HistoryTask {
-  id: string;
-  projectPath: string;
-  projectName: string;
-  worktreePath: string | null;
-  branchName: string | null;
-  taskDescription: string | null;
-  sessionId: string | null;
-  model: string | null;
-  totalCostUsd: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  mode: 'terminal' | 'chat';
-  firstPrompt: string | null;
-  title: string | null;
-  createdAt: string;
-  endedAt: string | null;
-}
 
 interface SidebarProps {
   projects: Project[];
@@ -95,11 +76,14 @@ export default function Sidebar({
     const onTitle = ({ instanceId, title }: { instanceId: string; title: string }) => {
       setHistory(prev => prev.map(t => t.id === instanceId ? { ...t, title } : t));
     };
+    const onHistoryChanged = () => { fetchHistory(); };
     socket.on('instance:exited', onExited);
     socket.on('instance:title', onTitle);
+    socket.on('history:changed', onHistoryChanged);
     return () => {
       socket.off('instance:exited', onExited);
       socket.off('instance:title', onTitle);
+      socket.off('history:changed', onHistoryChanged);
     };
   }, [fetchHistory, socket]);
 
@@ -320,7 +304,9 @@ export default function Sidebar({
     instancesByProject,
     prCounts,
     branchStatuses,
-  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, branchStatuses]);
+    history,
+    onResumeHistory: handleResume,
+  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, branchStatuses, history, handleResume]);
 
   const renderProject = useCallback((project: Project) => (
     <ProjectRow

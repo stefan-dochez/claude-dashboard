@@ -111,6 +111,25 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface HistoryTask {
+  id: string;
+  projectPath: string;
+  projectName: string;
+  worktreePath: string | null;
+  branchName: string | null;
+  taskDescription: string | null;
+  sessionId: string | null;
+  model: string | null;
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  mode: 'terminal' | 'chat';
+  firstPrompt: string | null;
+  title: string | null;
+  createdAt: string;
+  endedAt: string | null;
+}
+
 export interface SessionInfo {
   sessionId: string | null;
   model: string | null;

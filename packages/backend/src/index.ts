@@ -83,7 +83,7 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Routes
-  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService, prAggregator, ciStatusService, updateChecker, pluginsManager);
+  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService, prAggregator, ciStatusService, updateChecker, pluginsManager, io);
   app.use(routes);
 
   // In production, serve the frontend static files

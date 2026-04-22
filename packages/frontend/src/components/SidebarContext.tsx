@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { Instance, BranchStatus } from '../types';
+import type { Instance, BranchStatus, HistoryTask } from '../types';
 
 interface IdeInfo {
   id: string;
@@ -25,6 +25,10 @@ interface SidebarActions {
   prCounts: Map<string, number>;
   /** Branch status (CI + PR state) keyed by worktree path or instance path. */
   branchStatuses: Map<string, BranchStatus>;
+  /** Completed task history, shared across rows so a worktree can show its prior sessions. */
+  history: HistoryTask[];
+  /** Resume a session from history (uses worktreePath if still present, replays sessionId). */
+  onResumeHistory: (task: HistoryTask) => void;
 }
 
 const SidebarActionsContext = createContext<SidebarActions | null>(null);
