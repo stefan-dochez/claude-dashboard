@@ -2,7 +2,13 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
-## [0.20.8]
+## [0.21.0]
+
+### Features
+
+- **GitHub Actions status** — Every simple repo in the sidebar now shows a small colored icon reflecting the latest workflow run on its current branch: green check (success), red X (failure), animated amber dot (queued/in-progress), muted dash (cancelled/skipped). Click the icon to open the run on GitHub. Workspaces and monorepos don't get a badge since they span multiple branches. The Pull Request tab gains a `Checks` block above the commits list: a compact flex-wrap of pills, one per check run on the head commit, with the same color scheme and a count summary (`3 passed · 1 failed`).
+
+  **Backend** — new `CiStatusService` wrapping `gh run list --branch` (for the sidebar badge) and `gh api repos/{slug}/commits/{sha}/check-runs` (for the PR view pill list). Slug resolution is reused from `PrAggregator` via a new public `resolveGitHubSlug()` accessor so the permanent slug cache isn't duplicated. Two caches: 60s TTL for the latest-run-per-branch (CI state changes fast), 2min TTL for per-commit checks (more stable). A session-wide `noWorkflowsCache` remembers repos whose first `gh run list` returned `[]` so the sidebar batch doesn't keep hammering `gh` for repos that will never have runs. Two new REST endpoints: `POST /api/git/ci-status` (batched `{ projects: [{path, branch}] }`) and `GET /api/git/checks?path=X&sha=Y`. PATH is enriched with `getExtraPaths()` so the `gh` binary resolves inside Electron.
 
 ### Fixes
 

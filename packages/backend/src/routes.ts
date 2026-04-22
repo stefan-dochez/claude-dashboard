@@ -14,6 +14,7 @@ import type { WorktreeManager } from './worktree-manager.js';
 import type { TaskStore } from './task-store.js';
 import type { IdeService, IdeType } from './ide-service.js';
 import type { PrAggregator } from './pr-aggregator.js';
+import type { CiStatusService } from './ci-status.js';
 import type { UpdateChecker } from './update-checker.js';
 import type { PluginsManager } from './plugins-manager.js';
 import { readChangelogSince } from './changelog-reader.js';
@@ -65,6 +66,7 @@ export function createRoutes(
   appVersion: string,
   ideService: IdeService,
   prAggregator: PrAggregator,
+  ciStatusService: CiStatusService,
   updateChecker: UpdateChecker,
   pluginsManager: PluginsManager,
 ): Router {
@@ -551,6 +553,42 @@ export function createRoutes(
     );
     const counts = await prAggregator.getPrCounts(safeProjects);
     res.json(counts);
+  }));
+
+  // Git — CI status (latest workflow run per branch) for a batch of projects
+  router.post('/api/git/ci-status', asyncHandler(async (req, res) => {
+    const { projects } = req.body as {
+      projects: Array<{ path: string; branch: string | null }>;
+    };
+    if (!projects || !Array.isArray(projects)) {
+      res.status(400).json({ error: 'projects array is required' });
+      return;
+    }
+    const config = await configService.get();
+    const roots = config.scanPaths ?? [];
+    const safe = projects.filter(p =>
+      typeof p.path === 'string' && isPathAllowed(p.path, roots),
+    );
+    const runs = await ciStatusService.getLatestRunsBatch(safe);
+    res.json(runs);
+  }));
+
+  // Git — Check runs for a specific commit (used by the PR view)
+  router.get('/api/git/checks', asyncHandler(async (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    const sha = req.query.sha as string | undefined;
+    if (!projectPath || !sha) {
+      res.status(400).json({ error: 'path and sha query parameters are required' });
+      return;
+    }
+    const config = await configService.get();
+    const roots = config.scanPaths ?? [];
+    if (!isPathAllowed(projectPath, roots)) {
+      res.status(403).json({ error: 'Access denied: path outside allowed scan paths' });
+      return;
+    }
+    const checks = await ciStatusService.getChecksForCommit(projectPath, sha);
+    res.json(checks);
   }));
 
   // Git — Aggregated PRs for workspace/monorepo

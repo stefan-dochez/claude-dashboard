@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, GitBranch, GitPullRequest, Play, Star, Trash2, Terminal, MessageSquare, X, Layers, Code2 } from 'lucide-react';
 import LaunchModal from './LaunchModal';
+import CiStatusBadge from './CiStatusBadge';
 import { useSidebarActions } from '../hooks/useSidebarActions';
 import { STATUS_DOT, STATUS_LABEL } from '../constants';
 import type { Project } from '../types';
@@ -13,7 +14,7 @@ interface ProjectRowProps {
 
 export default function ProjectRow({ project, worktrees, showWorkspace }: ProjectRowProps) {
   const {
-    instancesByProject, selectedInstanceId, favoriteProjects, prCounts,
+    instancesByProject, selectedInstanceId, favoriteProjects, prCounts, ciRuns,
     onSelectInstance, onKillInstance, onDismissInstance, onLaunch,
     onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects,
     onOpenInIde, onViewPrs, installedIdes,
@@ -31,6 +32,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
   const activeInstances = instances.filter(i => i.status !== 'exited');
   const hasActivity = activeInstances.length > 0 || worktrees.length > 0;
   const prCount = prCounts.get(project.path) ?? 0;
+  const ciRun = ciRuns.get(project.path);
 
   return (
     <>
@@ -63,6 +65,13 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
         )}
         {worktrees.length > 0 && (
           <span className="text-[10px] text-faint">{worktrees.length} wt</span>
+        )}
+        {ciRun && (
+          <CiStatusBadge
+            run={ciRun}
+            onClick={e => { e.stopPropagation(); window.open(ciRun.url, '_blank', 'noopener'); }}
+            className="transition-opacity group-hover/row:opacity-0"
+          />
         )}
         {prCount > 0 && (
           <span

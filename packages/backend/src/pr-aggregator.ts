@@ -205,6 +205,11 @@ export class PrAggregator {
     return results;
   }
 
+  /** Public accessor — other services (e.g. CiStatusService) reuse the slug cache. */
+  async resolveGitHubSlug(dir: string): Promise<string | null> {
+    return this.getGitHubSlug(dir);
+  }
+
   /** Extract `owner/repo` from the origin remote URL, or null. Cached permanently. */
   private async getGitHubSlug(dir: string): Promise<string | null> {
     if (this.slugCache.has(dir)) return this.slugCache.get(dir)!;

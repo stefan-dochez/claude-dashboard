@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy, ExternalLink } from 'lucide-react';
 import DiffViewer from './DiffViewer';
+import ChecksBlock from './ChecksBlock';
 import type { BranchDiffResponse } from '../types';
 
 interface PullRequestViewProps {
@@ -157,6 +158,12 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
             <span className="ml-auto text-[11px] text-faint">No PR</span>
           )}
         </div>
+
+        {/* GitHub Actions check runs for the head commit */}
+        <ChecksBlock
+          projectPath={projectPath}
+          sha={data.commits.length > 0 ? data.commits[data.commits.length - 1].hash : null}
+        />
 
         {/* Commits (compact) */}
         {data.commits.length > 0 && (

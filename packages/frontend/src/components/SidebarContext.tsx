@@ -1,5 +1,6 @@
 import { createContext } from 'react';
 import type { Instance } from '../types';
+import type { CiRun } from './CiStatusBadge';
 
 interface IdeInfo {
   id: string;
@@ -23,6 +24,7 @@ interface SidebarActions {
   favoriteProjects: Set<string>;
   instancesByProject: Map<string, Instance[]>;
   prCounts: Map<string, number>;
+  ciRuns: Map<string, CiRun>;
 }
 
 const SidebarActionsContext = createContext<SidebarActions | null>(null);

@@ -5,6 +5,7 @@ import { usePlatform } from '../hooks/usePlatform';
 import type { Project, Instance } from '../types';
 import { SidebarActionsContext } from './SidebarContext';
 import ProjectRow from './ProjectRow';
+import type { CiRun } from './CiStatusBadge';
 
 interface HistoryTask {
   id: string;
@@ -242,6 +243,43 @@ export default function Sidebar({
     return () => clearInterval(timer);
   }, [projectSpecs]);
 
+  // Fetch CI status (latest workflow run per branch) for all simple repos.
+  // Only `type === 'repo'` has a single branch; workspaces/monorepos have many.
+  const [ciRuns, setCiRuns] = useState<Map<string, CiRun>>(new Map());
+  const ciSpecs = useMemo(() => {
+    return projects
+      .filter(p => !p.isWorktree && p.type === 'repo' && p.gitBranch)
+      .map(p => ({ path: p.path, branch: p.gitBranch }));
+  }, [projects]);
+
+  useEffect(() => {
+    if (ciSpecs.length === 0) {
+      setCiRuns(new Map());
+      return;
+    }
+
+    const fetchCiStatus = async () => {
+      try {
+        const res = await fetch('/api/git/ci-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projects: ciSpecs }),
+        });
+        if (!res.ok) return;
+        const data = await res.json() as Record<string, CiRun>;
+        const runs = new Map<string, CiRun>();
+        for (const [projectPath, run] of Object.entries(data)) {
+          runs.set(projectPath, run);
+        }
+        setCiRuns(runs);
+      } catch { /* ignore */ }
+    };
+
+    fetchCiStatus();
+    const timer = setInterval(fetchCiStatus, 60 * 1000);
+    return () => clearInterval(timer);
+  }, [ciSpecs]);
+
   const sidebarActions = useMemo(() => ({
     onSelectInstance,
     onKillInstance,
@@ -258,7 +296,8 @@ export default function Sidebar({
     favoriteProjects,
     instancesByProject,
     prCounts,
-  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts]);
+    ciRuns,
+  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, ciRuns]);
 
   const renderProject = useCallback((project: Project) => (
     <ProjectRow

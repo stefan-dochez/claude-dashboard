@@ -17,6 +17,7 @@ import { setupSocketHandlers } from './socket.js';
 import { setupStreamSocketHandlers } from './stream-socket.js';
 import { IdeService } from './ide-service.js';
 import { PrAggregator } from './pr-aggregator.js';
+import { CiStatusService } from './ci-status.js';
 import { UpdateChecker } from './update-checker.js';
 import { PluginsManager } from './plugins-manager.js';
 import { runHealthCheck } from './health.js';
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
   const streamProcess = new StreamProcessManager(config);
   const ideService = new IdeService();
   const prAggregator = new PrAggregator();
+  const ciStatusService = new CiStatusService(prAggregator);
   const appVersion = await readVersion();
   log.info(`Version: ${appVersion}`);
   const updateChecker = new UpdateChecker(appVersion, process.env.UPDATE_REPO);
@@ -81,7 +83,7 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Routes
-  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService, prAggregator, updateChecker, pluginsManager);
+  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService, prAggregator, ciStatusService, updateChecker, pluginsManager);
   app.use(routes);
 
   // In production, serve the frontend static files
