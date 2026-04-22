@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.20.8]
+
+### Fixes
+
+- **Hidden files/folders invisible in File Explorer** — The `/api/files` endpoint was filtering out every entry whose name started with `.`, so dotfiles (`.env`, `.gitignore`) and dot-directories (`.claude/`, `.idea/`, `.github/`) never appeared in the tree. Changed the filter to only exclude `.git` (which would flood the tree with thousands of internal objects), alongside the existing `node_modules`, `dist`, `__pycache__` exclusions.
+
 ## [0.20.7]
 
 ### Fixes

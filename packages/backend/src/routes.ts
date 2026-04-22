@@ -1017,7 +1017,7 @@ export function createRoutes(
     const fsPromises = await import('fs/promises');
     const entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
     const items = entries
-      .filter(e => !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== 'dist' && e.name !== '__pycache__')
+      .filter(e => e.name !== '.git' && e.name !== 'node_modules' && e.name !== 'dist' && e.name !== '__pycache__')
       .map(e => ({
         name: e.name,
         path: path.join(dirPath, e.name),
