@@ -1,77 +1,94 @@
-import { CheckCircle2, XCircle, CircleDot, MinusCircle, HelpCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, CircleDot, GitMerge, MinusCircle } from 'lucide-react';
 
-export interface CiRun {
-  databaseId: number;
-  name: string;
-  status: string;
-  conclusion: string | null;
-  url: string;
-  headSha: string;
-  createdAt: string;
-  updatedAt: string;
+export type CiState = 'success' | 'failure' | 'running' | 'neutral';
+export type PrState = 'OPEN' | 'MERGED' | 'CLOSED';
+
+export interface CiSummary {
+  passed: number;
+  failed: number;
+  running: number;
+  total: number;
+}
+
+export interface BranchStatus {
+  ciState: CiState | null;
+  ciSummary: CiSummary;
+  prState: PrState | null;
+  prUrl: string | null;
 }
 
 interface Props {
-  run: CiRun;
+  status: BranchStatus;
   onClick?: (e: React.MouseEvent) => void;
   className?: string;
 }
 
 /**
- * Collapse GitHub's split (status / conclusion) fields into one visual state.
- * - status=queued|in_progress → running (terminal conclusion not set yet)
- * - status=completed → use conclusion
+ * Render priority:
+ * 1. MERGED PR → violet git-merge icon (CI state is stale / uninteresting)
+ * 2. CLOSED PR → muted dash (rare; no CI badge either)
+ * 3. Open or no PR → CI state icon if any check-runs exist
+ * 4. Nothing worth showing → null
  */
-function deriveState(run: CiRun): 'success' | 'failure' | 'running' | 'cancelled' | 'neutral' {
-  if (run.status === 'queued' || run.status === 'in_progress') return 'running';
-  switch (run.conclusion) {
-    case 'success':
-      return 'success';
-    case 'failure':
-    case 'timed_out':
-    case 'action_required':
-      return 'failure';
-    case 'cancelled':
-    case 'skipped':
-      return 'cancelled';
-    default:
-      return 'neutral';
+export default function CiStatusBadge({ status, onClick, className = '' }: Props) {
+  if (status.prState === 'MERGED') {
+    return (
+      <span
+        onClick={onClick}
+        className={`inline-flex shrink-0 items-center text-violet-400 ${className}`}
+        title="PR merged"
+      >
+        <GitMerge className="h-3 w-3" />
+      </span>
+    );
   }
-}
 
-const ICONS = {
-  success: CheckCircle2,
-  failure: XCircle,
-  running: CircleDot,
-  cancelled: MinusCircle,
-  neutral: HelpCircle,
-};
+  if (status.prState === 'CLOSED') {
+    return (
+      <span
+        onClick={onClick}
+        className={`inline-flex shrink-0 items-center text-faint ${className}`}
+        title="PR closed (not merged)"
+      >
+        <MinusCircle className="h-3 w-3" />
+      </span>
+    );
+  }
 
-const COLORS = {
-  success: 'text-green-400',
-  failure: 'text-rose-400',
-  running: 'text-amber-400 animate-pulse',
-  cancelled: 'text-faint',
-  neutral: 'text-faint',
-};
+  if (!status.ciState || status.ciSummary.total === 0) return null;
 
-const LABELS = {
-  success: 'CI passed',
-  failure: 'CI failed',
-  running: 'CI running',
-  cancelled: 'CI cancelled',
-  neutral: 'CI status unknown',
-};
+  const color = {
+    success: 'text-green-400',
+    failure: 'text-rose-400',
+    running: 'text-amber-400 animate-pulse',
+    neutral: 'text-faint',
+  }[status.ciState];
 
-export default function CiStatusBadge({ run, onClick, className = '' }: Props) {
-  const state = deriveState(run);
-  const Icon = ICONS[state];
+  const Icon = {
+    success: CheckCircle2,
+    failure: XCircle,
+    running: CircleDot,
+    neutral: MinusCircle,
+  }[status.ciState];
+
+  const labelState = {
+    success: 'CI passed',
+    failure: 'CI failed',
+    running: 'CI running',
+    neutral: 'CI pending',
+  }[status.ciState];
+
+  const summary = [
+    status.ciSummary.passed > 0 ? `${status.ciSummary.passed} passed` : null,
+    status.ciSummary.failed > 0 ? `${status.ciSummary.failed} failed` : null,
+    status.ciSummary.running > 0 ? `${status.ciSummary.running} running` : null,
+  ].filter(Boolean).join(' · ');
 
   return (
     <span
       onClick={onClick}
-      className={`inline-flex shrink-0 items-center ${COLORS[state]} ${className}`}
-      title={`${LABELS[state]} — ${run.name}`}
+      className={`inline-flex shrink-0 items-center ${color} ${className}`}
+      title={summary ? `${labelState} — ${summary}` : labelState}
     >
       <Icon className="h-3 w-3" />
     </span>

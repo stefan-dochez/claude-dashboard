@@ -2,6 +2,18 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.21.2]
+
+### Fixes
+
+- **Sidebar CI badge reflected the wrong workflow** — `gh run list --branch X --limit 1` returns whichever workflow finished most recently, which on repos with several workflows attached to `pull_request` (e.g. `PR Labeler`, `Clear skip CI on Renovate PR`, the real CI) was often a trivial job. The tooltip showed `CI passed — PR Labeler` or `CI cancelled — Clear skip CI on Renovate PR` even when the actual CI was in a different state. Replaced with an aggregated read: a single `gh api repos/{slug}/commits/{branch}/check-runs` call gathers every check-run on the branch head and the service folds them into one state via shared `aggregateChecks()`. `cancelled`/`skipped`/`neutral` conclusions are ignored in the fold so a skipped workflow can't drag the result to a misleading grey, and `failure` still wins over `running` so an actionable red doesn't hide behind a still-running job. Tooltip now shows a count summary (`3 passed · 1 failed · 2 running`).
+
+### Features
+
+- **Distinguish merged / closed PRs in the sidebar and PR view** — A CI icon on a merged PR is stale by construction; a failed CI run next to a long-merged branch is actively misleading. The batch endpoint now also looks up the most recent PR per branch (`gh pr list --head <branch> --state all --limit 1 --json state,url`) and returns a `BranchStatus { ciState, ciSummary, prState, prUrl }`. Render priority in `CiStatusBadge`: merged PR → violet `GitMerge` icon (no CI color); closed PR → muted dash; open PR or no PR → the CI-state icon as before. The `PR` button in the Pull Request view header gets the same treatment: violet `GitMerge` pill for merged, muted `XCircle` for closed, and the previous CI-state coloring for open/unknown. `/api/git/pr-url` now returns `{ url, state }` rather than just `{ url }`.
+
+  **Shape change** — `POST /api/git/ci-status` response went from `{ path: CiRun }` (a raw `gh run list` row) to `{ path: BranchStatus }`. The old `CiStatusService.getLatestRunForBranch` / `getLatestRunsBatch` / `noWorkflowsCache` are gone — all replaced by `getBranchStatus` / `getBranchStatusBatch`, keyed by `${path}::${branch}` with a 60s TTL.
+
 ## [0.21.1]
 
 ### UX

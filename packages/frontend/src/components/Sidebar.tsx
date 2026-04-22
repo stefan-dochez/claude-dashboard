@@ -5,7 +5,7 @@ import { usePlatform } from '../hooks/usePlatform';
 import type { Project, Instance } from '../types';
 import { SidebarActionsContext } from './SidebarContext';
 import ProjectRow from './ProjectRow';
-import type { CiRun } from './CiStatusBadge';
+import type { BranchStatus } from './CiStatusBadge';
 
 interface HistoryTask {
   id: string;
@@ -243,10 +243,11 @@ export default function Sidebar({
     return () => clearInterval(timer);
   }, [projectSpecs]);
 
-  // Fetch CI runs for every active session (instance) and every standalone
-  // worktree. Badges are shown inline under those rows only — never on a
-  // project root — so the branch the badge refers to is unambiguous.
-  const [ciRuns, setCiRuns] = useState<Map<string, CiRun>>(new Map());
+  // Fetch branch status (CI aggregate + PR state) for every active session
+  // (instance) and every standalone worktree. Badges are shown inline under
+  // those rows only — never on a project root — so the branch each badge
+  // refers to is unambiguous.
+  const [branchStatuses, setBranchStatuses] = useState<Map<string, BranchStatus>>(new Map());
   const ciSpecs = useMemo(() => {
     const specs: Array<{ path: string; branch: string }> = [];
     const seen = new Set<string>();
@@ -268,7 +269,6 @@ export default function Sidebar({
     return specs;
   }, [instances, projects]);
 
-  // Stable key so the effect doesn't re-run when array identity changes but content doesn't
   const ciSpecsKey = useMemo(
     () => ciSpecs.map(s => `${s.path}::${s.branch}`).sort().join('|'),
     [ciSpecs],
@@ -276,11 +276,11 @@ export default function Sidebar({
 
   useEffect(() => {
     if (ciSpecs.length === 0) {
-      setCiRuns(new Map());
+      setBranchStatuses(new Map());
       return;
     }
 
-    const fetchCiStatus = async () => {
+    const fetchStatuses = async () => {
       try {
         const res = await fetch('/api/git/ci-status', {
           method: 'POST',
@@ -288,15 +288,15 @@ export default function Sidebar({
           body: JSON.stringify({ projects: ciSpecs }),
         });
         if (!res.ok) return;
-        const data = await res.json() as Record<string, CiRun>;
-        const runs = new Map<string, CiRun>();
-        for (const [path, run] of Object.entries(data)) runs.set(path, run);
-        setCiRuns(runs);
+        const data = await res.json() as Record<string, BranchStatus>;
+        const map = new Map<string, BranchStatus>();
+        for (const [path, status] of Object.entries(data)) map.set(path, status);
+        setBranchStatuses(map);
       } catch { /* ignore */ }
     };
 
-    fetchCiStatus();
-    const timer = setInterval(fetchCiStatus, 60 * 1000);
+    fetchStatuses();
+    const timer = setInterval(fetchStatuses, 60 * 1000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ciSpecsKey]);
@@ -317,8 +317,8 @@ export default function Sidebar({
     favoriteProjects,
     instancesByProject,
     prCounts,
-    ciRuns,
-  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, ciRuns]);
+    branchStatuses,
+  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, branchStatuses]);
 
   const renderProject = useCallback((project: Project) => (
     <ProjectRow

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy, ExternalLink, CheckCircle2, XCircle, CircleDot } from 'lucide-react';
+import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy, ExternalLink, CheckCircle2, XCircle, CircleDot, GitMerge } from 'lucide-react';
 import DiffViewer from './DiffViewer';
 import type { BranchDiffResponse } from '../types';
 
@@ -55,6 +55,7 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [prUrl, setPrUrl] = useState<string | null>(null);
+  const [prState, setPrState] = useState<'OPEN' | 'MERGED' | 'CLOSED' | null>(null);
   const [checks, setChecks] = useState<CheckRun[]>([]);
 
   const isDefaultBranch = !branchName || DEFAULT_BRANCHES.includes(branchName);
@@ -65,11 +66,13 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
     try {
       const res = await fetch(`/api/git/pr-url?path=${encodeURIComponent(projectPath)}`);
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as { url: string | null; state: 'OPEN' | 'MERGED' | 'CLOSED' | null };
         setPrUrl(data.url);
+        setPrState(data.state);
       }
     } catch {
       setPrUrl(null);
+      setPrState(null);
     }
   }, [projectPath, isDefaultBranch]);
 
@@ -183,6 +186,37 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
           </span>
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
             {prUrl && (() => {
+              // Merged / closed PRs: the final CI status is stale, so surface the
+              // PR lifecycle state on the button itself instead of a CI color.
+              if (prState === 'MERGED') {
+                return (
+                  <a
+                    href={prUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[11px] font-medium text-violet-300 transition-colors hover:bg-violet-500/25"
+                    title="PR merged"
+                  >
+                    <GitMerge className="h-2.5 w-2.5" />
+                    PR
+                  </a>
+                );
+              }
+              if (prState === 'CLOSED') {
+                return (
+                  <a
+                    href={prUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 rounded bg-hover/50 px-1.5 py-0.5 text-[11px] font-medium text-faint transition-colors hover:bg-hover"
+                    title="PR closed (not merged)"
+                  >
+                    <XCircle className="h-2.5 w-2.5" />
+                    PR
+                  </a>
+                );
+              }
+
               const styles: Record<CiState, { bg: string; text: string; hover: string; Icon: typeof CheckCircle2 | null; iconClass: string }> = {
                 success: { bg: 'bg-green-500/15', text: 'text-green-400', hover: 'hover:bg-green-500/25', Icon: CheckCircle2, iconClass: '' },
                 failure: { bg: 'bg-rose-500/15', text: 'text-rose-400', hover: 'hover:bg-rose-500/25', Icon: XCircle, iconClass: '' },

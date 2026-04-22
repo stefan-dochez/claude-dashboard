@@ -1,6 +1,6 @@
 import { createContext } from 'react';
 import type { Instance } from '../types';
-import type { CiRun } from './CiStatusBadge';
+import type { BranchStatus } from './CiStatusBadge';
 
 interface IdeInfo {
   id: string;
@@ -24,8 +24,8 @@ interface SidebarActions {
   favoriteProjects: Set<string>;
   instancesByProject: Map<string, Instance[]>;
   prCounts: Map<string, number>;
-  /** CI runs keyed by worktree path or instance path (never by project root). */
-  ciRuns: Map<string, CiRun>;
+  /** Branch status (CI + PR state) keyed by worktree path or instance path. */
+  branchStatuses: Map<string, BranchStatus>;
 }
 
 const SidebarActionsContext = createContext<SidebarActions | null>(null);

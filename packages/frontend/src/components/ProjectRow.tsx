@@ -14,7 +14,7 @@ interface ProjectRowProps {
 
 export default function ProjectRow({ project, worktrees, showWorkspace }: ProjectRowProps) {
   const {
-    instancesByProject, selectedInstanceId, favoriteProjects, prCounts, ciRuns,
+    instancesByProject, selectedInstanceId, favoriteProjects, prCounts, branchStatuses,
     onSelectInstance, onKillInstance, onDismissInstance, onLaunch,
     onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects,
     onOpenInIde, onViewPrs, installedIdes,
@@ -143,7 +143,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
             const isSelected = inst.id === selectedInstanceId;
             const isChat = inst.mode === 'chat';
             const ModeIcon = isChat ? MessageSquare : Terminal;
-            const instCiRun = ciRuns.get(inst.worktreePath ?? inst.projectPath);
+            const instStatus = branchStatuses.get(inst.worktreePath ?? inst.projectPath);
 
             return (
               <div
@@ -158,10 +158,13 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
                 <span className={`min-w-0 flex-1 truncate text-[11px] ${isSelected ? 'text-primary' : 'text-tertiary'}`}>
                   {inst.taskDescription ?? inst.branchName ?? STATUS_LABEL[inst.status]}
                 </span>
-                {instCiRun && (
+                {instStatus && (
                   <CiStatusBadge
-                    run={instCiRun}
-                    onClick={e => { e.stopPropagation(); window.open(instCiRun.url, '_blank', 'noopener'); }}
+                    status={instStatus}
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (instStatus.prUrl) window.open(instStatus.prUrl, '_blank', 'noopener');
+                    }}
                   />
                 )}
                 <span className="shrink-0 text-[9px] text-faint">
@@ -235,7 +238,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
           {worktrees
             .filter(wt => !instances.some(i => i.worktreePath === wt.path))
             .map(wt => {
-              const wtCiRun = ciRuns.get(wt.path);
+              const wtStatus = branchStatuses.get(wt.path);
               return (
               <div
                 key={wt.path}
@@ -246,10 +249,13 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
                 <span className="min-w-0 flex-1 truncate text-[11px] text-faint transition-colors group-hover/wt:text-tertiary">
                   {wt.gitBranch ?? wt.name}
                 </span>
-                {wtCiRun && (
+                {wtStatus && (
                   <CiStatusBadge
-                    run={wtCiRun}
-                    onClick={e => { e.stopPropagation(); window.open(wtCiRun.url, '_blank', 'noopener'); }}
+                    status={wtStatus}
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (wtStatus.prUrl) window.open(wtStatus.prUrl, '_blank', 'noopener');
+                    }}
                   />
                 )}
                 <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/wt:opacity-100">

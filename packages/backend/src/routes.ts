@@ -570,8 +570,8 @@ export function createRoutes(
     const safe = projects.filter(p =>
       typeof p.path === 'string' && isPathAllowed(p.path, roots),
     );
-    const runs = await ciStatusService.getLatestRunsBatch(safe);
-    res.json(runs);
+    const statuses = await ciStatusService.getBranchStatusBatch(safe);
+    res.json(statuses);
   }));
 
   // Git — Check runs for a specific commit (used by the PR view)
@@ -610,7 +610,7 @@ export function createRoutes(
     res.json({ login });
   }));
 
-  // Git — PR info
+  // Git — PR info (url + state so the PR view can distinguish merged/closed)
   router.get('/api/git/pr-url', async (req, res) => {
     const projectPath = req.query.path as string | undefined;
     if (!projectPath) {
@@ -618,14 +618,19 @@ export function createRoutes(
       return;
     }
     try {
-      const { stdout } = await execAsync('gh pr view --json url -q .url', {
+      const { stdout } = await execAsync('gh pr view --json url,state', {
         cwd: projectPath,
         encoding: 'utf-8',
         timeout: TIMEOUTS.GH_CLI,
       });
-      res.json({ url: stdout.trim() || null });
+      const parsed = JSON.parse(stdout) as { url?: string; state?: string };
+      const rawState = (parsed.state ?? '').toUpperCase();
+      const state = rawState === 'OPEN' || rawState === 'MERGED' || rawState === 'CLOSED'
+        ? rawState
+        : null;
+      res.json({ url: parsed.url ?? null, state });
     } catch {
-      res.json({ url: null });
+      res.json({ url: null, state: null });
     }
   });
 

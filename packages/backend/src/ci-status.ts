@@ -8,8 +8,8 @@ import type { PrAggregator } from './pr-aggregator.js';
 const execFileAsync = promisify(execFile);
 const log = createLogger('ci-status');
 
-const RUN_CACHE_TTL_MS = 60 * 1000;        // 60s — latest run per branch
-const CHECKS_CACHE_TTL_MS = 2 * 60 * 1000; // 2min — check runs per commit
+const STATUS_CACHE_TTL_MS = 60 * 1000;      // 60s — branch status (CI + PR state)
+const CHECKS_CACHE_TTL_MS = 2 * 60 * 1000;  // 2min — full check-runs list per commit (PR view)
 
 function enrichedEnv(): NodeJS.ProcessEnv {
   return {
@@ -18,30 +18,73 @@ function enrichedEnv(): NodeJS.ProcessEnv {
   };
 }
 
-/** Status of a single workflow run (from `gh run list`). */
-export interface CiRun {
-  databaseId: number;
-  name: string;
-  status: string;              // queued | in_progress | completed
-  conclusion: string | null;   // success | failure | cancelled | skipped | neutral | timed_out | action_required
-  url: string;
-  headSha: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** Status of a single check run (from `gh api check-runs`). */
 export interface CheckRun {
   name: string;
-  status: string;
-  conclusion: string | null;
+  status: string;            // queued | in_progress | completed
+  conclusion: string | null; // success | failure | cancelled | skipped | neutral | timed_out | action_required
   url: string;
   startedAt: string | null;
   completedAt: string | null;
 }
 
-interface RunCacheEntry {
-  run: CiRun | null;
+export type CiState = 'success' | 'failure' | 'running' | 'neutral';
+export type PrState = 'OPEN' | 'MERGED' | 'CLOSED';
+
+export interface CiSummary {
+  passed: number;
+  failed: number;
+  running: number;
+  total: number;
+}
+
+/** Aggregated state of a branch: CI status derived from all check-runs, plus PR state. */
+export interface BranchStatus {
+  ciState: CiState | null;     // null when no check data or branch has no PR-worthy commits
+  ciSummary: CiSummary;
+  prState: PrState | null;     // null when no PR exists for the branch
+  prUrl: string | null;
+}
+
+/**
+ * Aggregate a list of check-runs into a single state.
+ * - `cancelled` / `skipped` / `neutral` conclusions are ignored in the count
+ *   so that trivial workflows (PR Labeler, "Clear skip CI on Renovate PR")
+ *   don't mask the real CI state.
+ * - Failure wins over running: an actionable red state shouldn't be hidden
+ *   behind a still-running job.
+ */
+export function aggregateChecks(checks: CheckRun[]): { state: CiState; summary: CiSummary } {
+  let running = 0;
+  let failed = 0;
+  let passed = 0;
+  for (const c of checks) {
+    if (c.status === 'queued' || c.status === 'in_progress') {
+      running += 1;
+      continue;
+    }
+    switch (c.conclusion) {
+      case 'failure':
+      case 'timed_out':
+      case 'action_required':
+        failed += 1;
+        break;
+      case 'success':
+        passed += 1;
+        break;
+      // cancelled / skipped / neutral → ignored
+    }
+  }
+  const total = running + failed + passed;
+  let state: CiState;
+  if (failed > 0) state = 'failure';
+  else if (running > 0) state = 'running';
+  else if (passed > 0) state = 'success';
+  else state = 'neutral';
+  return { state, summary: { passed, failed, running, total } };
+}
+
+interface StatusCacheEntry {
+  status: BranchStatus;
   fetchedAt: number;
 }
 
@@ -51,78 +94,129 @@ interface ChecksCacheEntry {
 }
 
 export class CiStatusService {
-  private runCache = new Map<string, RunCacheEntry>();       // key: `${projectPath}::${branch}`
+  private statusCache = new Map<string, StatusCacheEntry>(); // key: `${projectPath}::${branch}`
   private checksCache = new Map<string, ChecksCacheEntry>(); // key: `${slug}::${sha}`
-  private noWorkflowsCache = new Set<string>();              // slugs whose first gh run list returned []
 
   constructor(private prAggregator: PrAggregator) {}
 
-  /** Return the latest workflow run for a branch, or null if none / not a GH repo. */
-  async getLatestRunForBranch(projectPath: string, branch: string): Promise<CiRun | null> {
+  /**
+   * Return aggregated branch status (CI + PR state) for a single branch.
+   * Uses check-runs for all workflows on the branch head, not `gh run list`,
+   * so the result reflects the real CI state rather than whichever workflow
+   * happened to finish last.
+   */
+  async getBranchStatus(projectPath: string, branch: string): Promise<BranchStatus> {
     const key = `${projectPath}::${branch}`;
-    const cached = this.runCache.get(key);
-    if (cached && Date.now() - cached.fetchedAt < RUN_CACHE_TTL_MS) {
-      return cached.run;
+    const cached = this.statusCache.get(key);
+    if (cached && Date.now() - cached.fetchedAt < STATUS_CACHE_TTL_MS) {
+      return cached.status;
     }
+
+    const empty: BranchStatus = {
+      ciState: null,
+      ciSummary: { passed: 0, failed: 0, running: 0, total: 0 },
+      prState: null,
+      prUrl: null,
+    };
 
     const slug = await this.prAggregator.resolveGitHubSlug(projectPath);
     if (!slug) {
-      this.runCache.set(key, { run: null, fetchedAt: Date.now() });
-      return null;
+      this.statusCache.set(key, { status: empty, fetchedAt: Date.now() });
+      return empty;
     }
 
-    if (this.noWorkflowsCache.has(slug)) {
-      this.runCache.set(key, { run: null, fetchedAt: Date.now() });
-      return null;
-    }
+    const [checksResult, prResult] = await Promise.allSettled([
+      this.fetchChecksForBranch(slug, branch),
+      this.fetchPrForBranch(slug, branch),
+    ]);
 
+    const checks = checksResult.status === 'fulfilled' ? checksResult.value : [];
+    const pr = prResult.status === 'fulfilled' ? prResult.value : null;
+
+    const { state, summary } = checks.length > 0
+      ? aggregateChecks(checks)
+      : { state: 'neutral' as CiState, summary: { passed: 0, failed: 0, running: 0, total: 0 } };
+
+    const status: BranchStatus = {
+      ciState: checks.length > 0 ? state : null,
+      ciSummary: summary,
+      prState: pr?.state ?? null,
+      prUrl: pr?.url ?? null,
+    };
+
+    this.statusCache.set(key, { status, fetchedAt: Date.now() });
+    return status;
+  }
+
+  /** Fetch check-runs for a branch head (one call, all workflows). */
+  private async fetchChecksForBranch(slug: string, branch: string): Promise<CheckRun[]> {
+    try {
+      // gh api accepts branch name as the {ref} path segment and resolves it
+      // to the branch's head commit server-side — no need to rev-parse locally.
+      const { stdout } = await execFileAsync(
+        'gh', [
+          'api', `repos/${slug}/commits/${encodeURIComponent(branch)}/check-runs?per_page=100`,
+          '--jq', '[.check_runs[] | {name, status, conclusion, url: .html_url, startedAt: .started_at, completedAt: .completed_at}]',
+        ],
+        { timeout: TIMEOUTS.GH_CLI * 2, env: enrichedEnv() },
+      );
+      return JSON.parse(stdout) as CheckRun[];
+    } catch (err) {
+      log.warn(`check-runs failed for ${slug}@${branch}:`, err instanceof Error ? err.message : err);
+      return [];
+    }
+  }
+
+  /** Fetch the most recent PR (any state) for a branch. Null if none exists. */
+  private async fetchPrForBranch(
+    slug: string,
+    branch: string,
+  ): Promise<{ state: PrState; url: string } | null> {
     try {
       const { stdout } = await execFileAsync(
         'gh', [
-          'run', 'list',
+          'pr', 'list',
           '--repo', slug,
-          '--branch', branch,
+          '--head', branch,
+          '--state', 'all',
           '--limit', '1',
-          '--json', 'databaseId,name,status,conclusion,url,headSha,createdAt,updatedAt',
+          '--json', 'state,url',
         ],
         { timeout: TIMEOUTS.GH_CLI, env: enrichedEnv() },
       );
-      const runs = JSON.parse(stdout) as CiRun[];
-      const run = runs[0] ?? null;
-
-      if (runs.length === 0) {
-        this.noWorkflowsCache.add(slug);
+      const prs = JSON.parse(stdout) as Array<{ state: string; url: string }>;
+      const pr = prs[0];
+      if (!pr) return null;
+      const state = pr.state.toUpperCase();
+      if (state === 'OPEN' || state === 'MERGED' || state === 'CLOSED') {
+        return { state, url: pr.url };
       }
-
-      this.runCache.set(key, { run, fetchedAt: Date.now() });
-      return run;
+      return null;
     } catch (err) {
-      log.warn(`gh run list failed for ${slug}@${branch}:`, err instanceof Error ? err.message : err);
-      this.runCache.set(key, { run: null, fetchedAt: Date.now() });
+      log.warn(`pr list failed for ${slug}@${branch}:`, err instanceof Error ? err.message : err);
       return null;
     }
   }
 
-  /**
-   * Fetch latest runs for a batch of (path, branch) pairs in parallel.
-   * Returns a map keyed by the path (so the frontend can index by worktree
-   * path or instance path without knowing which one the backend used).
-   */
-  async getLatestRunsBatch(
+  /** Batch version — one BranchStatus per (path, branch) pair. */
+  async getBranchStatusBatch(
     projects: Array<{ path: string; branch: string | null }>,
-  ): Promise<Record<string, CiRun>> {
-    const result: Record<string, CiRun> = {};
+  ): Promise<Record<string, BranchStatus>> {
+    const result: Record<string, BranchStatus> = {};
     const valid = projects.filter(p => typeof p.branch === 'string' && p.branch.length > 0) as Array<{ path: string; branch: string }>;
 
     await Promise.all(valid.map(async ({ path, branch }) => {
-      const run = await this.getLatestRunForBranch(path, branch);
-      if (run) result[path] = run;
+      const status = await this.getBranchStatus(path, branch);
+      // Only include entries where we have something useful to show
+      if (status.ciState !== null || status.prState !== null) {
+        result[path] = status;
+      }
     }));
 
     return result;
   }
 
-  /** Return check runs for a specific commit on a repo. */
+  /** Return check runs for a specific commit — used by the PR view. */
   async getChecksForCommit(projectPath: string, sha: string): Promise<CheckRun[]> {
     const slug = await this.prAggregator.resolveGitHubSlug(projectPath);
     if (!slug) return [];
