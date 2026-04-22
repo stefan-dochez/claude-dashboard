@@ -173,7 +173,9 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
             const isSelected = inst.id === selectedInstanceId;
             const isChat = inst.mode === 'chat';
             const ModeIcon = isChat ? MessageSquare : Terminal;
-            const instStatus = branchStatuses.get(inst.worktreePath ?? inst.projectPath);
+            // CI indicator is reserved for worktree sessions — a session
+            // launched directly on the repo (main branch) doesn't get one.
+            const instStatus = inst.worktreePath ? branchStatuses.get(inst.worktreePath) : undefined;
 
             return (
               <div

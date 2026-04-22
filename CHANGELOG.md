@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.21.5]
+
+### UX
+
+- **Hide CI indicator on non-worktree sessions** — Sessions launched directly on the repo (typically on the default branch via "Launch on main") were getting the CI left-border like worktree sessions, even though the CI of main isn't really a per-session concern. The indicator is now reserved for sessions whose `worktreePath` is set, plus standalone worktree rows. Sidebar also skips the `gh` lookup for non-worktree sessions, saving a round-trip per such row every 60 seconds.
+
 ## [0.21.4]
 
 ### UX

@@ -253,10 +253,13 @@ export default function Sidebar({
 
     for (const inst of instances) {
       if (inst.status === 'exited' || !inst.branchName) continue;
-      const path = inst.worktreePath ?? inst.projectPath;
-      if (!seen.has(path)) {
-        seen.add(path);
-        specs.push({ path, branch: inst.branchName });
+      // Only surface CI for sessions running on a worktree. Sessions launched
+      // directly on the repo (typically the default branch) don't get an
+      // indicator — the CI of main isn't a per-session concern.
+      if (!inst.worktreePath) continue;
+      if (!seen.has(inst.worktreePath)) {
+        seen.add(inst.worktreePath);
+        specs.push({ path: inst.worktreePath, branch: inst.branchName });
       }
     }
     for (const p of projects) {
