@@ -2,6 +2,14 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.22.1]
+
+### Performance
+
+- **Cache the GitHub user in the frontend** — `AggregatedPrView` called `/api/git/github-user` in a `useEffect` on every mount, even though the `gh auth` login doesn't change inside a dashboard session. The backend already cached the value (`pr-aggregator.ts`), but each view-open still paid a network round-trip. Extracted into a `useGithubUser` hook with a module-level cache plus an `inflight` promise to dedupe concurrent mounts — one fetch per page lifetime, zero fetches on subsequent PR view opens. The component's old `useState`/`useEffect` pair is replaced by `const { user: ghUser, loading: ghUserLoading } = useGithubUser();` plus a small effect that falls back to the "All" filter only once `ghUserLoading` resolves to `false` without a user.
+
+  **Known trade-off** — if the user re-authenticates as a different GitHub account inside an open session, the cached value stays until the page reloads. The backend has the same behavior with its own cache, so this aligns the two layers rather than introducing a new staleness window.
+
 ## [0.22.0]
 
 ### Features

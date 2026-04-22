@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { GitPullRequest, ExternalLink, RefreshCw, AlertCircle, User, GitBranch } from 'lucide-react';
 import { usePullRequests } from '../hooks/usePullRequests';
+import { useGithubUser } from '../hooks/useGithubUser';
 import type { PullRequest } from '../types';
 
 interface AggregatedPrViewProps {
@@ -33,18 +34,12 @@ function isMyPr(pr: PullRequest, username: string): boolean {
 export default function AggregatedPrView({ projectPath, projectName }: AggregatedPrViewProps) {
   const { prs, loading, error, refresh } = usePullRequests(projectPath);
   const [filter, setFilter] = useState<Filter>(FILTERS.MINE);
-  const [ghUser, setGhUser] = useState<string | null>(null);
+  const { user: ghUser, loading: ghUserLoading } = useGithubUser();
 
+  // Once the user resolves, fall back to "all" if `gh` isn't authenticated.
   useEffect(() => {
-    fetch('/api/git/github-user')
-      .then(r => r.json())
-      .then((data: { login: string | null }) => {
-        setGhUser(data.login);
-        // If no GitHub user, fall back to showing all
-        if (!data.login) setFilter(FILTERS.ALL);
-      })
-      .catch(() => setFilter(FILTERS.ALL));
-  }, []);
+    if (!ghUserLoading && !ghUser) setFilter(FILTERS.ALL);
+  }, [ghUserLoading, ghUser]);
 
   const filteredPrs = useMemo(() => {
     if (filter === FILTERS.ALL || !ghUser) return prs;
