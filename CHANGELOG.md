@@ -2,6 +2,14 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.22.3]
+
+### Fixes
+
+- **Silent launch failures** — Clicking a branch to turn it into a worktree (or any launch flow) would fail with no visible feedback when the backend returned a 500. `handleLaunch` in `App.tsx` was swallowing the thrown error in an empty `catch {}` block with just a comment pointing at the hook's `console.error`, so users only saw it if they had devtools open. Now surfaces a red error toast for 10s with a context-aware title (`Failed to detach branch to worktree` / `Failed to create worktree` / `Failed to launch`) and the backend error message.
+
+- **Unreadable git errors in launch toasts** — When `git worktree add` fails on Windows (e.g. filenames too long, blocking the branch→worktree detach flow), Node's exec rejection bundles the full stderr into `err.message` — which includes dozens of `Updating files: XX%` progress lines between the actual errors. Added a `cleanGitError()` helper in `worktree-manager.ts` that filters stderr to just the `error:` and `fatal:` lines (cap 5), and applied it on the `git worktree add` catch in `detachBranchToWorktree`. The toast now shows the actionable info only — e.g. `error: unable to create file ...: Filename too long` / `fatal: Could not reset index file to revision 'HEAD'.` — instead of a multi-kilobyte wall of progress noise.
+
 ## [0.22.2]
 
 ### Fixes

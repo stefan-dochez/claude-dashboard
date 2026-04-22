@@ -232,10 +232,15 @@ export default function App() {
       if (taskDescription || detachBranch) {
         refreshProjects();
       }
-    } catch {
-      // Error already logged in hook
+    } catch (err) {
+      const title = detachBranch
+        ? 'Failed to detach branch to worktree'
+        : taskDescription
+          ? 'Failed to create worktree'
+          : 'Failed to launch';
+      addToast('error', title, err instanceof Error ? err.message : 'Unknown error', 10000);
     }
-  }, [spawnInstance, refreshProjects, handleSelectInstance]);
+  }, [spawnInstance, refreshProjects, handleSelectInstance, addToast]);
 
   const handleKill = useCallback(async (id: string, deleteWt?: boolean) => {
     await killInstance(id, deleteWt);

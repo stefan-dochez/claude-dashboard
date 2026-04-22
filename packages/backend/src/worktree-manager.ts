@@ -28,6 +28,22 @@ function execAsync(cmd: string, opts: { encoding: BufferEncoding; cwd?: string; 
   return execPromise(cmd, { ...opts, shell: IS_WINDOWS ? true as unknown as string : undefined, ...(extraEnv ? { env: extraEnv } : {}) });
 }
 
+// Git failures come back with multi-kilobyte stderr full of `Updating files: XX%`
+// progress lines. Extract the actionable `error:` / `fatal:` lines so the
+// message we bubble up to the UI stays readable.
+function cleanGitError(err: unknown, fallback: string): Error {
+  if (!(err instanceof Error)) return new Error(fallback);
+  const stderr = (err as Error & { stderr?: string }).stderr ?? '';
+  const actionable = stderr
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => /^(error|fatal):/i.test(line))
+    .slice(0, 5);
+  if (actionable.length > 0) return new Error(actionable.join('\n'));
+  const firstLine = err.message.split('\n')[0];
+  return new Error(firstLine || fallback);
+}
+
 interface WorktreeResult {
   worktreePath: string;
   branchName: string;
@@ -395,7 +411,7 @@ export class WorktreeManager {
           timeout: 15000,
         });
       }
-      throw err;
+      throw cleanGitError(err, 'git worktree add failed');
     }
 
     // Step 4: Restore stashed changes in the worktree
