@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.20.6]
+
+### Fixes
+
+- **Terminal glyph overlap with emojis and Unicode characters** — Long sessions containing emojis (e.g. `✅`) or wide Unicode characters could end up with overlapping/shifted text in the embedded terminal, making the output unreadable. Root cause: xterm.js defaults to Unicode 6 (1991) glyph widths, which treat modern emojis as 1 cell while they render as 2 cells — every subsequent character then lands at the wrong column. Two fixes in `TerminalView`: (1) load `@xterm/addon-unicode11` and activate `term.unicode.activeVersion = '11'` so glyph widths match what the PTY on the backend assumed, and (2) load `@xterm/addon-webgl` (with a silent fallback to the DOM renderer if the GPU context fails) for more reliable monospace alignment and faster rendering.
+
 ## [0.20.5]
 
 ### Features

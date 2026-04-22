@@ -3,6 +3,8 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { SearchAddon } from '@xterm/addon-search';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
+import { WebglAddon } from '@xterm/addon-webgl';
 import { ArrowDownToLine } from 'lucide-react';
 import '@xterm/xterm/css/xterm.css';
 import { useSocket } from '../hooks/useSocket';
@@ -46,11 +48,28 @@ export default function TerminalView({ instanceId, terminalTheme, onTypingChange
       window.open(uri, '_blank', 'noopener');
     });
     const searchAddon = new SearchAddon();
+    const unicode11Addon = new Unicode11Addon();
 
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
     term.loadAddon(searchAddon);
+    term.loadAddon(unicode11Addon);
     term.open(containerRef.current);
+
+    // Activate Unicode 11 widths so modern emojis (✅, etc.) are treated as
+    // 2-cell wide — prevents glyph-width mismatches that overlap subsequent text.
+    term.unicode.activeVersion = '11';
+
+    // WebGL renderer is far more reliable than the default DOM renderer for
+    // wide glyphs and monospace alignment. Fall back silently if the GPU
+    // context is unavailable (rare: headless, old GPUs, or driver bugs).
+    try {
+      const webglAddon = new WebglAddon();
+      webglAddon.onContextLoss(() => webglAddon.dispose());
+      term.loadAddon(webglAddon);
+    } catch (err) {
+      console.warn('[terminal] WebGL renderer unavailable, using DOM fallback', err);
+    }
 
     searchAddonRef.current = searchAddon;
 
