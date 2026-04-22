@@ -243,14 +243,36 @@ export default function Sidebar({
     return () => clearInterval(timer);
   }, [projectSpecs]);
 
-  // Fetch CI status (latest workflow run per branch) for all simple repos.
-  // Only `type === 'repo'` has a single branch; workspaces/monorepos have many.
+  // Fetch CI runs for every active session (instance) and every standalone
+  // worktree. Badges are shown inline under those rows only — never on a
+  // project root — so the branch the badge refers to is unambiguous.
   const [ciRuns, setCiRuns] = useState<Map<string, CiRun>>(new Map());
   const ciSpecs = useMemo(() => {
-    return projects
-      .filter(p => !p.isWorktree && p.type === 'repo' && p.gitBranch)
-      .map(p => ({ path: p.path, branch: p.gitBranch }));
-  }, [projects]);
+    const specs: Array<{ path: string; branch: string }> = [];
+    const seen = new Set<string>();
+
+    for (const inst of instances) {
+      if (inst.status === 'exited' || !inst.branchName) continue;
+      const path = inst.worktreePath ?? inst.projectPath;
+      if (!seen.has(path)) {
+        seen.add(path);
+        specs.push({ path, branch: inst.branchName });
+      }
+    }
+    for (const p of projects) {
+      if (!p.isWorktree || !p.gitBranch) continue;
+      if (seen.has(p.path)) continue;
+      seen.add(p.path);
+      specs.push({ path: p.path, branch: p.gitBranch });
+    }
+    return specs;
+  }, [instances, projects]);
+
+  // Stable key so the effect doesn't re-run when array identity changes but content doesn't
+  const ciSpecsKey = useMemo(
+    () => ciSpecs.map(s => `${s.path}::${s.branch}`).sort().join('|'),
+    [ciSpecs],
+  );
 
   useEffect(() => {
     if (ciSpecs.length === 0) {
@@ -268,9 +290,7 @@ export default function Sidebar({
         if (!res.ok) return;
         const data = await res.json() as Record<string, CiRun>;
         const runs = new Map<string, CiRun>();
-        for (const [projectPath, run] of Object.entries(data)) {
-          runs.set(projectPath, run);
-        }
+        for (const [path, run] of Object.entries(data)) runs.set(path, run);
         setCiRuns(runs);
       } catch { /* ignore */ }
     };
@@ -278,7 +298,8 @@ export default function Sidebar({
     fetchCiStatus();
     const timer = setInterval(fetchCiStatus, 60 * 1000);
     return () => clearInterval(timer);
-  }, [ciSpecs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ciSpecsKey]);
 
   const sidebarActions = useMemo(() => ({
     onSelectInstance,

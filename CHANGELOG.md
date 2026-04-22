@@ -2,6 +2,16 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.21.1]
+
+### UX
+
+- **CI badges moved from project rows to instance/worktree rows** — The v0.21.0 design put a CI icon on every root project row, which was ambiguous: the badge reflected the current branch of the repo, but with several worktrees in flight there's no visual hint of *which* branch that was. The badge now appears inline on each active-session row and each standalone worktree row instead, right next to the branch name it refers to — never on a project root. Workspaces/monorepos were already skipped.
+
+- **CI summary surfaced on the PR button, not in a pill list** — The `Checks` block under the PR header listed every check run (dozens on repos with matrix jobs — see the banking-consolidation monorepo), which drowned the commit list. The block is gone: the existing `PR` link in the Pull Request tab header is now colored by the aggregated CI state of the head commit — green (all passed), rose (any failed), amber with a pulse (any running), or the previous neutral green when no check data is available. The tooltip shows a compact summary (`3 passed · 1 failed · 2 running`), and the icon changes to match (check / X / circle-dot). Failure takes priority over running so an actionable red state isn't hidden behind a running job.
+
+  Backend is unchanged — both `POST /api/git/ci-status` (batch) and `GET /api/git/checks` endpoints are still in use. The unused `ChecksBlock` and `CiStatusBadge` v1 components were deleted and `CiStatusBadge` was re-added with a simpler single-icon API.
+
 ## [0.21.0]
 
 ### Features

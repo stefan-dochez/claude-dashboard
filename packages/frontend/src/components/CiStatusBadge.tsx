@@ -3,7 +3,7 @@ import { CheckCircle2, XCircle, CircleDot, MinusCircle, HelpCircle } from 'lucid
 export interface CiRun {
   databaseId: number;
   name: string;
-  status: string;              // queued | in_progress | completed
+  status: string;
   conclusion: string | null;
   url: string;
   headSha: string;
@@ -18,10 +18,9 @@ interface Props {
 }
 
 /**
- * Derive a compact visual state from a `gh run list` row.
- * GitHub splits the live state across two fields (status for queued/running,
- * conclusion for the terminal state once status=completed) which the UI
- * collapses into one.
+ * Collapse GitHub's split (status / conclusion) fields into one visual state.
+ * - status=queued|in_progress → running (terminal conclusion not set yet)
+ * - status=completed → use conclusion
  */
 function deriveState(run: CiRun): 'success' | 'failure' | 'running' | 'cancelled' | 'neutral' {
   if (run.status === 'queued' || run.status === 'in_progress') return 'running';
@@ -40,38 +39,39 @@ function deriveState(run: CiRun): 'success' | 'failure' | 'running' | 'cancelled
   }
 }
 
+const ICONS = {
+  success: CheckCircle2,
+  failure: XCircle,
+  running: CircleDot,
+  cancelled: MinusCircle,
+  neutral: HelpCircle,
+};
+
+const COLORS = {
+  success: 'text-green-400',
+  failure: 'text-rose-400',
+  running: 'text-amber-400 animate-pulse',
+  cancelled: 'text-faint',
+  neutral: 'text-faint',
+};
+
+const LABELS = {
+  success: 'CI passed',
+  failure: 'CI failed',
+  running: 'CI running',
+  cancelled: 'CI cancelled',
+  neutral: 'CI status unknown',
+};
+
 export default function CiStatusBadge({ run, onClick, className = '' }: Props) {
   const state = deriveState(run);
-
-  const Icon = {
-    success: CheckCircle2,
-    failure: XCircle,
-    running: CircleDot,
-    cancelled: MinusCircle,
-    neutral: HelpCircle,
-  }[state];
-
-  const color = {
-    success: 'text-green-400',
-    failure: 'text-rose-400',
-    running: 'text-amber-400 animate-pulse',
-    cancelled: 'text-faint',
-    neutral: 'text-faint',
-  }[state];
-
-  const label = {
-    success: 'CI passed',
-    failure: 'CI failed',
-    running: 'CI running',
-    cancelled: 'CI cancelled',
-    neutral: 'CI status unknown',
-  }[state];
+  const Icon = ICONS[state];
 
   return (
     <span
       onClick={onClick}
-      className={`inline-flex items-center ${color} ${className}`}
-      title={`${label} — ${run.name}`}
+      className={`inline-flex shrink-0 items-center ${COLORS[state]} ${className}`}
+      title={`${LABELS[state]} — ${run.name}`}
     >
       <Icon className="h-3 w-3" />
     </span>

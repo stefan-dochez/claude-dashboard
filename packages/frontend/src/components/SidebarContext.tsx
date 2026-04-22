@@ -24,6 +24,7 @@ interface SidebarActions {
   favoriteProjects: Set<string>;
   instancesByProject: Map<string, Instance[]>;
   prCounts: Map<string, number>;
+  /** CI runs keyed by worktree path or instance path (never by project root). */
   ciRuns: Map<string, CiRun>;
 }
 

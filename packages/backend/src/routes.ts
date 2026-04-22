@@ -555,7 +555,8 @@ export function createRoutes(
     res.json(counts);
   }));
 
-  // Git — CI status (latest workflow run per branch) for a batch of projects
+  // Git — CI status (latest workflow run per branch) for a batch of (path, branch) pairs.
+  // Used by the sidebar to badge instance + worktree rows with their CI state.
   router.post('/api/git/ci-status', asyncHandler(async (req, res) => {
     const { projects } = req.body as {
       projects: Array<{ path: string; branch: string | null }>;

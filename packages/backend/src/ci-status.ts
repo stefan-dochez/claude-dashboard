@@ -8,7 +8,7 @@ import type { PrAggregator } from './pr-aggregator.js';
 const execFileAsync = promisify(execFile);
 const log = createLogger('ci-status');
 
-const RUN_CACHE_TTL_MS = 60 * 1000;      // 60s — latest run per branch
+const RUN_CACHE_TTL_MS = 60 * 1000;        // 60s — latest run per branch
 const CHECKS_CACHE_TTL_MS = 2 * 60 * 1000; // 2min — check runs per commit
 
 function enrichedEnv(): NodeJS.ProcessEnv {
@@ -21,9 +21,9 @@ function enrichedEnv(): NodeJS.ProcessEnv {
 /** Status of a single workflow run (from `gh run list`). */
 export interface CiRun {
   databaseId: number;
-  name: string;            // workflow name
-  status: string;          // queued | in_progress | completed
-  conclusion: string | null; // success | failure | cancelled | skipped | neutral | timed_out | action_required
+  name: string;
+  status: string;              // queued | in_progress | completed
+  conclusion: string | null;   // success | failure | cancelled | skipped | neutral | timed_out | action_required
   url: string;
   headSha: string;
   createdAt: string;
@@ -33,8 +33,8 @@ export interface CiRun {
 /** Status of a single check run (from `gh api check-runs`). */
 export interface CheckRun {
   name: string;
-  status: string;            // queued | in_progress | completed
-  conclusion: string | null; // success | failure | cancelled | skipped | neutral | timed_out | action_required
+  status: string;
+  conclusion: string | null;
   url: string;
   startedAt: string | null;
   completedAt: string | null;
@@ -53,7 +53,7 @@ interface ChecksCacheEntry {
 export class CiStatusService {
   private runCache = new Map<string, RunCacheEntry>();       // key: `${projectPath}::${branch}`
   private checksCache = new Map<string, ChecksCacheEntry>(); // key: `${slug}::${sha}`
-  private noWorkflowsCache = new Set<string>();              // slugs that returned empty — avoid re-hitting gh
+  private noWorkflowsCache = new Set<string>();              // slugs whose first gh run list returned []
 
   constructor(private prAggregator: PrAggregator) {}
 
@@ -87,12 +87,9 @@ export class CiStatusService {
         ],
         { timeout: TIMEOUTS.GH_CLI, env: enrichedEnv() },
       );
-
       const runs = JSON.parse(stdout) as CiRun[];
       const run = runs[0] ?? null;
 
-      // If a repo has no workflows at all, gh returns []. Remember it for the session
-      // so batch calls don't hammer gh for repos that will never have runs.
       if (runs.length === 0) {
         this.noWorkflowsCache.add(slug);
       }
@@ -107,8 +104,9 @@ export class CiStatusService {
   }
 
   /**
-   * Fetch latest runs for a batch of (projectPath, branch) pairs in parallel.
-   * Returns a map keyed by projectPath. Entries with null branches or non-GitHub repos are omitted.
+   * Fetch latest runs for a batch of (path, branch) pairs in parallel.
+   * Returns a map keyed by the path (so the frontend can index by worktree
+   * path or instance path without knowing which one the backend used).
    */
   async getLatestRunsBatch(
     projects: Array<{ path: string; branch: string | null }>,

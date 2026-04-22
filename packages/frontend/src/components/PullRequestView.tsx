@@ -1,8 +1,47 @@
-import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy, ExternalLink, CheckCircle2, XCircle, CircleDot } from 'lucide-react';
 import DiffViewer from './DiffViewer';
-import ChecksBlock from './ChecksBlock';
 import type { BranchDiffResponse } from '../types';
+
+interface CheckRun {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  url: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+type CiState = 'success' | 'failure' | 'running' | 'neutral';
+
+function deriveCiState(checks: CheckRun[]): CiState {
+  if (checks.length === 0) return 'neutral';
+  let hasRunning = false;
+  let hasFailure = false;
+  let hasSuccess = false;
+  for (const c of checks) {
+    if (c.status === 'queued' || c.status === 'in_progress') {
+      hasRunning = true;
+      continue;
+    }
+    switch (c.conclusion) {
+      case 'failure':
+      case 'timed_out':
+      case 'action_required':
+        hasFailure = true;
+        break;
+      case 'success':
+        hasSuccess = true;
+        break;
+      // cancelled, skipped, neutral → ignored
+    }
+  }
+  // Failure wins over running (actionable state comes first)
+  if (hasFailure) return 'failure';
+  if (hasRunning) return 'running';
+  if (hasSuccess) return 'success';
+  return 'neutral';
+}
 
 interface PullRequestViewProps {
   projectPath: string;
@@ -16,8 +55,10 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [prUrl, setPrUrl] = useState<string | null>(null);
+  const [checks, setChecks] = useState<CheckRun[]>([]);
 
   const isDefaultBranch = !branchName || DEFAULT_BRANCHES.includes(branchName);
+  const headSha = data && data.commits.length > 0 ? data.commits[data.commits.length - 1].hash : null;
 
   const fetchPrUrl = useCallback(async () => {
     if (isDefaultBranch) return;
@@ -55,10 +96,34 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
     }
   }, [projectPath, isDefaultBranch]);
 
+  const fetchChecks = useCallback(async (sha: string) => {
+    try {
+      const res = await fetch(`/api/git/checks?path=${encodeURIComponent(projectPath)}&sha=${encodeURIComponent(sha)}`);
+      if (res.ok) setChecks(await res.json());
+    } catch {
+      setChecks([]);
+    }
+  }, [projectPath]);
+
   useEffect(() => {
     fetchBranchDiff();
     fetchPrUrl();
   }, [fetchBranchDiff, fetchPrUrl]);
+
+  useEffect(() => {
+    if (headSha) fetchChecks(headSha);
+    else setChecks([]);
+  }, [headSha, fetchChecks]);
+
+  const ciState = useMemo(() => deriveCiState(checks), [checks]);
+  const ciSummary = useMemo(() => {
+    const passed = checks.filter(c => c.status === 'completed' && c.conclusion === 'success').length;
+    const failed = checks.filter(c =>
+      c.status === 'completed' && ['failure', 'timed_out', 'action_required'].includes(c.conclusion ?? ''),
+    ).length;
+    const running = checks.filter(c => c.status === 'queued' || c.status === 'in_progress').length;
+    return { passed, failed, running, total: checks.length };
+  }, [checks]);
 
   if (isDefaultBranch) {
     return (
@@ -117,20 +182,40 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
             {data.baseBranch}
           </span>
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            {prUrl && (
-              <a
-                href={prUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 rounded bg-green-500/15 px-1.5 py-0.5 text-[11px] font-medium text-green-400 transition-colors hover:bg-green-500/25"
-                title={prUrl}
-              >
-                <ExternalLink className="h-2.5 w-2.5" />
-                PR
-              </a>
-            )}
+            {prUrl && (() => {
+              const styles: Record<CiState, { bg: string; text: string; hover: string; Icon: typeof CheckCircle2 | null; iconClass: string }> = {
+                success: { bg: 'bg-green-500/15', text: 'text-green-400', hover: 'hover:bg-green-500/25', Icon: CheckCircle2, iconClass: '' },
+                failure: { bg: 'bg-rose-500/15', text: 'text-rose-400', hover: 'hover:bg-rose-500/25', Icon: XCircle, iconClass: '' },
+                running: { bg: 'bg-amber-500/15', text: 'text-amber-400', hover: 'hover:bg-amber-500/25', Icon: CircleDot, iconClass: 'animate-pulse' },
+                neutral: { bg: 'bg-green-500/15', text: 'text-green-400', hover: 'hover:bg-green-500/25', Icon: null, iconClass: '' },
+              };
+              const s = styles[ciState];
+              const title = ciSummary.total === 0
+                ? prUrl
+                : [
+                    ciSummary.passed > 0 ? `${ciSummary.passed} passed` : null,
+                    ciSummary.failed > 0 ? `${ciSummary.failed} failed` : null,
+                    ciSummary.running > 0 ? `${ciSummary.running} running` : null,
+                  ].filter(Boolean).join(' · ');
+              const StatusIcon = s.Icon;
+              return (
+                <a
+                  href={prUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${s.bg} ${s.text} ${s.hover}`}
+                  title={title}
+                >
+                  {StatusIcon
+                    ? <StatusIcon className={`h-2.5 w-2.5 ${s.iconClass}`} />
+                    : <ExternalLink className="h-2.5 w-2.5" />
+                  }
+                  PR
+                </a>
+              );
+            })()}
             <button
-              onClick={() => { fetchBranchDiff(); fetchPrUrl(); }}
+              onClick={() => { fetchBranchDiff(); fetchPrUrl(); if (headSha) fetchChecks(headSha); }}
               className="rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-secondary"
               title="Refresh"
               aria-label="Refresh"
@@ -158,12 +243,6 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
             <span className="ml-auto text-[11px] text-faint">No PR</span>
           )}
         </div>
-
-        {/* GitHub Actions check runs for the head commit */}
-        <ChecksBlock
-          projectPath={projectPath}
-          sha={data.commits.length > 0 ? data.commits[data.commits.length - 1].hash : null}
-        />
 
         {/* Commits (compact) */}
         {data.commits.length > 0 && (
