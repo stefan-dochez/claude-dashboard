@@ -16,6 +16,24 @@ export interface Project {
   parentProject?: string;
 }
 
+export type CiState = 'success' | 'failure' | 'running' | 'neutral';
+export type PrState = 'OPEN' | 'MERGED' | 'CLOSED';
+
+export interface CiSummary {
+  passed: number;
+  failed: number;
+  running: number;
+  total: number;
+}
+
+/** Aggregated state of a branch: CI status derived from check-runs, plus PR state. */
+export interface BranchStatus {
+  ciState: CiState | null;
+  ciSummary: CiSummary;
+  prState: PrState | null;
+  prUrl: string | null;
+}
+
 export const INSTANCE_STATUS = {
   LAUNCHING: 'launching',
   PROCESSING: 'processing',

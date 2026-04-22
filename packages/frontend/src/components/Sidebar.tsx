@@ -2,10 +2,9 @@ import { RefreshCw, Settings, Download, ChevronDown, ChevronRight, Search, Loade
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { usePlatform } from '../hooks/usePlatform';
-import type { Project, Instance } from '../types';
+import type { Project, Instance, BranchStatus } from '../types';
 import { SidebarActionsContext } from './SidebarContext';
 import ProjectRow from './ProjectRow';
-import type { BranchStatus } from './CiStatusBadge';
 
 interface HistoryTask {
   id: string;

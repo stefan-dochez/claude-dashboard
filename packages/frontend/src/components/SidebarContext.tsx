@@ -1,6 +1,5 @@
 import { createContext } from 'react';
-import type { Instance } from '../types';
-import type { BranchStatus } from './CiStatusBadge';
+import type { Instance, BranchStatus } from '../types';
 
 interface IdeInfo {
   id: string;

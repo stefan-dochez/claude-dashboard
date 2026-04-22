@@ -2,6 +2,14 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.21.4]
+
+### UX
+
+- **CI status as a left border, not a trailing icon** — The circle icons in the right column competed for attention with the status dot, mode icon, timestamp, and hover actions, making each row feel cluttered. Replaced with a 2px vertical stripe on the left edge of each session/worktree row, colored by aggregated CI state (green passed / rose failed / amber pulsed running) or PR state (violet merged, nothing for closed). Rendered via a `::before` pseudo-element so it doesn't consume layout space — the row content stays exactly where it was. Details (`3 passed · 1 failed · 2 running` or `PR merged`) are surfaced via a native `title` tooltip on the row.
+
+  **Cleanup** — `CiStatusBadge.tsx` is gone, its type exports moved to `types.ts` as part of the frontend's shared type barrel. The alignment scaffolding added in 0.21.3 (`w-[28px]` timestamp/spacer, `w-3` badge slot, `min-w-[54px]` action container) is reverted since badges no longer need to line up in a column.
+
 ## [0.21.3]
 
 ### UX

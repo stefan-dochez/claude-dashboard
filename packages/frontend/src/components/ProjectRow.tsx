@@ -1,10 +1,40 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, GitBranch, GitPullRequest, Play, Star, Trash2, Terminal, MessageSquare, X, Layers, Code2 } from 'lucide-react';
 import LaunchModal from './LaunchModal';
-import CiStatusBadge from './CiStatusBadge';
 import { useSidebarActions } from '../hooks/useSidebarActions';
 import { STATUS_DOT, STATUS_LABEL } from '../constants';
-import type { Project } from '../types';
+import type { Project, BranchStatus } from '../types';
+
+/**
+ * Translate a BranchStatus to a 2px left border via a ::before pseudo-element
+ * so it doesn't consume layout space. Priority: PR state wins over CI state —
+ * a merged PR's CI color is stale and irrelevant.
+ */
+function ciBorderClasses(status: BranchStatus | undefined): string {
+  if (!status) return '';
+  const base = "relative before:absolute before:left-0.5 before:top-1 before:bottom-1 before:w-0.5 before:rounded-full before:content-['']";
+  if (status.prState === 'MERGED') return `${base} before:bg-violet-400`;
+  if (status.prState === 'CLOSED') return '';
+  switch (status.ciState) {
+    case 'success': return `${base} before:bg-green-400`;
+    case 'failure': return `${base} before:bg-rose-400`;
+    case 'running': return `${base} before:bg-amber-400 before:animate-pulse`;
+    default: return '';
+  }
+}
+
+function ciTooltip(status: BranchStatus | undefined): string | undefined {
+  if (!status) return undefined;
+  if (status.prState === 'MERGED') return 'PR merged';
+  if (status.prState === 'CLOSED') return 'PR closed (not merged)';
+  if (!status.ciState) return undefined;
+  const parts: string[] = [];
+  if (status.ciSummary.passed > 0) parts.push(`${status.ciSummary.passed} passed`);
+  if (status.ciSummary.failed > 0) parts.push(`${status.ciSummary.failed} failed`);
+  if (status.ciSummary.running > 0) parts.push(`${status.ciSummary.running} running`);
+  const label = { success: 'CI passed', failure: 'CI failed', running: 'CI running', neutral: 'CI pending' }[status.ciState];
+  return parts.length > 0 ? `${label} — ${parts.join(' · ')}` : label;
+}
 
 interface ProjectRowProps {
   project: Project;
@@ -149,30 +179,20 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
               <div
                 key={inst.id}
                 onClick={() => onSelectInstance(inst.id)}
+                title={ciTooltip(instStatus)}
                 className={`group/inst flex cursor-default items-center gap-1.5 rounded px-2 py-1 transition-colors ${
                   isSelected ? 'bg-elevated/50' : 'hover:bg-elevated/20'
-                }`}
+                } ${ciBorderClasses(instStatus)}`}
               >
                 <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[inst.status]}`} />
                 <ModeIcon className="h-3 w-3 shrink-0 text-faint" />
                 <span className={`min-w-0 flex-1 truncate text-[11px] ${isSelected ? 'text-primary' : 'text-tertiary'}`}>
                   {inst.taskDescription ?? inst.branchName ?? STATUS_LABEL[inst.status]}
                 </span>
-                <span className="w-[28px] shrink-0 text-right text-[9px] text-faint">
+                <span className="shrink-0 text-[9px] text-faint">
                   {new Date(inst.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
-                <span className="inline-flex h-3 w-3 shrink-0 items-center justify-center">
-                  {instStatus && (
-                    <CiStatusBadge
-                      status={instStatus}
-                      onClick={e => {
-                        e.stopPropagation();
-                        if (instStatus.prUrl) window.open(instStatus.prUrl, '_blank', 'noopener');
-                      }}
-                    />
-                  )}
-                </span>
-                <div className="flex min-w-[54px] shrink-0 items-center justify-end gap-0.5">
+                <div className="flex shrink-0 items-center gap-0.5">
                   {installedIdes.length > 0 && (
                     <button
                       onClick={e => {
@@ -247,27 +267,14 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
               <div
                 key={wt.path}
                 onClick={() => onLaunch(wt.path)}
-                className="group/wt flex cursor-default items-center gap-1.5 rounded px-2 py-1 transition-colors hover:bg-elevated/50"
+                title={ciTooltip(wtStatus)}
+                className={`group/wt flex cursor-default items-center gap-1.5 rounded px-2 py-1 transition-colors hover:bg-elevated/50 ${ciBorderClasses(wtStatus)}`}
               >
                 <GitBranch className="h-3 w-3 shrink-0 text-violet-400/60" />
                 <span className="min-w-0 flex-1 truncate text-[11px] text-faint transition-colors group-hover/wt:text-tertiary">
                   {wt.gitBranch ?? wt.name}
                 </span>
-                {/* Empty slot matching the session-row timestamp width so the
-                    CI badge lands in the same x-position on both row types. */}
-                <span className="w-[28px] shrink-0" aria-hidden />
-                <span className="inline-flex h-3 w-3 shrink-0 items-center justify-center">
-                  {wtStatus && (
-                    <CiStatusBadge
-                      status={wtStatus}
-                      onClick={e => {
-                        e.stopPropagation();
-                        if (wtStatus.prUrl) window.open(wtStatus.prUrl, '_blank', 'noopener');
-                      }}
-                    />
-                  )}
-                </span>
-                <div className="flex min-w-[54px] shrink-0 items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover/wt:opacity-100">
+                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/wt:opacity-100">
                   {installedIdes.length > 0 && (
                     <span
                       onClick={e => { e.stopPropagation(); onOpenInIde(wt.path); }}
