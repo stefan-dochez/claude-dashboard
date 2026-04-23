@@ -46,7 +46,7 @@ export default function Sidebar({
   projects, projectsLoading, projectsRefreshing, instances, selectedInstanceId,
   scanPaths, favoriteProjects, pullingProjects: _pullingProjects, checkingOutProjects: _checkingOutProjects, pullingAll, queuedIds: _queuedIds,
   onRefreshProjects, onLaunchProject, onSelectInstance, onKillInstance, onDismissInstance,
-  onDeleteWorktree, onToggleFavorite, onToggleMeta, onPullProject: _onPullProject, onPullAll, onCheckoutDefault: _onCheckoutDefault,
+  onDeleteWorktree, onToggleFavorite, onToggleMeta, onPullProject: _onPullProject, onPullAll, onCheckoutDefault,
   onOpenInIde, onViewPrs, installedIdes,
   onOpenScanPaths,
   addToast,
@@ -298,6 +298,7 @@ export default function Sidebar({
     onDeleteWorktree,
     onToggleFavorite,
     onToggleMeta,
+    onCheckoutDefault,
     onOpenInIde,
     onViewPrs,
     installedIdes,
@@ -310,7 +311,7 @@ export default function Sidebar({
     history,
     onResumeHistory: handleResume,
     addToast,
-  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, branchStatuses, history, handleResume, addToast]);
+  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onCheckoutDefault, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, branchStatuses, history, handleResume, addToast]);
 
   const renderProject = useCallback((project: Project) => (
     <ProjectRow

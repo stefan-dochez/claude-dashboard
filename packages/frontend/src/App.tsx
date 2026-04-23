@@ -24,6 +24,7 @@ import PromptTemplatesModal from './components/PromptTemplatesModal';
 import PluginsModal from './components/PluginsModal';
 import CostDashboard from './components/CostDashboard';
 import ToastContainer from './components/ToastContainer';
+import StashConfirmModal from './components/StashConfirmModal';
 import WhatsNewModal, { type ChangelogEntry } from './components/WhatsNewModal';
 import { useProjects } from './hooks/useProjects';
 import { useInstances } from './hooks/useInstances';
@@ -324,6 +325,7 @@ export default function App() {
   const [pullingProjects, setPullingProjects] = useState<Set<string>>(new Set());
   const [pullingAll, setPullingAll] = useState(false);
   const [checkingOutProjects, setCheckingOutProjects] = useState<Set<string>>(new Set());
+  const [stashConfirm, setStashConfirm] = useState<{ projectPath: string; projectName: string; currentBranch: string } | null>(null);
 
   const handlePullProject = useCallback(async (projectPath: string) => {
     setPullingProjects(prev => new Set(prev).add(projectPath));
@@ -371,18 +373,21 @@ export default function App() {
     }
   }, [refreshProjects, addToast]);
 
-  const handleCheckoutDefault = useCallback(async (projectPath: string) => {
+  const handleCheckoutDefault = useCallback(async (projectPath: string, autoStash = false) => {
     setCheckingOutProjects(prev => new Set(prev).add(projectPath));
-    const name = projectPath.split('/').pop() ?? projectPath;
+    const name = projectPath.split(/[\\/]/).pop() ?? projectPath;
     try {
       const res = await fetch('/api/git/checkout-default', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectPath }),
+        body: JSON.stringify({ projectPath, autoStash }),
       });
       const result = await res.json();
       if (result.success) {
         addToast(result.message === 'Already on default branch' ? 'info' : 'success', name, result.message);
+      } else if (result.needsStash) {
+        // Let the user decide — open a confirmation modal, don't toast.
+        setStashConfirm({ projectPath, projectName: name, currentBranch: result.branch || '' });
       } else {
         addToast('error', name, result.message);
       }
@@ -985,6 +990,19 @@ export default function App() {
             Undo
           </button>
         </div>
+      )}
+
+      {stashConfirm && (
+        <StashConfirmModal
+          projectName={stashConfirm.projectName}
+          currentBranch={stashConfirm.currentBranch}
+          onConfirm={() => {
+            const { projectPath } = stashConfirm;
+            setStashConfirm(null);
+            handleCheckoutDefault(projectPath, true);
+          }}
+          onCancel={() => setStashConfirm(null)}
+        />
       )}
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />

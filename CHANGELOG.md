@@ -2,6 +2,20 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.24.0]
+
+### Features
+
+- **"Switch to default branch" button visible again in the sidebar** — The feature existed in the backend (`POST /api/git/checkout-default` → `WorktreeManager.checkoutDefaultBranch`) and in the old `ProjectList.tsx` (now dead code), but the current `ProjectRow` never rendered the button, so it was unreachable. Added a `RotateCcw` icon to the hover action group in `ProjectRow.tsx`, shown only when `project.gitBranch` is set, the row is not a worktree, and the branch isn't `main` / `master` / `develop`. Tooltip reads `Switch to default branch (currently on <branch>)`. Wired `onCheckoutDefault` through `SidebarActionsContext` (was previously destructured as `_onCheckoutDefault` and dropped).
+
+- **Auto-stash confirmation when switching branches with uncommitted work** — Previously `checkoutDefaultBranch` flatly refused when the working tree was dirty (`"Uncommitted changes — commit or stash first"`). Now it returns `needsStash: true` with the current branch, and the frontend opens a new `StashConfirmModal` with `Cancel` / `Stash and switch` (amber). Confirm re-calls the endpoint with `autoStash: true`; the backend runs `git stash push -u -m "claude-dashboard: switch from <feature> to <default>"` before checkout. The stash stays on the global stash list (not auto-popped) — the user runs `git stash pop` when they return to their feature branch. Keyboard: `Enter` confirms, `Esc` cancels.
+
+- **Toasts stay visible while hovered** — Every toast had a `setTimeout` that fired regardless of pointer position, so long stderr messages (e.g. the Windows MAX_PATH remediation) could disappear mid-read. Moved the per-toast timer out of `useToasts` into a new `ToastItem` sub-component inside `ToastContainer`. Hover pauses the timer (clears it via the `useEffect` cleanup), un-hover restarts a fresh `toast.duration` window. The close `X` button still dismisses immediately. `Toast` now carries `duration` so the timer can live next to the DOM node.
+
+### Fixes
+
+- **"Pull all" toast showed `Command failed: git pull …` instead of the actual reason** — `WorktreeManager.pullRepo` was matching `err.message` (which starts with the command string) for `"Not possible to fast-forward"` only, and falling back to `msg.split('\n')[0]` for everything else — so every other failure mode surfaced as the unhelpful command line. Now reads `err.stderr` (the actual git output) and pattern-matches the common cases into short actionable messages: diverged branch, uncommitted changes blocking the pull, missing remote ref, auth failure, network error. Fallback extracts the first `error:` / `fatal:` line from stderr instead of the command prefix.
+
 ## [0.23.1]
 
 ### Fixes

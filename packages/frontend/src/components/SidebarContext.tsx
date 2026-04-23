@@ -16,6 +16,7 @@ interface SidebarActions {
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
   onToggleMeta: (projectPath: string) => void;
+  onCheckoutDefault: (projectPath: string) => void;
   onOpenInIde: (projectPath: string) => void;
   onViewPrs: (projectPath: string) => void;
   installedIdes: IdeInfo[];

@@ -481,7 +481,10 @@ export class WorktreeManager {
     return { worktreePath, branchName };
   }
 
-  async checkoutDefaultBranch(projectPath: string): Promise<{ success: boolean; message: string; branch: string }> {
+  async checkoutDefaultBranch(
+    projectPath: string,
+    options?: { autoStash?: boolean },
+  ): Promise<{ success: boolean; message: string; branch: string; needsStash?: boolean; stashed?: boolean }> {
     const currentBranch = await this.getGitBranch(projectPath);
     const defaultBranch = await this.getDefaultBranch(projectPath);
     if (!defaultBranch) {
@@ -491,10 +494,37 @@ export class WorktreeManager {
       return { success: true, message: 'Already on default branch', branch: defaultBranch };
     }
 
-    // Check for uncommitted changes
+    // Check for uncommitted changes. If present and the caller hasn't opted
+    // into autoStash, bail with `needsStash` so the UI can prompt. The stash
+    // is left on the global stash list (not auto-popped) — the user can run
+    // `git stash pop` on their feature branch when they return.
     const status = await this.getStatus(projectPath);
-    if (status.length > 0) {
-      return { success: false, message: 'Uncommitted changes — commit or stash first', branch: currentBranch ?? '' };
+    const hasUncommitted = status.length > 0;
+    let stashed = false;
+
+    if (hasUncommitted && !options?.autoStash) {
+      return {
+        success: false,
+        message: 'Uncommitted changes — stash them to continue',
+        branch: currentBranch ?? '',
+        needsStash: true,
+      };
+    }
+
+    if (hasUncommitted && options?.autoStash) {
+      const label = `claude-dashboard: switch from ${currentBranch ?? 'unknown'} to ${defaultBranch}`;
+      try {
+        await execAsync(`git stash push -u -m ${JSON.stringify(label)}`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          timeout: 15000,
+        });
+        stashed = true;
+        log.info(` Stashed uncommitted changes on ${currentBranch}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message.split('\n')[0] : 'Stash failed';
+        return { success: false, message: `Stash failed: ${msg}`, branch: currentBranch ?? '' };
+      }
     }
 
     try {
@@ -505,7 +535,7 @@ export class WorktreeManager {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Checkout failed';
-      return { success: false, message: msg.split('\n')[0], branch: currentBranch ?? '' };
+      return { success: false, message: msg.split('\n')[0], branch: currentBranch ?? '', stashed };
     }
 
     // Pull latest
@@ -520,7 +550,10 @@ export class WorktreeManager {
     }
 
     log.info(` Switched ${projectPath} from ${currentBranch} to ${defaultBranch}`);
-    return { success: true, message: `Switched to ${defaultBranch}`, branch: defaultBranch };
+    const message = stashed
+      ? `Switched to ${defaultBranch} (stashed changes from ${currentBranch})`
+      : `Switched to ${defaultBranch}`;
+    return { success: true, message, branch: defaultBranch, stashed };
   }
 
   async detachBranchToWorktree(projectPath: string): Promise<WorktreeResult> {
@@ -800,12 +833,36 @@ export class WorktreeManager {
         message: alreadyUpToDate ? 'Already up to date' : 'Updated',
       };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Pull failed';
-      // Check for common issues
-      if (msg.includes('Not possible to fast-forward')) {
-        return { success: false, message: 'Cannot fast-forward — local branch has diverged' };
+      // exec's rejection packs stderr as a property on the Error. err.message
+      // starts with "Command failed: <cmd>" followed by stderr, which is why
+      // bare err.message.split('\n')[0] just shows the command and hides the
+      // actionable reason. Match against stderr directly.
+      const stderr = (err as Error & { stderr?: string })?.stderr ?? '';
+      const msg = err instanceof Error ? err.message : '';
+      const haystack = `${stderr}\n${msg}`;
+
+      if (/not possible to fast-forward/i.test(haystack) || /non-fast-forward/i.test(haystack) || /diverged/i.test(haystack)) {
+        return { success: false, message: 'Local branch has diverged — rebase or merge manually' };
       }
-      return { success: false, message: msg.split('\n')[0] };
+      if (/would be overwritten by merge/i.test(haystack) || /Please commit your changes or stash them/i.test(haystack)) {
+        return { success: false, message: 'Uncommitted changes — commit or stash first' };
+      }
+      if (/couldn't find remote ref/i.test(haystack) || /no such ref was fetched/i.test(haystack)) {
+        return { success: false, message: 'Remote branch not found — it may have been deleted' };
+      }
+      if (/authentication failed/i.test(haystack) || /could not read username/i.test(haystack) || /terminal prompts disabled/i.test(haystack)) {
+        return { success: false, message: 'Authentication failed — check your git credentials' };
+      }
+      if (/could not resolve host/i.test(haystack) || /failed to connect/i.test(haystack) || /network is unreachable/i.test(haystack)) {
+        return { success: false, message: 'Network error — cannot reach origin' };
+      }
+
+      // Fallback: first `error:` / `fatal:` line from stderr, else first line of msg.
+      const actionable = stderr
+        .split('\n')
+        .map(l => l.trim())
+        .find(l => /^(error|fatal):/i.test(l));
+      return { success: false, message: actionable ?? msg.split('\n')[0] ?? 'Pull failed' };
     }
   }
 

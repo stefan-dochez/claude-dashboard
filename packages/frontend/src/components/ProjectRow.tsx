@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, GitBranch, GitPullRequest, Play, Power, Star, Trash2, Terminal, MessageSquare, Layers, Code2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitBranch, GitPullRequest, Play, Power, RotateCcw, Star, Trash2, Terminal, MessageSquare, Layers, Code2 } from 'lucide-react';
 import LaunchModal from './LaunchModal';
 import WorktreeResumeModal from './WorktreeResumeModal';
 import { useSidebarActions } from '../hooks/useSidebarActions';
@@ -48,7 +48,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
     instancesByProject, selectedInstanceId, favoriteProjects, prCounts, branchStatuses,
     history, onResumeHistory,
     onSelectInstance, onKillInstance, onDismissInstance, onLaunch,
-    onDeleteWorktree, onToggleFavorite, onToggleMeta, onRefreshProjects,
+    onDeleteWorktree, onToggleFavorite, onToggleMeta, onCheckoutDefault, onRefreshProjects,
     onOpenInIde, onViewPrs, installedIdes,
   } = useSidebarActions();
 
@@ -178,6 +178,15 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
               title="Open in IDE"
             >
               <Code2 className="h-3 w-3" />
+            </span>
+          )}
+          {!!project.gitBranch && !project.isWorktree && !['main', 'master', 'develop'].includes(project.gitBranch) && (
+            <span
+              onClick={e => { e.stopPropagation(); onCheckoutDefault(project.path); }}
+              className="rounded p-0.5 text-faint transition-colors hover:text-amber-400"
+              title={`Switch to default branch (currently on ${project.gitBranch})`}
+            >
+              <RotateCcw className="h-3 w-3" />
             </span>
           )}
           <span

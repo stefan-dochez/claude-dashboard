@@ -532,14 +532,14 @@ export function createRoutes(
     res.json(result);
   }));
 
-  // Git — checkout default branch
+  // Git — checkout default branch (optional autoStash to stash uncommitted changes first)
   router.post('/api/git/checkout-default', asyncHandler(async (req, res) => {
-    const { projectPath } = req.body as { projectPath?: string };
+    const { projectPath, autoStash } = req.body as { projectPath?: string; autoStash?: boolean };
     if (!projectPath) {
       res.status(400).json({ error: 'projectPath is required' });
       return;
     }
-    const result = await worktreeManager.checkoutDefaultBranch(projectPath);
+    const result = await worktreeManager.checkoutDefaultBranch(projectPath, { autoStash });
     res.json(result);
   }));
 
