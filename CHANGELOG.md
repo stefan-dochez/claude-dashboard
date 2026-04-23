@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.28.0]
+
+### Features
+
+- **Multi-file tabs inside the workspace side panel** — The side panel used to hold a single `openedFile` at a time; opening another file overwrote the first. It now keeps an ordered `openFiles` list with a per-file `highlightLine`, and renders an internal tab row (visible only when ≥ 2 files are open) above the active `FileViewer`. Each tab shows the language icon + truncated filename and an ✕ that closes only that file — closing the active tab falls back to the next file by position, and closing the last file collapses the panel back to `main`. The top-bar tab label adapts: a single open file still shows its basename, multiple show `Files (N)`. Opening the same file again updates its `highlightLine` in place instead of duplicating the tab. State is persisted under `dashboard:openFiles` (JSON) + `dashboard:activeFilePath`, with restore-time validation that drops paths no longer present and reconciles `activeFilePath` with the current list. Switching instance still clears the list — scope is intentionally per-instance for now.
+
 ## [0.27.0]
 
 ### Features
