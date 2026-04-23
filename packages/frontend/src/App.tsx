@@ -17,7 +17,7 @@ import HealthBanner from './components/HealthBanner';
 import UpdateBanner from './components/UpdateBanner';
 import FileViewer from './components/FileViewer';
 import ResizeHandle from './components/ResizeHandle';
-import CodeSearchModal from './components/CodeSearchModal';
+import SearchEverywhere from './components/SearchEverywhere';
 import CommandPalette from './components/CommandPalette';
 import ScanPathsModal from './components/ScanPathsModal';
 import PromptTemplatesModal from './components/PromptTemplatesModal';
@@ -71,7 +71,7 @@ export default function App() {
   const { toasts, addToast, removeToast } = useToasts();
   const { installedIdes, openInIde } = useIde();
   const [scanPathsOpen, setScanPathsOpen] = useState(false);
-  const [codeSearchOpen, setCodeSearchOpen] = useState(false);
+  const [searchEverywhere, setSearchEverywhere] = useState<{ tab: 'all' | 'files' | 'text' } | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
   const [pluginsModalOpen, setPluginsModalOpen] = useState(false);
@@ -152,6 +152,7 @@ export default function App() {
   const [openedFile, setOpenedFile] = useState<string | null>(() => {
     return localStorage.getItem('dashboard:openedFile');
   });
+  const [openedFileLine, setOpenedFileLine] = useState<number | undefined>(undefined);
 
   // Split terminal mode
   const [splitInstanceIds, setSplitInstanceIds] = useState<string[]>([]);
@@ -198,14 +199,16 @@ export default function App() {
       if (prev !== id) {
         setActiveTab('main');
         setOpenedFile(null);
+        setOpenedFileLine(undefined);
       }
       return id;
     });
     if (id) setPrViewProject(null);
   }, []);
 
-  const handleOpenFile = useCallback((filePath: string) => {
+  const handleOpenFile = useCallback((filePath: string, line?: number) => {
     setOpenedFile(filePath);
+    setOpenedFileLine(line);
     setActiveTab('file');
   }, []);
 
@@ -454,7 +457,8 @@ export default function App() {
     activeTab,
     onSetTab: setActiveTab,
     selectedInstance,
-    onOpenCodeSearch: useCallback(() => setCodeSearchOpen(true), []),
+    onOpenSearchEverywhere: useCallback(() => setSearchEverywhere({ tab: 'all' }), []),
+    onOpenCodeSearch: useCallback(() => setSearchEverywhere({ tab: 'text' }), []),
     onOpenScanPaths: useCallback(() => setScanPathsOpen(true), []),
     onOpenTemplates: useCallback(() => setTemplatesModalOpen(true), []),
     onOpenCostDashboard: useCallback(() => setCostDashboardOpen(true), []),
@@ -494,6 +498,7 @@ export default function App() {
       setSelectedInstanceId(null);
       setActiveTab('main');
       setOpenedFile(null);
+      setOpenedFileLine(undefined);
     }
   }, [selectedInstanceId, instances]);
   useEffect(() => {
@@ -514,14 +519,20 @@ export default function App() {
         setCommandPaletteOpen(prev => !prev);
         return;
       }
-      // Cmd+Shift+F — code search (works even from inputs)
+      // Cmd+Shift+F — search everywhere, Text tab preselected (works even from inputs)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
-        setCodeSearchOpen(prev => !prev);
+        setSearchEverywhere(prev => prev ? null : { tab: 'text' });
         return;
       }
-      // Cmd+T — prompt templates
+      // Cmd+T — search everywhere, All tab (works even from inputs)
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === 't') {
+        e.preventDefault();
+        setSearchEverywhere(prev => prev ? null : { tab: 'all' });
+        return;
+      }
+      // Cmd+Shift+T — prompt templates (moved from Cmd+T)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
         e.preventDefault();
         setTemplatesModalOpen(prev => !prev);
         return;
@@ -849,7 +860,8 @@ export default function App() {
                 <FileViewer
                   key={openedFile}
                   filePath={openedFile}
-                  onClose={() => { setOpenedFile(null); setActiveTab('main'); }}
+                  highlightLine={openedFileLine}
+                  onClose={() => { setOpenedFile(null); setOpenedFileLine(undefined); setActiveTab('main'); }}
                   onSendToChat={selectedInstance?.mode === 'chat' ? handleSendToChat : undefined}
                 />
               ) : activeTab === 'changes' ? (
@@ -937,11 +949,12 @@ export default function App() {
         />
       )}
 
-      {codeSearchOpen && instanceProjectPath && (
-        <CodeSearchModal
+      {searchEverywhere && instanceProjectPath && (
+        <SearchEverywhere
           projectPath={instanceProjectPath}
+          initialTab={searchEverywhere.tab}
           onOpenFile={handleOpenFile}
-          onClose={() => setCodeSearchOpen(false)}
+          onClose={() => setSearchEverywhere(null)}
         />
       )}
 

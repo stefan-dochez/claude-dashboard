@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { FileText, X, Loader2, MessageSquare, Code, BookOpen } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -10,15 +10,18 @@ interface FileViewerProps {
   filePath: string;
   onClose: () => void;
   onSendToChat?: (filePath: string, startLine: number, endLine: number, code: string) => void;
+  highlightLine?: number;
 }
 
-export default function FileViewer({ filePath, onClose, onSendToChat }: FileViewerProps) {
+export default function FileViewer({ filePath, onClose, onSendToChat, highlightLine }: FileViewerProps) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [size, setSize] = useState(0);
   const [selectionInfo, setSelectionInfo] = useState<{ startLine: number; endLine: number; text: string } | null>(null);
-  const [showSource, setShowSource] = useState(false);
+  // Markdown can't scroll to a source line when rendered, so show source when highlighting.
+  const [showSource, setShowSource] = useState(highlightLine != null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseUp = useCallback(() => {
     const selection = window.getSelection();
@@ -68,6 +71,17 @@ export default function FileViewer({ filePath, onClose, onSendToChat }: FileView
       .finally(() => setLoading(false));
   }, [filePath]);
 
+  // Scroll to highlighted line once content is rendered.
+  useEffect(() => {
+    if (highlightLine == null || content == null || loading) return;
+    // Defer to next frame so SyntaxHighlighter has painted.
+    const raf = requestAnimationFrame(() => {
+      const el = scrollContainerRef.current?.querySelector<HTMLElement>(`[data-line="${highlightLine}"]`);
+      el?.scrollIntoView({ block: 'center', behavior: 'auto' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [highlightLine, content, loading, showSource]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -111,7 +125,7 @@ export default function FileViewer({ filePath, onClose, onSendToChat }: FileView
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto" onMouseUp={handleMouseUp}>
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto" onMouseUp={handleMouseUp}>
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <Loader2 className="h-5 w-5 animate-spin text-faint" />
@@ -151,6 +165,14 @@ export default function FileViewer({ filePath, onClose, onSendToChat }: FileView
             language={language}
             style={oneDark}
             showLineNumbers
+            wrapLines
+            lineProps={(lineNumber: number) => ({
+              'data-line': String(lineNumber),
+              style: {
+                display: 'block',
+                backgroundColor: lineNumber === highlightLine ? 'rgba(250, 204, 21, 0.15)' : undefined,
+              },
+            }) as React.HTMLAttributes<HTMLElement>}
             customStyle={{
               margin: 0,
               padding: '0.75rem',

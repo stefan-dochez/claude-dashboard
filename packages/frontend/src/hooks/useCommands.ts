@@ -40,6 +40,7 @@ interface UseCommandsOptions {
   selectedInstance: Instance | undefined;
 
   // Modals
+  onOpenSearchEverywhere: () => void;
   onOpenCodeSearch: () => void;
   onOpenScanPaths: () => void;
   onOpenTemplates: () => void;
@@ -78,6 +79,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onToggleContext,
     onSetTab,
     selectedInstance,
+    onOpenSearchEverywhere,
     onOpenCodeSearch,
     onOpenScanPaths,
     onOpenTemplates,
@@ -135,6 +137,18 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     }
 
     commands.push({
+      id: 'search-everywhere',
+      label: 'Search Everywhere',
+      description: 'Find files and content in this project',
+      category: 'action',
+      icon: Search,
+      iconColor: 'text-blue-400',
+      shortcut: `${MOD}T`,
+      keywords: ['go to', 'file', 'find', 'search', 'everywhere'],
+      onExecute: onOpenSearchEverywhere,
+    });
+
+    commands.push({
       id: 'code-search',
       label: 'Search in Files',
       description: 'Full-text code search',
@@ -142,7 +156,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       icon: Search,
       iconColor: 'text-blue-400',
       shortcut: `${MOD}${SHIFT}F`,
-      keywords: ['grep', 'find', 'search', 'code'],
+      keywords: ['grep', 'find', 'search', 'code', 'text'],
       onExecute: onOpenCodeSearch,
     });
 
@@ -164,7 +178,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       category: 'action',
       icon: LayoutTemplate,
       iconColor: 'text-blue-400',
-      shortcut: `${MOD}T`,
+      shortcut: `${MOD}${SHIFT}T`,
       keywords: ['template', 'prompt', 'reusable', 'snippet'],
       onExecute: onOpenTemplates,
     });
@@ -379,7 +393,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     projects, favoriteProjects, onLaunchProject,
     sidebarOpen, onToggleSidebar, rightPanel, onToggleFiles, onToggleContext,
     onSetTab, selectedInstance,
-    onOpenCodeSearch, onOpenScanPaths, onOpenTemplates,
+    onOpenSearchEverywhere, onOpenCodeSearch, onOpenScanPaths, onOpenTemplates,
     onOpenCostDashboard, onOpenPlugins, onToggleNotifications, notificationsEnabled,
     onToggleTitleGeneration, titleGenerationEnabled,
     onRefreshProjects, theme, onToggleTheme,

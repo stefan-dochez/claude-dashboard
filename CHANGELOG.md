@@ -2,6 +2,18 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.26.0]
+
+### Features
+
+- **Search Everywhere (Cmd+T / Ctrl+T)** — new JetBrains-style global search modal that fuzzy-matches file names and greps file contents inside the currently selected project in one overlay. Three tabs (`All` / `Files` / `Text`) switchable via click, `Tab` / `Shift+Tab`, or `Cmd+1/2/3`; `All` shows a *Files* section followed by a *Text* section grouped by file. Keyboard nav is unified across both kinds (`↑↓` / `⏎` / `Esc`). Backed by the existing `/api/files/search` (find) and `/api/code/search` (grep) routes called in parallel with a shared `AbortController` + 250 ms debounce so fast typing cancels in-flight requests. Opening a text match routes through `handleOpenFile(path, line)` and lands inside `FileViewer` with the line highlighted.
+
+- **Jump-to-line in `FileViewer`** — `FileViewer` gained an optional `highlightLine` prop. When set, the SyntaxHighlighter renders with `wrapLines` and injects a per-line `data-line` attribute plus a yellow tint on the matched line; a `requestAnimationFrame` effect on the scroll container calls `scrollIntoView({ block: 'center' })` once the highlighter has painted. Markdown files fall back to *Source* view when `highlightLine` is set (rendered markdown has no source-line mapping). `App.tsx`'s `handleOpenFile` now accepts an optional `line`, and the parent state (`openedFileLine`) is reset on instance switch / file close so a stale highlight can't leak into the next file.
+
+- **`Cmd+Shift+F` now opens Search Everywhere on the Text tab** — the dedicated `CodeSearchModal` has been folded into `SearchEverywhere` (same component, different initial tab). The shortcut keeps its "jump straight to content search" behavior.
+
+- **Prompt Templates moved to `Cmd+Shift+T`** — to free up `Cmd+T` for Search Everywhere. The command palette entry's displayed shortcut was updated accordingly, and a new *Search Everywhere* command was added alongside *Search in Files* so both flows are discoverable from `Cmd+K`.
+
 ## [0.25.0]
 
 ### Features
