@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap, MessageSquare, Terminal, Cloud, Search, RefreshCw } from 'lucide-react';
 import type { Project, HistoryTask } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useSidebarActions } from '../hooks/useSidebarActions';
 
 interface RemoteBranchInfo {
   name: string;
@@ -61,6 +62,7 @@ interface LaunchModalProps {
 }
 
 export default function LaunchModal({ project, worktrees, onLaunch, onClose, onRefreshProjects }: LaunchModalProps) {
+  const { addToast } = useSidebarActions();
   const isGit = project.gitBranch !== null;
   const canDetach = isGit && !project.isWorktree && project.gitBranch !== null && !MAIN_BRANCHES.includes(project.gitBranch);
 
@@ -221,6 +223,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
       onClose();
     } catch (err) {
       console.error('[LaunchModal] Error checking out remote branch:', err);
+      addToast('error', 'Failed to check out remote branch', err instanceof Error ? err.message : 'Unknown error', 10000);
       setRemoteCheckingOut(null);
     }
   };
@@ -303,6 +306,7 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
       onClose();
     } catch (err) {
       console.error('[LaunchModal] Error converting branch to worktree:', err);
+      addToast('error', 'Failed to convert branch to worktree', err instanceof Error ? err.message : 'Unknown error', 10000);
       setConvertingBranch(null);
     }
   };

@@ -1,5 +1,6 @@
 import { createContext } from 'react';
 import type { Instance, BranchStatus, HistoryTask } from '../types';
+import type { Toast } from '../hooks/useToasts';
 
 interface IdeInfo {
   id: string;
@@ -29,6 +30,8 @@ interface SidebarActions {
   history: HistoryTask[];
   /** Resume a session from history (uses worktreePath if still present, replays sessionId). */
   onResumeHistory: (task: HistoryTask) => void;
+  /** Show a toast. Used by modals (e.g. LaunchModal) to surface backend errors. */
+  addToast: (type: Toast['type'], message: string, detail?: string, duration?: number) => string;
 }
 
 const SidebarActionsContext = createContext<SidebarActions | null>(null);

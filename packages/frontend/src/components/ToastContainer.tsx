@@ -38,7 +38,7 @@ export default function ToastContainer({ toasts, onRemove }: ToastContainerProps
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-primary">{toast.message}</p>
               {toast.detail && (
-                <p className="mt-0.5 whitespace-pre-line text-[12px] text-tertiary">{toast.detail}</p>
+                <p className="mt-0.5 whitespace-pre-line break-words text-[12px] text-tertiary [overflow-wrap:anywhere]">{toast.detail}</p>
               )}
             </div>
             <button

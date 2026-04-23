@@ -34,14 +34,33 @@ function execAsync(cmd: string, opts: { encoding: BufferEncoding; cwd?: string; 
 function cleanGitError(err: unknown, fallback: string): Error {
   if (!(err instanceof Error)) return new Error(fallback);
   const stderr = (err as Error & { stderr?: string }).stderr ?? '';
-  const actionable = stderr
+  const lines = stderr
     .split('\n')
     .map(line => line.trim())
-    .filter(line => /^(error|fatal):/i.test(line))
-    .slice(0, 5);
-  if (actionable.length > 0) return new Error(actionable.join('\n'));
-  const firstLine = err.message.split('\n')[0];
-  return new Error(firstLine || fallback);
+    .filter(line => /^(error|fatal):/i.test(line));
+
+  if (lines.length === 0) {
+    const firstLine = err.message.split('\n')[0];
+    return new Error(firstLine || fallback);
+  }
+
+  // Windows MAX_PATH case: N identical-shaped "Filename too long" errors only
+  // differ by the path. Collapse into a single remediation-focused message.
+  const longPathErrors = lines.filter(l => /filename too long/i.test(l));
+  if (longPathErrors.length > 0) {
+    const example = longPathErrors[0]
+      .replace(/^error:\s*unable to create file\s+/i, '')
+      .replace(/:\s*filename too long\s*$/i, '');
+    const count = longPathErrors.length;
+    const summary = `${count} file${count > 1 ? 's' : ''} exceed Windows' 260-char path limit — git can't create the worktree.`;
+    const fix = 'Fix: enable LongPathsEnabled in the registry (admin) and run `git config --global core.longpaths true`.';
+    const shortExample = example.length > 80 ? '…' + example.slice(-80) : example;
+    return new Error([summary, `e.g. ${shortExample}`, fix].join('\n'));
+  }
+
+  // Generic: dedupe identical lines, cap at 5.
+  const deduped = Array.from(new Set(lines)).slice(0, 5);
+  return new Error(deduped.join('\n'));
 }
 
 interface WorktreeResult {
@@ -139,11 +158,15 @@ export class WorktreeManager {
     log.info(` Creating worktree at ${worktreePath} (branch: ${finalBranch})`);
 
     const startArg = resolvedStartPoint ? ` "${resolvedStartPoint}"` : '';
-    await execAsync(`git worktree add -b "${finalBranch}" "${worktreePath}"${startArg}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-      timeout: 30000,
-    });
+    try {
+      await execAsync(`git worktree add -b "${finalBranch}" "${worktreePath}"${startArg}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 30000,
+      });
+    } catch (err) {
+      throw cleanGitError(err, 'git worktree add failed');
+    }
 
     log.info(` Worktree created successfully`);
 
@@ -310,20 +333,24 @@ export class WorktreeManager {
 
     log.info(` Creating worktree for remote branch ${remoteBranch} at ${worktreePath}`);
 
-    if (localExists) {
-      // Reuse existing local branch — git will refuse if already checked out elsewhere
-      await execAsync(`git worktree add "${worktreePath}" "${localBranch}"`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        timeout: 30000,
-      });
-    } else {
-      // Create a new local branch tracking the remote ref
-      await execAsync(`git worktree add --track -b "${localBranch}" "${worktreePath}" "${remoteBranch}"`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        timeout: 30000,
-      });
+    try {
+      if (localExists) {
+        // Reuse existing local branch — git will refuse if already checked out elsewhere
+        await execAsync(`git worktree add "${worktreePath}" "${localBranch}"`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          timeout: 30000,
+        });
+      } else {
+        // Create a new local branch tracking the remote ref
+        await execAsync(`git worktree add --track -b "${localBranch}" "${worktreePath}" "${remoteBranch}"`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          timeout: 30000,
+        });
+      }
+    } catch (err) {
+      throw cleanGitError(err, 'git worktree add failed');
     }
 
     log.info(` Worktree created successfully`);
@@ -439,11 +466,15 @@ export class WorktreeManager {
 
     log.info(` Creating worktree for branch ${branchName} at ${worktreePath}`);
 
-    await execAsync(`git worktree add "${worktreePath}" "${branchName}"`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-      timeout: 30000,
-    });
+    try {
+      await execAsync(`git worktree add "${worktreePath}" "${branchName}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 30000,
+      });
+    } catch (err) {
+      throw cleanGitError(err, 'git worktree add failed');
+    }
 
     log.info(` Worktree created successfully`);
 

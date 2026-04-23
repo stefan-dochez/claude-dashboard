@@ -2,6 +2,18 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.23.1]
+
+### Fixes
+
+- **Silent failures on branch-to-worktree flows** — Converting a local or remote branch into a worktree from `LaunchModal` would fail silently when the backend returned a 500 (e.g. Windows MAX_PATH errors on a large .NET repo). The fix in v0.22.3 only covered `handleLaunch` in `App.tsx`; the dedicated `handleBranchToWorktree` and `handleRemoteToWorktree` handlers in `LaunchModal.tsx` had their own empty `catch {}` blocks with only a `console.error`. `addToast` is now exposed via `SidebarActionsContext` (new field, wired from `App.tsx` through `Sidebar`), and both handlers surface a red 10s toast with the backend error.
+
+- **Unreadable stderr on non-detach worktree flows** — `createWorktree` (task description), `branchToWorktree` (local branch), and `remoteBranchToWorktree` (remote branch) all ran `git worktree add` without wrapping the call, so their multi-kilobyte raw stderr (progress bars + errors) bubbled untouched into the 500 response. Now each is wrapped with `cleanGitError()`, matching what `detachBranchToWorktree` already did.
+
+- **Windows MAX_PATH errors are now actionable** — `cleanGitError()` previously surfaced up to 5 raw `error: unable to create file <path>: Filename too long` lines, which rendered as nearly-identical repeating rows in a narrow toast (only the path suffix differed). It now detects this specific case and collapses it into: a count (`N files exceed Windows' 260-char path limit…`), one truncated example path, and the remediation (`enable LongPathsEnabled in the registry and run git config --global core.longpaths true`). Non-long-path errors fall back to deduped lines.
+
+- **Long paths overflowing the toast** — `ToastContainer.tsx`'s detail `<p>` only had `whitespace-pre-line` — long words without spaces (filesystem paths) overflowed the `max-w-sm` container. Added `break-words` + `[overflow-wrap:anywhere]` so paths wrap at any character if needed.
+
 ## [0.23.0]
 
 ### Features

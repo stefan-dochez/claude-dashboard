@@ -680,6 +680,7 @@ export default function App() {
           onViewPrs={handleViewPrs}
           installedIdes={installedIdes}
           onOpenScanPaths={() => setScanPathsOpen(true)}
+          addToast={addToast}
           collapsed={!sidebarOpen}
           onExpand={() => setSidebarOpen(true)}
           width={sidebarWidth}

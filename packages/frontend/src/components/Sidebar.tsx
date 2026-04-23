@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { usePlatform } from '../hooks/usePlatform';
 import type { Project, Instance, BranchStatus, HistoryTask } from '../types';
+import type { Toast } from '../hooks/useToasts';
 import { SidebarActionsContext } from './SidebarContext';
 import ProjectRow from './ProjectRow';
 
@@ -33,6 +34,7 @@ interface SidebarProps {
   onViewPrs: (projectPath: string) => void;
   installedIdes: Array<{ id: string; name: string; installed: boolean }>;
   onOpenScanPaths: () => void;
+  addToast: (type: Toast['type'], message: string, detail?: string, duration?: number) => string;
   collapsed: boolean;
   onExpand: () => void;
   width?: number;
@@ -47,6 +49,7 @@ export default function Sidebar({
   onDeleteWorktree, onToggleFavorite, onToggleMeta, onPullProject: _onPullProject, onPullAll, onCheckoutDefault: _onCheckoutDefault,
   onOpenInIde, onViewPrs, installedIdes,
   onOpenScanPaths,
+  addToast,
   collapsed, onExpand: _onExpand, width = 320,
 }: SidebarProps) {
   const [filter, setFilter] = useState('');
@@ -306,7 +309,8 @@ export default function Sidebar({
     branchStatuses,
     history,
     onResumeHistory: handleResume,
-  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, branchStatuses, history, handleResume]);
+    addToast,
+  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, branchStatuses, history, handleResume, addToast]);
 
   const renderProject = useCallback((project: Project) => (
     <ProjectRow
