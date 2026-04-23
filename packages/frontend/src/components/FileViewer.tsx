@@ -10,10 +10,11 @@ interface FileViewerProps {
   filePath: string;
   onClose: () => void;
   onSendToChat?: (filePath: string, startLine: number, endLine: number, code: string) => void;
+  onSelectionChange?: (sel: { filePath: string; startLine: number; endLine: number; text: string } | null) => void;
   highlightLine?: number;
 }
 
-export default function FileViewer({ filePath, onClose, onSendToChat, highlightLine }: FileViewerProps) {
+export default function FileViewer({ filePath, onClose, onSendToChat, onSelectionChange, highlightLine }: FileViewerProps) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,15 +28,24 @@ export default function FileViewer({ filePath, onClose, onSendToChat, highlightL
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !content) {
       setSelectionInfo(null);
+      onSelectionChange?.(null);
       return;
     }
     const text = selection.toString().trim();
-    if (!text) { setSelectionInfo(null); return; }
+    if (!text) {
+      setSelectionInfo(null);
+      onSelectionChange?.(null);
+      return;
+    }
 
     // Find line numbers from selection
     const lines = content.split('\n');
     const beforeStart = content.indexOf(text);
-    if (beforeStart < 0) { setSelectionInfo(null); return; }
+    if (beforeStart < 0) {
+      setSelectionInfo(null);
+      onSelectionChange?.(null);
+      return;
+    }
     let startLine = 1;
     let charCount = 0;
     for (let i = 0; i < lines.length; i++) {
@@ -43,8 +53,10 @@ export default function FileViewer({ filePath, onClose, onSendToChat, highlightL
       charCount += lines[i].length + 1;
     }
     const endLine = startLine + text.split('\n').length - 1;
-    setSelectionInfo({ startLine, endLine, text });
-  }, [content]);
+    const info = { startLine, endLine, text };
+    setSelectionInfo(info);
+    onSelectionChange?.({ filePath, ...info });
+  }, [content, filePath, onSelectionChange]);
 
   const fileName = filePath.split('/').pop() ?? filePath;
   const language = detectLanguage(filePath);
@@ -166,13 +178,21 @@ export default function FileViewer({ filePath, onClose, onSendToChat, highlightL
             style={oneDark}
             showLineNumbers
             wrapLines
-            lineProps={(lineNumber: number) => ({
-              'data-line': String(lineNumber),
-              style: {
-                display: 'block',
-                backgroundColor: lineNumber === highlightLine ? 'rgba(250, 204, 21, 0.15)' : undefined,
-              },
-            }) as React.HTMLAttributes<HTMLElement>}
+            lineProps={(lineNumber: number) => {
+              const inSelection = selectionInfo
+                && lineNumber >= selectionInfo.startLine
+                && lineNumber <= selectionInfo.endLine;
+              return {
+                'data-line': String(lineNumber),
+                style: {
+                  display: 'block',
+                  backgroundColor:
+                    inSelection ? 'rgba(139, 92, 246, 0.18)'
+                    : lineNumber === highlightLine ? 'rgba(250, 204, 21, 0.15)'
+                    : undefined,
+                },
+              } as React.HTMLAttributes<HTMLElement>;
+            }}
             customStyle={{
               margin: 0,
               padding: '0.75rem',

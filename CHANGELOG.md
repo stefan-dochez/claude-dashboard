@@ -2,6 +2,18 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.29.0]
+
+### Features
+
+- **Claude Code IDE integration via MCP WebSocket** — the dashboard now registers itself as Claude Code's "IDE" for every spawned terminal instance. A per-instance MCP server binds to a random port on `127.0.0.1`, writes `~/.claude/ide/<port>.lock` (with `pid`, `workspaceFolders`, `ideName: "Claude Dashboard"`, `transport: "ws"`, `authToken`), and is advertised to the PTY via `CLAUDE_CODE_SSE_PORT` + `ENABLE_IDE_INTEGRATION=true` env vars. WebSocket upgrades require the matching `x-claude-code-ide-authorization` header; traffic is JSON-RPC 2.0. Tools exposed back to Claude: `getOpenEditors`, `getCurrentSelection`, `getLatestSelection`, `getWorkspaceFolders`, `openFile`, `close_tab` (+ stubs for `getDiagnostics`, `checkDocumentDirty`, `saveDocument`, `closeAllDiffTabs`, `openDiff`, `executeCode`). Frontend pushes state via `socket.io` (`ide:state` with `openFiles` / `activeFilePath` / `selection`), which a single `IdeMcpServer.updateState` applies atomically to avoid race-y intermediate `selection_changed` notifications. `openFile` / `close_tab` tool calls flow back through `ide:open-file` / `ide:close-tab` socket events to `handleOpenFile` / `handleCloseFile` in `App.tsx`.
+
+- **`selection_changed` notification now matches the schema Claude Code expects** — payload includes `text`, `filePath`, `fileUrl` (a `file://` URI) and a full `selection` object with `start` / `end` positions and an `isEmpty` flag. Line numbers use LSP half-open ranges: selecting lines L..N (1-indexed, inclusive) emits `start: { line: L-1, character: 0 }`, `end: { line: N, character: 0 }` — previously the end was off by one, so Claude reported one fewer line than the user had actually selected. When the file is closed or no selection exists, `isEmpty: true` is sent with the current `activeFilePath` (or empty string if no file is open), so Claude's IDE-side context follows the dashboard instead of sticking on stale state.
+
+- **Persistent selection highlight in `FileViewer`** — selected lines stay visually highlighted (violet tint) even after the native DOM selection is cleared by focusing the terminal or another element. The highlight is driven by the same `selectionInfo` React state that powers the IDE push, so the visual state cannot drift from what Claude sees.
+
+- **Multi-file tab tracking is now stale-safe** — when the user switches the active file in the workspace panel, any `codeSelection` that pointed to the previous file is dropped at the push layer (it's only sent to Claude when its `filePath` matches `activeFilePath`), so the IDE never receives a selection from a file the user is no longer viewing.
+
 ## [0.28.0]
 
 ### Features

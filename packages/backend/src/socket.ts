@@ -35,6 +35,14 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
     io.emit('instance:context', { instanceId, ...context });
   };
 
+  const onIdeOpenFile = (instanceId: string, payload: { filePath: string; startLine?: number; endLine?: number }) => {
+    io.emit('ide:open-file', { instanceId, ...payload });
+  };
+
+  const onIdeCloseTab = (instanceId: string, payload: { tabName: string }) => {
+    io.emit('ide:close-tab', { instanceId, ...payload });
+  };
+
   const onFirstPrompt = (instanceId: string, firstPrompt: string) => {
     if (taskStore) {
       const instance = processManager.get(instanceId);
@@ -71,6 +79,8 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
   processManager.on('exited', onExited);
   processManager.on('context', onContext);
   processManager.on('first_prompt', onFirstPrompt);
+  processManager.on('ide:open-file', onIdeOpenFile);
+  processManager.on('ide:close-tab', onIdeCloseTab);
 
   io.on('connection', (socket: Socket) => {
     log.info(`Client connected: ${socket.id}`);
@@ -128,6 +138,26 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
       }
     });
 
+    socket.on('ide:state', ({ instanceId, openFiles, activeFilePath, selection }: {
+      instanceId: string;
+      openFiles?: { path: string; highlightLine?: number }[];
+      activeFilePath?: string | null;
+      selection?: { filePath: string; startLine: number; endLine: number; text: string } | null;
+    }) => {
+      const ideServer = processManager.getIdeServer(instanceId);
+      if (!ideServer) return;
+      ideServer.updateState({ openFiles, activeFilePath, selection });
+    });
+
+    socket.on('ide:at_mentioned', ({ instanceId, selection }: {
+      instanceId: string;
+      selection: { filePath: string; startLine: number; endLine: number; text: string };
+    }) => {
+      const ideServer = processManager.getIdeServer(instanceId);
+      if (!ideServer) return;
+      ideServer.notifyAtMentioned(selection);
+    });
+
     socket.on('disconnect', () => {
       log.info(`Client disconnected: ${socket.id}`);
       for (const [, sockets] of attachments) {
@@ -143,5 +173,7 @@ export function setupSocketHandlers(io: Server, processManager: ProcessManager, 
     processManager.off('exited', onExited);
     processManager.off('context', onContext);
     processManager.off('first_prompt', onFirstPrompt);
+    processManager.off('ide:open-file', onIdeOpenFile);
+    processManager.off('ide:close-tab', onIdeCloseTab);
   };
 }

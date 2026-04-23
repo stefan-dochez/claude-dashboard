@@ -8,6 +8,7 @@ import type { AppConfig } from './config.js';
 import { IS_WINDOWS, PATH_SEP, getExtraPaths, PTY_TERM_NAME } from './platform.js';
 import { TIMEOUTS, LIMITS, PTY_DEFAULTS } from './constants.js';
 import { createLogger } from './logger.js';
+import { IdeMcpServer } from './ide-mcp-server.js';
 
 const log = createLogger('process-manager');
 
@@ -124,11 +125,16 @@ interface InstanceContext {
 
 export class ProcessManager extends EventEmitter {
   private handles = new Map<string, PtyHandle>();
+  private ideServers = new Map<string, IdeMcpServer>();
   private readonly claudeBinary: string;
 
   constructor(private config: AppConfig) {
     super();
     this.claudeBinary = resolveClaudeBinary();
+  }
+
+  getIdeServer(instanceId: string): IdeMcpServer | undefined {
+    return this.ideServers.get(instanceId);
   }
 
   async spawn(options: SpawnOptions): Promise<Instance> {
@@ -154,6 +160,24 @@ export class ProcessManager extends EventEmitter {
     } else {
       sessionId = randomUUID();
       args.push('--session-id', sessionId);
+    }
+
+    // Start the IDE MCP server BEFORE spawning claude so its env vars are set.
+    // If start fails we continue without IDE integration rather than blocking the spawn.
+    const ideServer = new IdeMcpServer(id, cwd);
+    try {
+      const { port } = await ideServer.start();
+      env.CLAUDE_CODE_SSE_PORT = String(port);
+      env.ENABLE_IDE_INTEGRATION = 'true';
+      this.ideServers.set(id, ideServer);
+      ideServer.on('open-file', (filePath, startLine, endLine) => {
+        this.emit('ide:open-file', id, { filePath, startLine, endLine });
+      });
+      ideServer.on('close-tab', (tabName: string) => {
+        this.emit('ide:close-tab', id, { tabName });
+      });
+    } catch (err) {
+      log.warn(`IDE MCP server failed to start for ${id}; continuing without IDE integration: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     log.info(`Spawning ${this.claudeBinary} in ${cwd} (session ${sessionId}, resume=${!!options.resumeSessionId})`);
@@ -204,6 +228,11 @@ export class ProcessManager extends EventEmitter {
       this.emit('status', id, INSTANCE_STATUS.EXITED);
       this.emit('exited', id, exitCode);
       log.info(`Instance ${id} exited with code ${exitCode}`);
+      const srv = this.ideServers.get(id);
+      if (srv) {
+        this.ideServers.delete(id);
+        srv.stop().catch(err => log.warn(`IDE server stop failed for ${id}: ${err instanceof Error ? err.message : err}`));
+      }
     });
 
     log.info(`Spawned instance ${id} (pid ${ptyProcess.pid}) for ${cwd}`);

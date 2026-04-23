@@ -30,7 +30,7 @@ import { useProjects } from './hooks/useProjects';
 import { useInstances } from './hooks/useInstances';
 import { useConfig } from './hooks/useConfig';
 import { useAttentionQueue } from './hooks/useAttentionQueue';
-import { useSocketStatus } from './hooks/useSocket';
+import { useSocket, useSocketStatus } from './hooks/useSocket';
 import { useToasts } from './hooks/useToasts';
 import { useCommands } from './hooks/useCommands';
 import { usePromptTemplates } from './hooks/usePromptTemplates';
@@ -60,6 +60,7 @@ function StatusIcon({ status }: { status: string }) {
 // --------------- App ---------------
 
 export default function App() {
+  const socket = useSocket();
   const socketConnected = useSocketStatus();
   const { config, updateConfig } = useConfig();
   const { projects, loading: projectsLoading, refreshing: projectsRefreshing, refreshProjects, deleteWorktree } = useProjects();
@@ -555,11 +556,54 @@ export default function App() {
       setActiveFilePath(openFiles[0]?.path ?? null);
     }
   }, [activeFilePath, openFiles]);
+  // When switching file in the panel, drop any stale selection from the previous
+  // file so Claude's IDE-side state reflects "no selection in the new file yet".
+  useEffect(() => {
+    setCodeSelection(prev => (prev && prev.filePath !== activeFilePath ? null : prev));
+  }, [activeFilePath]);
 
   // Close right panel when no instance is selected
   useEffect(() => {
     if (!selectedInstanceId) setRightPanel(null);
   }, [selectedInstanceId]);
+
+  // Push IDE state (open files, active file, selection) to the backend so the
+  // per-instance MCP server can answer Claude's tool calls like getOpenEditors
+  // and getCurrentSelection. The selection is only pushed when it belongs to
+  // the currently active file — this avoids sending a stale selection from a
+  // file the user has already closed or navigated away from.
+  useEffect(() => {
+    if (!selectedInstanceId) return;
+    const selectionForPush = codeSelection && codeSelection.filePath === activeFilePath
+      ? { filePath: codeSelection.filePath, startLine: codeSelection.startLine, endLine: codeSelection.endLine, text: codeSelection.code }
+      : null;
+    socket.emit('ide:state', {
+      instanceId: selectedInstanceId,
+      openFiles,
+      activeFilePath,
+      selection: selectionForPush,
+    });
+  }, [socket, selectedInstanceId, openFiles, activeFilePath, codeSelection]);
+
+  // Receive open-file / close-tab requests that Claude issued via the MCP server
+  useEffect(() => {
+    const onOpenFile = ({ instanceId, filePath, startLine }: { instanceId: string; filePath: string; startLine?: number }) => {
+      if (instanceId !== selectedInstanceId) return;
+      handleOpenFile(filePath, startLine);
+    };
+    const onCloseTab = ({ instanceId, tabName }: { instanceId: string; tabName: string }) => {
+      if (instanceId !== selectedInstanceId) return;
+      // Match by full path or basename
+      const match = openFiles.find(f => f.path === tabName || f.path.endsWith(`/${tabName}`));
+      if (match) handleCloseFile(match.path);
+    };
+    socket.on('ide:open-file', onOpenFile);
+    socket.on('ide:close-tab', onCloseTab);
+    return () => {
+      socket.off('ide:open-file', onOpenFile);
+      socket.off('ide:close-tab', onCloseTab);
+    };
+  }, [socket, selectedInstanceId, openFiles, handleOpenFile, handleCloseFile]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -983,6 +1027,9 @@ export default function App() {
                         highlightLine={openFiles.find(f => f.path === activeFilePath)?.highlightLine}
                         onClose={() => handleCloseFile(activeFilePath)}
                         onSendToChat={selectedInstance.mode === 'chat' ? handleSendToChat : undefined}
+                        onSelectionChange={sel => setCodeSelection(
+                          sel ? { filePath: sel.filePath, startLine: sel.startLine, endLine: sel.endLine, code: sel.text } : null,
+                        )}
                       />
                     </div>
                   )}

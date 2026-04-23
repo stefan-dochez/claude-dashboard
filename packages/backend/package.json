@@ -1,6 +1,6 @@
 {
   "name": "@claude-dashboard/backend",
-  "version": "0.28.0",
+  "version": "0.29.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,13 +18,15 @@
     "pidusage": "^4.0.1",
     "simple-git": "^3.32.3",
     "socket.io": "^4.8.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.5",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   }
