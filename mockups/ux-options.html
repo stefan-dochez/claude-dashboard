@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Claude Dashboard — UX options</title>
+<style>
+  :root {
+    --bg-root: #0a0a0a;
+    --bg-surface: #141414;
+    --bg-elevated: #1c1c1c;
+    --bg-input: #222;
+    --border: #2a2a2a;
+    --border-strong: #3a3a3a;
+    --text-primary: #e6e6e6;
+    --text-secondary: #a0a0a0;
+    --text-faint: #666;
+    --accent-green: #10b981;
+    --accent-blue: #3b82f6;
+    --accent-yellow: #facc15;
+    --accent-red: #ef4444;
+    --accent-violet: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px;
+    background: #050505;
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text-primary);
+  }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  .subtitle { color: var(--text-secondary); margin-bottom: 24px; font-size: 13px; }
+  .option {
+    margin-bottom: 48px;
+  }
+  .option-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .option-header h2 { font-size: 15px; margin: 0; }
+  .option-header .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+  .option-header .pros { color: var(--accent-green); font-size: 12px; }
+  .option-header .cons { color: var(--accent-yellow); font-size: 12px; }
+
+  /* App chrome */
+  .app {
+    width: 1440px;
+    height: 820px;
+    background: var(--bg-root);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .topbar {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    background: #0c0c0c;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .traffic { display: flex; gap: 6px; }
+  .traffic span { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .traffic .r { background: #ff5f57; }
+  .traffic .y { background: #febc2e; }
+  .traffic .g { background: #28c840; }
+  .topbar .title { font-weight: 600; color: var(--text-primary); }
+  .topbar .spacer { flex: 1; }
+  .topbar .badge { padding: 2px 8px; background: var(--bg-elevated); border-radius: 4px; font-size: 11px; }
+
+  .body { flex: 1; display: flex; min-height: 0; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 260px;
+    background: #0d0d0d;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-section { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .sidebar-section h3 {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+  .proj { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 12px; color: var(--text-secondary); }
+  .proj.active { background: rgba(59, 130, 246, 0.12); color: var(--text-primary); }
+  .proj .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green); }
+  .proj .dot.idle { background: var(--text-faint); }
+  .proj .dot.busy { background: var(--accent-yellow); }
+  .proj .branch { font-size: 10px; color: var(--text-faint); margin-left: auto; }
+
+  /* Main area */
+  .main { flex: 1; display: flex; min-width: 0; position: relative; }
+
+  /* Terminal */
+  .terminal-pane { flex: 1; background: #0b0b0b; display: flex; flex-direction: column; min-width: 0; }
+  .pane-header {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+    background: #0f0f0f;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .pane-header .label { font-weight: 600; color: var(--text-primary); }
+  .pane-tabs { display: flex; gap: 4px; }
+  .tab {
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .tab.active { background: var(--bg-elevated); color: var(--text-primary); }
+  .tab .count { color: var(--text-faint); font-size: 10px; }
+  .pane-header .spacer { flex: 1; }
+  .pane-header .action { color: var(--text-faint); padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+  .pane-header .action:hover { background: var(--bg-elevated); }
+
+  .terminal-body {
+    flex: 1;
+    padding: 14px 16px;
+    font-family: "SF Mono", "JetBrains Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    overflow: hidden;
+  }
+  .terminal-body .sys { color: var(--text-faint); }
+  .terminal-body .prompt { color: var(--accent-violet); }
+  .terminal-body .user { color: var(--accent-blue); }
+  .terminal-body .tool { color: var(--accent-green); }
+  .terminal-body .warn { color: var(--accent-yellow); }
+  .terminal-body .cursor { background: var(--text-primary); color: #000; padding: 0 1px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  /* FileViewer */
+  .file-pane {
+    background: #0c0c0c;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    min-width: 0;
+  }
+  .file-body {
+    flex: 1;
+    padding: 10px 0;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11.5px;
+    line-height: 1.55;
+    overflow: hidden;
+  }
+  .code-line {
+    display: flex;
+    padding: 0 12px;
+  }
+  .code-line .ln {
+    width: 36px;
+    flex-shrink: 0;
+    color: var(--text-faint);
+    text-align: right;
+    padding-right: 12px;
+    user-select: none;
+  }
+  .code-line.hl { background: rgba(250, 204, 21, 0.10); }
+  .code-line.hl .ln { color: var(--accent-yellow); }
+  .code-line.selected { background: rgba(59, 130, 246, 0.22); }
+  .kw { color: #c678dd; }
+  .str { color: #98c379; }
+  .fn { color: #61afef; }
+  .cm { color: #5c6370; font-style: italic; }
+  .num { color: #d19a66; }
+  .ty { color: #e5c07b; }
+
+  /* Selection callout */
+  .callout {
+    position: absolute;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 30;
+  }
+  .callout .kbd {
+    background: #2a2a2a;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+  .callout .btn {
+    background: var(--accent-blue);
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .flow-arrow {
+    position: absolute;
+    z-index: 25;
+    pointer-events: none;
+  }
+
+  /* Drawer */
+  .drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 640px;
+    background: #101010;
+    border-left: 1px solid var(--border-strong);
+    box-shadow: -12px 0 32px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    z-index: 20;
+  }
+  .drawer-header {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    background: #0d0d0d;
+  }
+  .drawer-tabs { display: flex; gap: 2px; }
+  .drawer-tab {
+    padding: 5px 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .drawer-tab.active { background: var(--bg-elevated); color: var(--text-primary); }
+  .drawer-tab .count { background: #2a2a2a; color: var(--text-secondary); padding: 0 5px; border-radius: 8px; font-size: 10px; }
+  .drawer-body { flex: 1; padding: 14px; overflow: hidden; }
+
+  /* Diff block */
+  .file-change { margin-bottom: 16px; }
+  .file-change .name { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; font-family: monospace; }
+  .file-change .name .pm { float: right; font-size: 10px; }
+  .file-change .name .pm .p { color: var(--accent-green); }
+  .file-change .name .pm .m { color: var(--accent-red); }
+  .diff { background: #0a0a0a; border: 1px solid var(--border); border-radius: 4px; padding: 6px 0; font-family: monospace; font-size: 11px; line-height: 1.5; }
+  .diff .l { padding: 0 10px; display: block; }
+  .diff .add { background: rgba(16, 185, 129, 0.12); color: #a7f3d0; }
+  .diff .rem { background: rgba(239, 68, 68, 0.12); color: #fca5a5; }
+  .diff .ctx { color: var(--text-faint); }
+  .diff .hunk { color: var(--accent-violet); padding: 2px 10px; background: rgba(167, 139, 250, 0.05); }
+
+  /* Backdrop for drawer in option A */
+  .backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 15;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 18px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<h1>Claude Dashboard — UX options</h1>
+<p class="subtitle">Les deux pistes pour garder le terminal/chat toujours visible tout en offrant Changes, Pull Request et FileViewer.</p>
+
+<!-- ============================================================ -->
+<!-- OPTION A — tout en drawer                                     -->
+<!-- ============================================================ -->
+
+<section class="option">
+  <div class="option-header">
+    <h2>Option A — Drawer unique pour Changes / PR / FileViewer</h2>
+    <span class="tag">terminal plein écran, panneau latéral coulissant</span>
+    <span class="pros">+ focus maximal sur le terminal</span>
+    <span class="cons">— FileViewer confiné à ~640 px</span>
+  </div>
+
+  <div class="app">
+    <div class="topbar">
+      <span class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></span>
+      <span class="title">Claude Dashboard</span>
+      <span class="badge">~/Workspace/claude-dashboard</span>
+      <span class="spacer"></span>
+      <span class="badge">main</span>
+      <span class="badge">v0.26.0</span>
+    </div>
+
+    <div class="body">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <h3>Active instances (3)</h3>
+          <div class="proj active"><span class="dot"></span>claude-dashboard<span class="branch">main</span></div>
+          <div class="proj"><span class="dot busy"></span>banking-fees<span class="branch">feat/imp</span></div>
+          <div class="proj"><span class="dot idle"></span>di-kernel-lib<span class="branch">fix/xyz</span></div>
+        </div>
+        <div class="sidebar-section" style="flex:1">
+          <h3>Workspace</h3>
+          <div class="proj"><span class="dot idle"></span>shared-flipper-front</div>
+          <div class="proj"><span class="dot idle"></span>di-banking-ia-lib</div>
+          <div class="proj"><span class="dot idle"></span>prj-banking-fees</div>
+        </div>
+      </aside>
+
+      <!-- Main: terminal plein écran -->
+      <main class="main">
+        <div class="terminal-pane">
+          <div class="pane-header">
+            <span class="label">Terminal</span>
+            <span style="color: var(--text-faint); font-size: 11px">claude-dashboard · main · pid 48211</span>
+            <span class="spacer"></span>
+            <span class="action" style="color: var(--text-primary); background: var(--bg-elevated)">Changes <span style="background:#2a2a2a;padding:0 5px;border-radius:8px;font-size:10px;margin-left:4px">3</span></span>
+            <span class="action" style="color: var(--text-primary); background: var(--bg-elevated)">PR <span style="background:#2a2a2a;padding:0 5px;border-radius:8px;font-size:10px;margin-left:4px">2</span></span>
+            <span class="action">Files</span>
+            <span class="action">⋯</span>
+          </div>
+          <div class="terminal-body">
+            <div class="sys">──── session 2026-04-23 14:02 ────</div>
+            <br />
+            <div><span class="prompt">&gt;</span> implémente le drawer latéral pour Changes et PR selon la maquette option A</div>
+            <br />
+            <div class="tool">● Update(packages/frontend/src/App.tsx)</div>
+            <div class="tool">  ⎿ inserted 42 lines</div>
+            <br />
+            <div class="tool">● Write(packages/frontend/src/components/SideDrawer.tsx)</div>
+            <div class="tool">  ⎿ 118 lines</div>
+            <br />
+            <div>Le drawer glisse depuis la droite et superpose le terminal avec un backdrop semi-transparent. La largeur est redimensionnable entre 480 et 900 px, stockée dans <code style="color:var(--accent-violet)">localStorage</code> sous la clé <code style="color:var(--accent-violet)">dashboard:drawer:width</code>.</div>
+            <br />
+            <div>Les tabs Changes / PR / File sont persistés aussi. Je lance le typecheck…</div>
+            <br />
+            <div class="sys">› npm run typecheck</div>
+            <div class="tool">✓ no errors found</div>
+            <br />
+            <div><span class="prompt">&gt;</span> <span class="cursor">&nbsp;</span></div>
+          </div>
+        </div>
+
+        <!-- Backdrop + drawer -->
+        <div class="backdrop"></div>
+        <div class="drawer">
+          <div class="drawer-header">
+            <div class="drawer-tabs">
+              <span class="drawer-tab active">📝 Changes <span class="count">3</span></span>
+              <span class="drawer-tab">🔀 PR <span class="count">2</span></span>
+              <span class="drawer-tab">📄 FileViewer</span>
+            </div>
+            <span style="flex:1"></span>
+            <span style="color: var(--text-faint); font-size: 11px">⌘⇧D pour fermer</span>
+          </div>
+          <div class="drawer-body">
+            <div class="file-change">
+              <div class="name">packages/frontend/src/App.tsx <span class="pm"><span class="p">+42</span> <span class="m">−8</span></span></div>
+              <div class="diff">
+                <div class="l hunk">@@ -512,6 +512,14 @@ function App()</div>
+                <div class="l ctx">  useEffect(() =&gt; {</div>
+                <div class="l ctx">    const handleKeyDown = (e: KeyboardEvent) =&gt; {</div>
+                <div class="l add">+     if ((e.metaKey || e.ctrlKey) &amp;&amp; e.shiftKey &amp;&amp; e.key === 'D') {</div>
+                <div class="l add">+       e.preventDefault();</div>
+                <div class="l add">+       setDrawerOpen(prev =&gt; !prev);</div>
+                <div class="l add">+       return;</div>
+                <div class="l add">+     }</div>
+                <div class="l ctx">      if ((e.ctrlKey || e.metaKey) &amp;&amp; !e.shiftKey &amp;&amp; e.key === 'k') {</div>
+              </div>
+            </div>
+            <div class="file-change">
+              <div class="name">packages/frontend/src/components/SideDrawer.tsx <span class="pm"><span class="p">+118</span></span></div>
+              <div class="diff">
+                <div class="l add">+import { useState, useRef, useEffect } from 'react';</div>
+                <div class="l add">+import { X } from 'lucide-react';</div>
+                <div class="l add">+</div>
+                <div class="l add">+type Tab = 'changes' | 'pr' | 'file';</div>
+                <div class="l add">+</div>
+                <div class="l add">+interface SideDrawerProps {</div>
+                <div class="l add">+  open: boolean;</div>
+                <div class="l add">+  initialTab?: Tab;</div>
+                <div class="l add">+  onClose: () =&gt; void;</div>
+                <div class="l add">+}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div><span class="sw" style="background: var(--bg-surface); border:1px solid var(--border)"></span>Terminal/chat (toujours visible en fond)</div>
+    <div><span class="sw" style="background: rgba(0,0,0,0.5)"></span>Backdrop semi-transparent</div>
+    <div><span class="sw" style="background: #101010; border:1px solid var(--border-strong)"></span>Drawer latéral (Changes / PR / File)</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- OPTION B — split terminal + FileViewer, drawer pour Changes/PR -->
+<!-- ============================================================ -->
+
+<section class="option">
+  <div class="option-header">
+    <h2>Option B — Split terminal + FileViewer, drawer uniquement pour Changes / PR</h2>
+    <span class="tag">side-by-side, sélection → chat naturelle</span>
+    <span class="pros">+ FileViewer lisible, copier-coller fluide</span>
+    <span class="cons">— terminal plus étroit quand le viewer est ouvert</span>
+  </div>
+
+  <div class="app">
+    <div class="topbar">
+      <span class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></span>
+      <span class="title">Claude Dashboard</span>
+      <span class="badge">~/Workspace/claude-dashboard</span>
+      <span class="spacer"></span>
+      <span class="badge">main</span>
+      <span class="badge">v0.26.0</span>
+    </div>
+
+    <div class="body">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <h3>Active instances (3)</h3>
+          <div class="proj active"><span class="dot"></span>claude-dashboard<span class="branch">main</span></div>
+          <div class="proj"><span class="dot busy"></span>banking-fees<span class="branch">feat/imp</span></div>
+          <div class="proj"><span class="dot idle"></span>di-kernel-lib<span class="branch">fix/xyz</span></div>
+        </div>
+        <div class="sidebar-section" style="flex:1">
+          <h3>Workspace</h3>
+          <div class="proj"><span class="dot idle"></span>shared-flipper-front</div>
+          <div class="proj"><span class="dot idle"></span>di-banking-ia-lib</div>
+          <div class="proj"><span class="dot idle"></span>prj-banking-fees</div>
+        </div>
+      </aside>
+
+      <!-- Main: split terminal + FileViewer -->
+      <main class="main">
+        <div class="terminal-pane" style="flex: 1.1">
+          <div class="pane-header">
+            <span class="label">Terminal</span>
+            <span style="color: var(--text-faint); font-size: 11px">claude-dashboard · main · pid 48211</span>
+            <span class="spacer"></span>
+            <span class="action" style="color: var(--text-primary); background: var(--bg-elevated)">Changes <span style="background:#2a2a2a;padding:0 5px;border-radius:8px;font-size:10px;margin-left:4px">3</span></span>
+            <span class="action" style="color: var(--text-primary); background: var(--bg-elevated)">PR <span style="background:#2a2a2a;padding:0 5px;border-radius:8px;font-size:10px;margin-left:4px">2</span></span>
+            <span class="action">⋯</span>
+          </div>
+          <div class="terminal-body">
+            <div class="sys">──── session 2026-04-23 14:02 ────</div>
+            <br />
+            <div><span class="prompt">&gt;</span> que fait cette portion de code ?</div>
+            <div style="margin-left: 16px; margin-top: 4px; padding: 8px 10px; background: rgba(59, 130, 246, 0.08); border-left: 2px solid var(--accent-blue); border-radius: 2px; font-family: monospace; font-size: 11px; color: var(--text-secondary);">
+              <span style="color: var(--text-faint); font-size: 10px; display:block; margin-bottom: 4px;">📎 useCommands.ts:460-464 · auto-inséré depuis la sélection</span>
+              onOpenSearchEverywhere: useCallback(() =&gt; setSearchEverywhere({ tab: 'all' }), []),<br/>
+              onOpenCodeSearch: useCallback(() =&gt; setSearchEverywhere({ tab: 'text' }), []),
+            </div>
+            <br />
+            <div class="tool">● Ce bloc déclare deux <span class="kw">useCallback</span> qui ouvrent le modal <span class="ty">SearchEverywhere</span> sur deux onglets différents. La première ouvre l'onglet <span class="str">'all'</span> — le mode par défaut du raccourci <span class="str">Cmd+T</span>.</div>
+            <br />
+            <div class="tool">La seconde est conservée uniquement pour la compatibilité avec l'ancienne commande <span class="str">"Search in Files"</span> du command palette, qui pointe directement sur l'onglet Text…</div>
+            <br />
+            <div><span class="prompt">&gt;</span> <span class="cursor">&nbsp;</span></div>
+          </div>
+        </div>
+
+        <!-- FileViewer side-by-side -->
+        <div class="file-pane" style="flex: 0.9">
+          <div class="pane-header">
+            <span class="label">📄 useCommands.ts</span>
+            <span style="color: var(--text-faint); font-size: 11px">packages/frontend/src/hooks</span>
+            <span class="spacer"></span>
+            <span class="action">↗ Plein écran</span>
+            <span class="action">✕</span>
+          </div>
+          <div class="file-body">
+            <div class="code-line"><span class="ln">455</span><span><span class="cm">// Modals + palettes</span></span></div>
+            <div class="code-line"><span class="ln">456</span><span>&nbsp;</span></div>
+            <div class="code-line"><span class="ln">457</span><span><span class="kw">const</span> commands = useMemo(() =&gt; [</div>
+            <div class="code-line"><span class="ln">458</span><span>&nbsp;&nbsp;{</span></div>
+            <div class="code-line"><span class="ln">459</span><span>&nbsp;&nbsp;&nbsp;&nbsp;id: <span class="str">'search-everywhere'</span>,</span></div>
+            <div class="code-line selected"><span class="ln">460</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenSearchEverywhere: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setSearchEverywhere</span>({ tab: <span class="str">'all'</span> }), []),</span></div>
+            <div class="code-line selected"><span class="ln">461</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenCodeSearch: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setSearchEverywhere</span>({ tab: <span class="str">'text'</span> }), []),</span></div>
+            <div class="code-line selected"><span class="ln">462</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenTemplates: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setTemplatesModalOpen</span>(<span class="kw">true</span>), []),</span></div>
+            <div class="code-line selected"><span class="ln">463</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenCostDashboard: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setCostDashboardOpen</span>(<span class="kw">true</span>), []),</span></div>
+            <div class="code-line selected"><span class="ln">464</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenPlugins: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setPluginsModalOpen</span>(<span class="kw">true</span>), []),</span></div>
+            <div class="code-line"><span class="ln">465</span><span>&nbsp;&nbsp;&nbsp;&nbsp;shortcut: <span class="str">`${MOD}T`</span>,</span></div>
+            <div class="code-line"><span class="ln">466</span><span>&nbsp;&nbsp;&nbsp;&nbsp;action: onOpenSearchEverywhere,</span></div>
+            <div class="code-line"><span class="ln">467</span><span>&nbsp;&nbsp;},</span></div>
+            <div class="code-line"><span class="ln">468</span><span>&nbsp;&nbsp;{</span></div>
+            <div class="code-line"><span class="ln">469</span><span>&nbsp;&nbsp;&nbsp;&nbsp;id: <span class="str">'search-code'</span>,</span></div>
+            <div class="code-line"><span class="ln">470</span><span>&nbsp;&nbsp;&nbsp;&nbsp;label: <span class="str">'Search in Files'</span>,</span></div>
+            <div class="code-line"><span class="ln">471</span><span>&nbsp;&nbsp;&nbsp;&nbsp;icon: Search,</span></div>
+            <div class="code-line"><span class="ln">472</span><span>&nbsp;&nbsp;&nbsp;&nbsp;section: <span class="str">'Modals'</span>,</span></div>
+            <div class="code-line"><span class="ln">473</span><span>&nbsp;&nbsp;&nbsp;&nbsp;shortcut: <span class="str">`${MOD}${SHIFT}F`</span>,</span></div>
+            <div class="code-line"><span class="ln">474</span><span>&nbsp;&nbsp;&nbsp;&nbsp;action: onOpenCodeSearch,</span></div>
+            <div class="code-line"><span class="ln">475</span><span>&nbsp;&nbsp;},</span></div>
+          </div>
+
+          <!-- Selection callout -->
+          <div class="callout" style="top: 215px; left: 52%; transform: translateX(-50%);">
+            <span style="color: var(--text-faint);">5 lignes sélectionnées</span>
+            <span class="btn">Envoyer au chat</span>
+            <span class="kbd">⌘⏎</span>
+            <span style="color: var(--text-faint); margin-left: 4px;">·</span>
+            <span style="color: var(--text-secondary);">Copier</span>
+            <span class="kbd">⌘C</span>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div><span class="sw" style="background: var(--bg-surface); border:1px solid var(--border)"></span>Terminal/chat (gauche, toujours visible)</div>
+    <div><span class="sw" style="background: #0c0c0c; border:1px solid var(--border)"></span>FileViewer (droite, fermable)</div>
+    <div><span class="sw" style="background: rgba(59, 130, 246, 0.22)"></span>Sélection active → bouton "Envoyer au chat"</div>
+  </div>
+</section>
+
+</body>
+</html>

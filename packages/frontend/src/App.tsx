@@ -144,6 +144,11 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [rightPanel, setRightPanel] = useState<'files' | 'context' | null>(null);
   const [rightPanelWidth, setRightPanelWidth] = useState(280);
+  const [workspacePanelWidth, setWorkspacePanelWidth] = useState(() => {
+    const stored = localStorage.getItem('dashboard:workspacePanelWidth');
+    const parsed = stored ? parseInt(stored, 10) : NaN;
+    return Number.isFinite(parsed) ? Math.max(320, Math.min(900, parsed)) : 540;
+  });
 
   // Center tabs — restore last selected instance + tab from localStorage
   const [activeTab, setActiveTab] = useState<'main' | 'changes' | 'pr' | 'file'>(() => {
@@ -214,7 +219,6 @@ export default function App() {
 
   const handleSendToChat = useCallback((filePath: string, startLine: number, endLine: number, code: string) => {
     setCodeSelection({ filePath, startLine, endLine, code });
-    setActiveTab('main');
   }, []);
 
   const { queue, skipInstance: _skipInstance, jumpToInstance: _jumpToInstance } = useAttentionQueue({
@@ -484,6 +488,9 @@ export default function App() {
   // Persist tab state to localStorage
   useEffect(() => { localStorage.setItem('dashboard:activeTab', activeTab); }, [activeTab]);
   useEffect(() => {
+    localStorage.setItem('dashboard:workspacePanelWidth', String(workspacePanelWidth));
+  }, [workspacePanelWidth]);
+  useEffect(() => {
     if (openedFile) localStorage.setItem('dashboard:openedFile', openedFile);
     else localStorage.removeItem('dashboard:openedFile');
   }, [openedFile]);
@@ -713,15 +720,20 @@ export default function App() {
         <main className="flex flex-1 flex-col overflow-hidden rounded-xl bg-surface">
           <UpdateBanner />
           <HealthBanner />
-          {/* Tabs (only when instance selected) */}
+          {/* Panel toggles (only when instance selected). The main chat/terminal is always visible now;
+              clicking a toggle opens/closes a side panel beside it. */}
           {selectedInstance && (
             <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border-default px-3">
+              <div className="flex items-center gap-1.5 px-1.5 py-1 text-[11px] font-medium text-secondary">
+                {selectedInstance.mode === 'chat' ? (
+                  <MessageSquare className="h-3 w-3" />
+                ) : (
+                  <Terminal className="h-3 w-3" />
+                )}
+                {selectedInstance.mode === 'chat' ? 'Chat' : 'Terminal'}
+              </div>
+              <div className="mx-1 h-4 w-px bg-border-default" />
               {([
-                {
-                  key: 'main' as const,
-                  label: selectedInstance.mode === 'chat' ? 'Chat' : 'Terminal',
-                  Icon: selectedInstance.mode === 'chat' ? MessageSquare : Terminal,
-                },
                 { key: 'changes' as const, label: 'Changes', Icon: FileCode2 },
                 { key: 'pr' as const, label: 'PR', Icon: GitPullRequest },
                 ...(openedFile ? [{
@@ -732,12 +744,13 @@ export default function App() {
               ]).map(({ key, label, Icon }) => (
                 <button
                   key={key}
-                  onClick={() => setActiveTab(key)}
+                  onClick={() => setActiveTab(activeTab === key ? 'main' : key)}
                   className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors ${
                     activeTab === key
                       ? 'bg-elevated/50 text-primary'
                       : 'text-muted hover:text-secondary'
                   }`}
+                  title={activeTab === key ? 'Close side panel' : `Open ${label} panel`}
                 >
                   <Icon className="h-3 w-3" />
                   {label}
@@ -803,10 +816,11 @@ export default function App() {
             </div>
           )}
 
-          {/* Content */}
-          <div className="flex-1 overflow-hidden">
-            {selectedInstance ? (
-              activeTab === 'main' ? (
+          {/* Content row: chat/terminal stays visible at all times; Changes / PR / FileViewer
+              live in a resizable side panel that pushes the chat instead of replacing it. */}
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              {selectedInstance ? (
                 isSplitMode ? (
                   <SplitTerminalView
                     instanceIds={splitInstanceIds}
@@ -856,44 +870,61 @@ export default function App() {
                     </div>
                   </div>
                 )
-              ) : activeTab === 'file' && openedFile ? (
-                <FileViewer
-                  key={openedFile}
-                  filePath={openedFile}
-                  highlightLine={openedFileLine}
-                  onClose={() => { setOpenedFile(null); setOpenedFileLine(undefined); setActiveTab('main'); }}
-                  onSendToChat={selectedInstance?.mode === 'chat' ? handleSendToChat : undefined}
-                />
-              ) : activeTab === 'changes' ? (
-                <ChangesView
-                  key={`changes-${selectedInstance.id}`}
-                  projectPath={instanceProjectPath!}
+              ) : prViewProject ? (
+                <AggregatedPrView
+                  key={prViewProject.path}
+                  projectPath={prViewProject.path}
+                  projectName={prViewProject.name}
                 />
               ) : (
-                <PullRequestView
-                  key={`pr-${selectedInstance.id}`}
-                  projectPath={instanceProjectPath!}
-                  branchName={selectedInstance.branchName}
-                />
-              )
-            ) : prViewProject ? (
-              <AggregatedPrView
-                key={prViewProject.path}
-                projectPath={prViewProject.path}
-                projectName={prViewProject.name}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <div className="max-w-xs text-center">
-                  <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-elevated">
-                    <MessageSquare className="h-7 w-7 text-faint" />
+                <div className="flex h-full items-center justify-center">
+                  <div className="max-w-xs text-center">
+                    <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-elevated">
+                      <MessageSquare className="h-7 w-7 text-faint" />
+                    </div>
+                    <p className="text-[15px] font-medium text-tertiary">No task selected</p>
+                    <p className="mt-2 text-[13px] leading-relaxed text-faint">
+                      Select a project from the sidebar to get started
+                    </p>
                   </div>
-                  <p className="text-[15px] font-medium text-tertiary">No task selected</p>
-                  <p className="mt-2 text-[13px] leading-relaxed text-faint">
-                    Select a project from the sidebar to get started
-                  </p>
                 </div>
-              </div>
+              )}
+            </div>
+
+            {selectedInstance && activeTab !== 'main' && (
+              <>
+                <ResizeHandle
+                  side="right"
+                  onResize={delta => setWorkspacePanelWidth(w => Math.max(320, Math.min(900, w + delta)))}
+                />
+                <div
+                  style={{ width: workspacePanelWidth }}
+                  className="flex shrink-0 flex-col overflow-hidden border-l border-border-default"
+                >
+                  {activeTab === 'file' && openedFile && (
+                    <FileViewer
+                      key={openedFile}
+                      filePath={openedFile}
+                      highlightLine={openedFileLine}
+                      onClose={() => { setOpenedFile(null); setOpenedFileLine(undefined); setActiveTab('main'); }}
+                      onSendToChat={selectedInstance.mode === 'chat' ? handleSendToChat : undefined}
+                    />
+                  )}
+                  {activeTab === 'changes' && (
+                    <ChangesView
+                      key={`changes-${selectedInstance.id}`}
+                      projectPath={instanceProjectPath!}
+                    />
+                  )}
+                  {activeTab === 'pr' && (
+                    <PullRequestView
+                      key={`pr-${selectedInstance.id}`}
+                      projectPath={instanceProjectPath!}
+                      branchName={selectedInstance.branchName}
+                    />
+                  )}
+                </div>
+              </>
             )}
           </div>
         </main>

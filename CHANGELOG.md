@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.27.0]
+
+### Features
+
+- **Push layout — chat/terminal stays visible beside Changes / PR / FileViewer** — Changes, Pull Requests and FileViewer used to be full-view tabs that *replaced* the chat or terminal when activated; you had to switch back to `Main` to see your session again. They now live in a resizable right-hand side panel that pushes the chat instead of hiding it. The top bar still exposes `Changes`, `PR` and (when a file is opened) a file tab, but each button now acts as an open/close toggle for that panel; clicking the active one closes it and returns the full width to the chat. `handleSendToChat` no longer forces `activeTab` back to `main` since the chat stays mounted — opening a file, selecting code, and pressing *Send to chat* now keeps the FileViewer visible while the code-selection chip appears in the chat input next to it. Panel width is clamped to 320–900 px and persisted to `localStorage` under `dashboard:workspacePanelWidth`.
+
 ## [0.26.0]
 
 ### Features

@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Claude Dashboard — Option B v2</title>
+<style>
+  :root {
+    --bg-root: #0a0a0a;
+    --bg-surface: #121212;
+    --bg-elevated: #1c1c1c;
+    --bg-hover: #222;
+    --bg-input: #1a1a1a;
+    --border: #242424;
+    --border-strong: #333;
+    --text-primary: #e6e6e6;
+    --text-secondary: #a0a0a0;
+    --text-tertiary: #7a7a7a;
+    --text-faint: #555;
+    --accent-green: #10b981;
+    --accent-blue: #3b82f6;
+    --accent-yellow: #facc15;
+    --accent-red: #ef4444;
+    --accent-violet: #a78bfa;
+    --accent-violet-bg: rgba(167, 139, 250, 0.10);
+    --accent-violet-border: rgba(167, 139, 250, 0.30);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px;
+    background: #050505;
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text-primary);
+  }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  .subtitle { color: var(--text-secondary); margin-bottom: 16px; font-size: 13px; max-width: 1200px; }
+  .subtitle strong { color: var(--text-primary); }
+
+  .key-features {
+    max-width: 1200px;
+    margin-bottom: 24px;
+    padding: 12px 16px;
+    background: #0c0c0c;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+  .key-features strong { color: var(--accent-violet); }
+
+  /* App chrome */
+  .app {
+    width: 1700px;
+    height: 920px;
+    background: var(--bg-root);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .topbar {
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    background: #0c0c0c;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .traffic { display: flex; gap: 6px; }
+  .traffic span { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .traffic .r { background: #ff5f57; }
+  .traffic .y { background: #febc2e; }
+  .traffic .g { background: #28c840; }
+  .topbar .title { font-weight: 600; color: var(--text-primary); }
+  .topbar .spacer { flex: 1; }
+  .topbar .pill {
+    padding: 2px 8px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .topbar .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); }
+
+  .body { flex: 1; display: flex; min-height: 0; }
+
+  /* Left sidebar — instances & projects */
+  .sidebar-left {
+    width: 230px;
+    background: #0a0a0a;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .side-section { padding: 12px 10px; border-bottom: 1px solid var(--border); }
+  .side-section h3 {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .side-section h3 .add { color: var(--text-tertiary); cursor: pointer; font-size: 14px; line-height: 1; }
+  .task {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+  .task:hover { background: var(--bg-hover); }
+  .task.active { background: rgba(59, 130, 246, 0.14); }
+  .task .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green); margin-top: 5px; flex-shrink: 0; }
+  .task .dot.busy { background: var(--accent-yellow); animation: pulse 1.4s infinite; }
+  .task .dot.idle { background: var(--text-faint); }
+  .task .dot.waiting { background: var(--accent-blue); }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  .task .meta { min-width: 0; flex: 1; }
+  .task .name { font-size: 12px; color: var(--text-primary); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task.active .name { color: var(--accent-blue); }
+  .task .sub { font-size: 10px; color: var(--text-faint); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task .branch {
+    display: inline-block;
+    padding: 0 4px;
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 9px;
+    color: var(--text-secondary);
+    margin-right: 4px;
+  }
+
+  /* Resize handle */
+  .resize {
+    width: 4px;
+    background: transparent;
+    cursor: col-resize;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .resize:hover { background: var(--accent-blue); opacity: 0.3; }
+
+  /* Main chat area */
+  .chat-pane {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-surface);
+    display: flex;
+    flex-direction: column;
+  }
+  .chat-header {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .chat-header .task-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .chat-header .task-branch {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 2px 6px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+  }
+  .chat-header .spacer { flex: 1; }
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .icon-btn.active { background: var(--bg-elevated); color: var(--accent-blue); }
+  .icon-btn .count {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 9px;
+    background: var(--accent-red);
+    color: white;
+    padding: 0 3px;
+    border-radius: 8px;
+    min-width: 12px;
+    text-align: center;
+  }
+  .icon-btn-wrapper { position: relative; }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .msg { max-width: 780px; }
+  .msg.user {
+    align-self: flex-end;
+    background: var(--bg-elevated);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--text-primary);
+    max-width: 620px;
+  }
+  .msg.user .attached {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .msg.user .chip-inline {
+    font-size: 11px;
+    padding: 2px 6px;
+    background: var(--accent-violet-bg);
+    border: 1px solid var(--accent-violet-border);
+    color: var(--accent-violet);
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .msg.assistant { font-size: 13px; color: var(--text-primary); }
+  .thinking {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-faint);
+    font-size: 12px;
+    font-style: italic;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: var(--bg-input);
+    border-radius: 6px;
+    border-left: 2px solid var(--accent-violet);
+  }
+  .thinking .chev { color: var(--text-tertiary); font-style: normal; }
+  .tool-call {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    margin: 4px 0;
+  }
+  .tool-call.done { border-color: rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.05); }
+  .tool-call .name { color: var(--accent-green); font-weight: 500; }
+  .tool-call .path { color: var(--text-tertiary); }
+  .tool-call .stat { color: var(--text-faint); }
+  .tool-call .stat .p { color: var(--accent-green); }
+  .tool-call .stat .m { color: var(--accent-red); }
+
+  /* Chat input area */
+  .chat-input-wrap {
+    padding: 10px 24px 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-surface);
+  }
+  .context-chips {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .chip.code-selection {
+    background: var(--accent-violet-bg);
+    border-color: var(--accent-violet-border);
+    color: var(--accent-violet);
+  }
+  .chip .lines { font-size: 10px; color: var(--text-faint); margin-left: 2px; }
+  .chip.code-selection .lines { color: rgba(167, 139, 250, 0.6); }
+  .chip .close {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .chip .close:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .input-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+  }
+  .input-box:focus-within { border-color: var(--accent-blue); }
+  .input-box .textarea {
+    flex: 1;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-primary);
+    min-height: 42px;
+  }
+  .input-box .textarea .placeholder { color: var(--text-faint); }
+  .input-box .textarea .caret { background: var(--text-primary); color: #000; padding: 0 1px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  .input-actions { display: flex; gap: 4px; align-items: center; }
+  .input-actions .at { color: var(--text-tertiary); padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  .input-actions .at:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .input-actions .send {
+    padding: 5px 10px;
+    background: var(--accent-blue);
+    color: white;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .input-footer {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+    font-size: 10.5px;
+    color: var(--text-faint);
+  }
+  .input-footer kbd {
+    padding: 1px 4px;
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace;
+    color: var(--text-tertiary);
+  }
+
+  /* TaskChangesPanel (right panel with tabs) */
+  .changes-panel {
+    width: 540px;
+    background: #0d0d0d;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    min-width: 0;
+  }
+  .tab-bar {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--border);
+    background: #0a0a0a;
+    gap: 1px;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+  .file-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px 6px 12px;
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: 4px 4px 0 0;
+    border-top: 2px solid transparent;
+    flex-shrink: 0;
+  }
+  .file-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .file-tab.active {
+    background: #0d0d0d;
+    color: var(--text-primary);
+    border-top-color: var(--accent-blue);
+  }
+  .file-tab .ico { font-size: 12px; color: var(--accent-blue); }
+  .file-tab .dot-unsaved { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-yellow); }
+  .file-tab .close {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    border-radius: 3px;
+    color: var(--text-faint);
+  }
+  .file-tab .close:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .tab-bar .spacer { flex: 1; }
+  .tab-bar .action { padding: 4px 8px; font-size: 11px; color: var(--text-tertiary); cursor: pointer; border-radius: 4px; }
+  .tab-bar .action:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+  .file-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    position: relative;
+  }
+  .file-breadcrumb {
+    padding: 6px 12px;
+    font-size: 10.5px;
+    font-family: "SF Mono", Menlo, monospace;
+    color: var(--text-faint);
+    background: var(--bg-input);
+    border-bottom: 1px solid var(--border);
+  }
+  .file-breadcrumb .sep { margin: 0 4px; color: var(--text-faint); }
+  .file-breadcrumb .name { color: var(--text-secondary); }
+
+  .code {
+    flex: 1;
+    overflow: hidden;
+    font-family: "SF Mono", "JetBrains Mono", Menlo, monospace;
+    font-size: 11.5px;
+    line-height: 1.55;
+    padding: 8px 0;
+  }
+  .line {
+    display: flex;
+    padding: 0 10px;
+  }
+  .line .ln {
+    width: 34px;
+    flex-shrink: 0;
+    color: var(--text-faint);
+    text-align: right;
+    padding-right: 12px;
+    user-select: none;
+    font-size: 10.5px;
+  }
+  .line.hl { background: rgba(250, 204, 21, 0.08); }
+  .line.selected { background: rgba(167, 139, 250, 0.16); }
+  .line.selected .ln { color: var(--accent-violet); }
+  .kw { color: #c678dd; }
+  .str { color: #98c379; }
+  .fn { color: #61afef; }
+  .cm { color: #5c6370; font-style: italic; }
+  .num { color: #d19a66; }
+  .ty { color: #e5c07b; }
+  .var { color: #e06c75; }
+
+  /* Selection callout floating on code */
+  .selection-callout {
+    position: absolute;
+    background: #1a1a1a;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 6px;
+    font-size: 11px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 10;
+  }
+  .selection-callout .action-btn {
+    padding: 4px 10px;
+    background: var(--accent-violet);
+    color: white;
+    border-radius: 5px;
+    font-weight: 500;
+    font-size: 11px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .selection-callout .sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
+  .selection-callout .k {
+    background: var(--bg-input);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+  .selection-callout .meta { color: var(--text-faint); padding: 0 6px; font-size: 10.5px; }
+
+  /* Right sidebar — Files explorer */
+  .sidebar-right {
+    width: 230px;
+    background: #0a0a0a;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .explorer-header {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+    background: #0a0a0a;
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .explorer-header .spacer { flex: 1; }
+  .explorer-header .act { color: var(--text-faint); cursor: pointer; font-size: 13px; }
+  .tree { padding: 6px 4px; overflow-y: auto; flex: 1; }
+  .tree-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  .tree-item:hover { background: var(--bg-hover); }
+  .tree-item.active { background: rgba(59, 130, 246, 0.14); color: var(--text-primary); }
+  .tree-item .caret { color: var(--text-faint); width: 10px; font-size: 9px; }
+  .tree-item .ico { width: 14px; text-align: center; font-size: 11px; }
+  .tree-item .ico.ts { color: #3178c6; }
+  .tree-item .ico.tsx { color: #3178c6; }
+  .tree-item .ico.json { color: #f7df1e; }
+  .tree-item .ico.md { color: #519aba; }
+  .tree-item .ico.folder { color: #dcb67a; }
+  .tree-item .ico.css { color: #2965f1; }
+  .tree-child { margin-left: 14px; }
+
+  /* TerminalPanel collapsed handle */
+  .terminal-rail {
+    width: 30px;
+    background: #070707;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 10px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .terminal-rail .btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .terminal-rail .btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .terminal-rail .btn.active { background: var(--bg-elevated); color: var(--accent-green); }
+  .terminal-rail .label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 12px;
+  }
+
+  /* Annotations (call-out boxes) */
+  .annotations {
+    max-width: 1700px;
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .anno {
+    padding: 12px 14px;
+    background: #0c0c0c;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 11.5px;
+    line-height: 1.55;
+  }
+  .anno h4 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: var(--accent-violet);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .anno h4 .num {
+    background: var(--accent-violet-bg);
+    color: var(--accent-violet);
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .anno p { margin: 0; color: var(--text-secondary); }
+  .anno code { font-family: "SF Mono", Menlo, monospace; font-size: 10.5px; background: var(--bg-input); padding: 1px 4px; border-radius: 3px; color: var(--accent-violet); }
+</style>
+</head>
+<body>
+
+<h1>Claude Dashboard — Option B v2 (inspired by <code style="font-family:monospace; color:var(--accent-violet);">armenaristakessyan/claude-agentic-development-environment</code>)</h1>
+<p class="subtitle">
+  Layout <strong>push-based</strong> : chaque panneau pousse le précédent au lieu de le masquer.
+  Le chat reste toujours visible, le FileViewer vit dans un <strong>TaskChangesPanel</strong> avec des onglets multi-fichiers,
+  et la sélection de code devient une <strong>context chip</strong> attachée au prochain prompt.
+</p>
+
+<div class="key-features">
+  <strong>Ce qui change vs l'UI actuelle :</strong><br />
+  → Le terminal brut est remplacé par une <strong>ChatView</strong> (thinking blocks, tool progress, diffs structurés).<br />
+  → <strong>Changes</strong> et <strong>Pull Request</strong> ne sont plus des tabs plein écran mais un panneau latéral avec onglets de fichiers ouverts.<br />
+  → L'Explorer de fichiers glisse à droite comme dans VS Code, avec icônes par langage.<br />
+  → Le terminal xterm devient optionnel — collapsible dans un rail à droite, ré-ouvrable à la demande.<br />
+  → Nouveau : <strong>sélection de code → chip violette</strong> <code>file:L460-464 · 5 lines</code> au-dessus de l'input.
+</div>
+
+<div class="app">
+  <div class="topbar">
+    <span class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></span>
+    <span class="title">Claude Dashboard</span>
+    <span class="pill">~/Workspace/claude-dashboard</span>
+    <span class="spacer"></span>
+    <span class="pill"><span class="dot"></span>3 instances</span>
+    <span class="pill">47% ctx</span>
+    <span class="pill">v0.26.0</span>
+  </div>
+
+  <div class="body">
+
+    <!-- LEFT SIDEBAR: tasks (sorted by last-used) -->
+    <aside class="sidebar-left">
+      <div class="side-section">
+        <h3>Active tasks <span class="add">+</span></h3>
+        <div class="task active">
+          <span class="dot"></span>
+          <div class="meta">
+            <div class="name">Refactor FileViewer to push layout</div>
+            <div class="sub"><span class="branch">feat/push</span>claude-dashboard</div>
+          </div>
+        </div>
+        <div class="task">
+          <span class="dot busy"></span>
+          <div class="meta">
+            <div class="name">Fix rate limit UI</div>
+            <div class="sub"><span class="branch">fix/rate</span>claude-dashboard</div>
+          </div>
+        </div>
+        <div class="task">
+          <span class="dot waiting"></span>
+          <div class="meta">
+            <div class="name">Investigate failing test</div>
+            <div class="sub"><span class="branch">main</span>banking-fees</div>
+          </div>
+        </div>
+        <div class="task">
+          <span class="dot idle"></span>
+          <div class="meta">
+            <div class="name">Review PR #842</div>
+            <div class="sub"><span class="branch">pr-842</span>di-kernel-lib</div>
+          </div>
+        </div>
+      </div>
+      <div class="side-section" style="flex:1">
+        <h3>Projects</h3>
+        <div class="task"><span class="dot idle"></span><div class="meta"><div class="name">shared-flipper-front</div></div></div>
+        <div class="task"><span class="dot idle"></span><div class="meta"><div class="name">di-banking-ia-lib</div></div></div>
+        <div class="task"><span class="dot idle"></span><div class="meta"><div class="name">prj-banking-fees</div></div></div>
+        <div class="task"><span class="dot idle"></span><div class="meta"><div class="name">claude-dashboard</div></div></div>
+      </div>
+    </aside>
+
+    <div class="resize"></div>
+
+    <!-- CHAT PANE -->
+    <main class="chat-pane">
+      <div class="chat-header">
+        <span class="task-title">Refactor FileViewer to push layout</span>
+        <span class="task-branch">feat/push</span>
+        <span class="spacer"></span>
+        <span class="icon-btn-wrapper"><span class="icon-btn active" title="Changes panel open">📄</span><span class="count" style="top:0;right:-2px">3</span></span>
+        <span class="icon-btn-wrapper"><span class="icon-btn" title="Pull requests">🔀</span><span class="count" style="top:0;right:-2px">2</span></span>
+        <span class="icon-btn" title="Terminal">⌨</span>
+        <span class="icon-btn" title="Settings">⚙</span>
+      </div>
+
+      <div class="chat-messages">
+
+        <!-- User message with attached context -->
+        <div class="msg user">
+          <div class="attached">
+            <span class="chip-inline">📎 useCommands.ts:460-464</span>
+          </div>
+          Explique-moi ce bloc et refactor-le pour éviter la duplication de <code style="font-family:monospace;">setSearchEverywhere</code>.
+        </div>
+
+        <!-- Assistant message -->
+        <div class="msg assistant">
+          <div class="thinking">
+            <span class="chev">▸</span>
+            <span>Thinking — je regarde d'abord comment <code style="font-family:monospace;">setSearchEverywhere</code> est consommé… (4.2s)</span>
+          </div>
+
+          Le bloc déclare deux <code style="color:var(--accent-violet);font-family:monospace;">useCallback</code> qui appellent le même setter avec un onglet différent. Je peux factoriser en un seul helper et passer l'onglet en paramètre.
+          <br /><br />
+
+          <div class="tool-call done">
+            <span class="name">● Read</span>
+            <span class="path">packages/frontend/src/hooks/useCommands.ts</span>
+            <span class="stat">456-475</span>
+          </div>
+          <br />
+          <div class="tool-call done">
+            <span class="name">● Edit</span>
+            <span class="path">packages/frontend/src/hooks/useCommands.ts</span>
+            <span class="stat"><span class="p">+3</span> <span class="m">−8</span></span>
+          </div>
+          <br />
+          <div class="tool-call">
+            <span class="name" style="color:var(--accent-yellow);">● Bash</span>
+            <span class="path">npm run typecheck</span>
+            <span class="stat" style="color:var(--accent-yellow);">running…</span>
+          </div>
+          <br /><br />
+
+          J'ai remplacé les deux callbacks par un seul <code style="font-family:monospace;">openSearchEverywhere(tab)</code> réutilisable. Le typecheck tourne, je te confirme dans un instant.
+        </div>
+
+      </div>
+
+      <div class="chat-input-wrap">
+        <!-- Context chips row (the key feature) -->
+        <div class="context-chips">
+          <span class="chip">
+            <span style="color:var(--text-faint)">📄</span>
+            <span>App.tsx</span>
+            <span class="close">×</span>
+          </span>
+          <span class="chip">
+            <span style="color:var(--text-faint)">🌿</span>
+            <span>main</span>
+            <span class="close">×</span>
+          </span>
+          <span class="chip code-selection">
+            <span>✦</span>
+            <span>useCommands.ts:460-464</span>
+            <span class="lines">· 5 lines</span>
+            <span class="close">×</span>
+          </span>
+        </div>
+
+        <div class="input-box">
+          <div class="textarea">
+            <span>Et maintenant, ajoute un test pour </span><span class="caret">&nbsp;</span>
+          </div>
+          <div class="input-actions">
+            <span class="at" title="Mention file">@</span>
+            <span class="send">Send ⌘⏎</span>
+          </div>
+        </div>
+        <div class="input-footer">
+          <span><kbd>@</kbd> mention file</span>
+          <span><kbd>⌘K</kbd> commands</span>
+          <span><kbd>⌘⇧F</kbd> search code</span>
+          <span style="margin-left:auto">claude-opus-4-7 · max tokens</span>
+        </div>
+      </div>
+    </main>
+
+    <div class="resize"></div>
+
+    <!-- TASK CHANGES PANEL -->
+    <section class="changes-panel">
+      <div class="tab-bar">
+        <span class="file-tab">
+          <span style="color:var(--accent-yellow);">⚡</span>
+          <span>Changes</span>
+          <span style="color:var(--text-faint); font-size:10px">3</span>
+        </span>
+        <span class="file-tab active">
+          <span class="ico">ts</span>
+          <span>useCommands.ts</span>
+          <span class="close">×</span>
+        </span>
+        <span class="file-tab">
+          <span class="ico" style="color:#3178c6">tsx</span>
+          <span>App.tsx</span>
+          <span class="dot-unsaved"></span>
+          <span class="close">×</span>
+        </span>
+        <span class="file-tab">
+          <span class="ico" style="color:#519aba">md</span>
+          <span>CHANGELOG.md</span>
+          <span class="close">×</span>
+        </span>
+        <span class="spacer"></span>
+        <span class="action" title="Close all">✕ all</span>
+      </div>
+
+      <div class="file-content">
+        <div class="file-breadcrumb">
+          <span>packages</span><span class="sep">/</span>
+          <span>frontend</span><span class="sep">/</span>
+          <span>src</span><span class="sep">/</span>
+          <span>hooks</span><span class="sep">/</span>
+          <span class="name">useCommands.ts</span>
+        </div>
+
+        <div class="code">
+          <div class="line"><span class="ln">455</span><span><span class="cm">// Modals + palettes</span></span></div>
+          <div class="line"><span class="ln">456</span><span>&nbsp;</span></div>
+          <div class="line"><span class="ln">457</span><span><span class="kw">const</span> commands = <span class="fn">useMemo</span>(() =&gt; [</span></div>
+          <div class="line"><span class="ln">458</span><span>&nbsp;&nbsp;{</span></div>
+          <div class="line"><span class="ln">459</span><span>&nbsp;&nbsp;&nbsp;&nbsp;id: <span class="str">'search-everywhere'</span>,</span></div>
+          <div class="line selected"><span class="ln">460</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenSearchEverywhere: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setSearchEverywhere</span>({ tab: <span class="str">'all'</span> }), []),</span></div>
+          <div class="line selected"><span class="ln">461</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenCodeSearch: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setSearchEverywhere</span>({ tab: <span class="str">'text'</span> }), []),</span></div>
+          <div class="line selected"><span class="ln">462</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenTemplates: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setTemplatesModalOpen</span>(<span class="kw">true</span>), []),</span></div>
+          <div class="line selected"><span class="ln">463</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenCostDashboard: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setCostDashboardOpen</span>(<span class="kw">true</span>), []),</span></div>
+          <div class="line selected"><span class="ln">464</span><span>&nbsp;&nbsp;&nbsp;&nbsp;onOpenPlugins: <span class="fn">useCallback</span>(() =&gt; <span class="fn">setPluginsModalOpen</span>(<span class="kw">true</span>), []),</span></div>
+          <div class="line"><span class="ln">465</span><span>&nbsp;&nbsp;&nbsp;&nbsp;shortcut: <span class="str">`${MOD}T`</span>,</span></div>
+          <div class="line"><span class="ln">466</span><span>&nbsp;&nbsp;&nbsp;&nbsp;action: onOpenSearchEverywhere,</span></div>
+          <div class="line"><span class="ln">467</span><span>&nbsp;&nbsp;},</span></div>
+          <div class="line"><span class="ln">468</span><span>&nbsp;&nbsp;{</span></div>
+          <div class="line"><span class="ln">469</span><span>&nbsp;&nbsp;&nbsp;&nbsp;id: <span class="str">'search-code'</span>,</span></div>
+          <div class="line"><span class="ln">470</span><span>&nbsp;&nbsp;&nbsp;&nbsp;label: <span class="str">'Search in Files'</span>,</span></div>
+          <div class="line"><span class="ln">471</span><span>&nbsp;&nbsp;&nbsp;&nbsp;icon: Search,</span></div>
+          <div class="line"><span class="ln">472</span><span>&nbsp;&nbsp;&nbsp;&nbsp;shortcut: <span class="str">`${MOD}${SHIFT}F`</span>,</span></div>
+          <div class="line"><span class="ln">473</span><span>&nbsp;&nbsp;&nbsp;&nbsp;action: onOpenCodeSearch,</span></div>
+          <div class="line"><span class="ln">474</span><span>&nbsp;&nbsp;},</span></div>
+          <div class="line"><span class="ln">475</span><span>], [onOpenSearchEverywhere, onOpenCodeSearch]);</span></div>
+        </div>
+
+        <!-- Selection callout -->
+        <div class="selection-callout" style="top: 196px; left: 50%; transform: translateX(-50%);">
+          <span class="action-btn">
+            <span>✦</span>
+            <span>Add to context</span>
+          </span>
+          <span class="k">⌘⇧⏎</span>
+          <span class="sep"></span>
+          <span style="color:var(--text-secondary); padding: 0 4px">Copy</span>
+          <span class="k">⌘C</span>
+          <span class="meta">· 5 lines selected</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT SIDEBAR: Files explorer -->
+    <aside class="sidebar-right">
+      <div class="explorer-header">
+        <span>Explorer</span>
+        <span class="spacer"></span>
+        <span class="act" title="Collapse all">⊟</span>
+        <span class="act" title="Refresh">↻</span>
+      </div>
+      <div class="tree">
+        <div class="tree-item"><span class="caret">▾</span><span class="ico folder">▸</span><span>claude-dashboard</span></div>
+        <div class="tree-child">
+          <div class="tree-item"><span class="caret">▾</span><span class="ico folder">▸</span><span>packages</span></div>
+          <div class="tree-child">
+            <div class="tree-item"><span class="caret">▸</span><span class="ico folder">▸</span><span>backend</span></div>
+            <div class="tree-item"><span class="caret">▾</span><span class="ico folder">▸</span><span>frontend</span></div>
+            <div class="tree-child">
+              <div class="tree-item"><span class="caret">▾</span><span class="ico folder">▸</span><span>src</span></div>
+              <div class="tree-child">
+                <div class="tree-item"><span class="caret">▸</span><span class="ico folder">▸</span><span>components</span></div>
+                <div class="tree-item"><span class="caret">▾</span><span class="ico folder">▸</span><span>hooks</span></div>
+                <div class="tree-child">
+                  <div class="tree-item"><span class="caret" style="visibility:hidden">▸</span><span class="ico ts">ts</span><span>useCodeSelection.ts</span></div>
+                  <div class="tree-item active"><span class="caret" style="visibility:hidden">▸</span><span class="ico ts">ts</span><span>useCommands.ts</span></div>
+                  <div class="tree-item"><span class="caret" style="visibility:hidden">▸</span><span class="ico ts">ts</span><span>useSocket.ts</span></div>
+                </div>
+                <div class="tree-item"><span class="caret" style="visibility:hidden">▸</span><span class="ico tsx">tsx</span><span>App.tsx</span></div>
+                <div class="tree-item"><span class="caret" style="visibility:hidden">▸</span><span class="ico tsx">tsx</span><span>main.tsx</span></div>
+              </div>
+            </div>
+            <div class="tree-item"><span class="caret">▸</span><span class="ico folder">▸</span><span>electron</span></div>
+          </div>
+          <div class="tree-item"><span class="caret" style="visibility:hidden">▸</span><span class="ico md">md</span><span>CHANGELOG.md</span></div>
+          <div class="tree-item"><span class="caret" style="visibility:hidden">▸</span><span class="ico md">md</span><span>CLAUDE.md</span></div>
+          <div class="tree-item"><span class="caret" style="visibility:hidden">▸</span><span class="ico json">{}</span><span>package.json</span></div>
+          <div class="tree-item"><span class="caret" style="visibility:hidden">▸</span><span class="ico md">md</span><span>README.md</span></div>
+          <div class="tree-item"><span class="caret" style="visibility:hidden">▸</span><span class="ico md">md</span><span>ROADMAP.md</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- TERMINAL RAIL (collapsed) -->
+    <div class="terminal-rail">
+      <span class="btn" title="Open terminal panel">⌨</span>
+      <span class="btn" title="Notifications">🔔</span>
+      <span class="btn" title="Export session">📥</span>
+      <span class="label">Terminal</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ANNOTATIONS -->
+<div class="annotations">
+  <div class="anno">
+    <h4><span class="num">1</span>Chat (ChatView, toujours visible)</h4>
+    <p>Remplace le terminal xterm. Streaming des réponses avec <code>thinking</code> block repliable, <code>tool_use</code> progress (Read / Edit / Bash) et diffs structurés inline. Draft par instance persisté.</p>
+  </div>
+  <div class="anno">
+    <h4><span class="num">2</span>Context chips au-dessus de l'input</h4>
+    <p>Ligne de <code>chips</code> unifiée — fichiers, branches, commits, changes, et <strong style="color:var(--accent-violet)">sélections de code</strong> (chip violette). Envoyés via <code>buildContextPayload()</code> avec le prochain message.</p>
+  </div>
+  <div class="anno">
+    <h4><span class="num">3</span>TaskChangesPanel (onglets)</h4>
+    <p>Un onglet <code>Changes</code> (diff) + un onglet par fichier ouvert (closable, avec indicateur ●unsaved et icône par langage). Largeur redimensionnable, persistée.</p>
+  </div>
+  <div class="anno">
+    <h4><span class="num">4</span>Sélection → context chip</h4>
+    <p>Sur une sélection ≥ 1 caractère dans le FileViewer, un callout flottant apparaît : <code>Add to context ⌘⇧⏎</code>. Crée une chip <code>file:L460-464 · 5 lines</code> prête à être envoyée.</p>
+  </div>
+  <div class="anno">
+    <h4><span class="num">5</span>Explorer (sidebar droite)</h4>
+    <p>Arbre du projet de la tâche active, icônes par langage (40+ mappings), click ouvre un tab dans le <code>TaskChangesPanel</code>. Fermable pour gagner en espace.</p>
+  </div>
+  <div class="anno">
+    <h4><span class="num">6</span>Terminal rail</h4>
+    <p>Le xterm brut reste accessible — collapsé dans un rail vertical à l'extrême droite. Click = il slide comme un panneau de plus à côté du Changes panel. Utile pour debug ponctuel, pas le focus principal.</p>
+  </div>
+</div>
+
+</body>
+</html>
