@@ -150,6 +150,187 @@ export class WorktreeManager {
     return { worktreePath, branchName: finalBranch };
   }
 
+  async listRemoteBranches(
+    projectPath: string,
+    opts: { limit?: number; search?: string } = {},
+  ): Promise<{
+    branches: Array<{ name: string; committerDate: number; authorName: string; hasLocalBranch: boolean }>;
+    total: number;
+    lastFetched: number | null;
+  }> {
+    const limit = Math.max(1, Math.min(opts.limit ?? 50, 1000));
+    const search = opts.search?.trim().toLowerCase() ?? '';
+
+    // Collect local branch names so we can flag remotes that are already present locally
+    const { stdout: localOut } = await execAsync('git branch --format="%(refname:short)"', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    const localSet = new Set(localOut.split('\n').map(l => l.trim()).filter(Boolean));
+
+    const { stdout } = await execAsync(
+      'git for-each-ref --sort=-committerdate --format="%(refname:short)||%(committerdate:unix)||%(authorname)" refs/remotes/origin/',
+      {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 15000,
+        maxBuffer: 5 * 1024 * 1024,
+      },
+    );
+
+    const rows: Array<{ name: string; committerDate: number; authorName: string; hasLocalBranch: boolean }> = [];
+    for (const line of stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const [name, dateStr, author] = trimmed.split('||');
+      if (!name || name.endsWith('/HEAD')) continue;
+      // Skip bare remote (e.g. "origin" with no branch segment)
+      if (!name.includes('/')) continue;
+      const shortName = name.replace(/^[^/]+\//, '');
+      if (!shortName) continue;
+      rows.push({
+        name,
+        committerDate: parseInt(dateStr ?? '0', 10) || 0,
+        authorName: author ?? '',
+        hasLocalBranch: localSet.has(shortName),
+      });
+    }
+
+    // Exclude remote branches that already have a same-named local branch —
+    // they'd be redundant with the "Local" section, so slicing after this
+    // filter guarantees the limit actually fills the UI list. `total` reflects
+    // the count of *candidates for checkout* so the UI's "X / Y" stays honest
+    // (no mysterious gap between rows shown and total reported).
+    const withoutLocalDupes = rows.filter(r => !r.hasLocalBranch);
+    const total = withoutLocalDupes.length;
+
+    const filtered = search
+      ? withoutLocalDupes.filter(r => r.name.toLowerCase().includes(search) || r.authorName.toLowerCase().includes(search))
+      : withoutLocalDupes;
+
+    return {
+      branches: filtered.slice(0, limit),
+      total,
+      lastFetched: this.getFetchTime(projectPath),
+    };
+  }
+
+  getFetchTime(projectPath: string): number | null {
+    const candidates: string[] = [];
+    const gitPath = path.join(projectPath, '.git');
+    try {
+      const stat = fs.statSync(gitPath);
+      if (stat.isDirectory()) {
+        candidates.push(path.join(gitPath, 'FETCH_HEAD'));
+      } else if (stat.isFile()) {
+        // Worktree: .git is a file pointing to the main repo's worktrees dir
+        const content = fs.readFileSync(gitPath, 'utf-8').trim();
+        const match = content.match(/^gitdir:\s*(.+)$/);
+        if (match) {
+          const gitdir = path.resolve(projectPath, match[1]);
+          const mainGitDir = path.resolve(gitdir, '..', '..');
+          candidates.push(path.join(mainGitDir, 'FETCH_HEAD'));
+        }
+      }
+    } catch {
+      return null;
+    }
+
+    for (const candidate of candidates) {
+      try {
+        const stat = fs.statSync(candidate);
+        return stat.mtimeMs;
+      } catch {
+        // try next
+      }
+    }
+    return null;
+  }
+
+  async fetchRemote(projectPath: string): Promise<{ success: boolean; message: string; lastFetched: number | null }> {
+    try {
+      await execAsync('git fetch origin --prune', {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 60000,
+      });
+      return { success: true, message: 'Fetched origin', lastFetched: this.getFetchTime(projectPath) };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Fetch failed';
+      return { success: false, message: msg.split('\n')[0], lastFetched: this.getFetchTime(projectPath) };
+    }
+  }
+
+  async remoteBranchToWorktree(projectPath: string, remoteBranch: string): Promise<WorktreeResult> {
+    // Expected input: "origin/feat/foo" (or any "<remote>/<branch>")
+    const firstSlash = remoteBranch.indexOf('/');
+    if (firstSlash < 0) {
+      throw new Error(`Invalid remote branch name: ${remoteBranch}`);
+    }
+    const localBranch = remoteBranch.slice(firstSlash + 1);
+    if (!localBranch) {
+      throw new Error(`Invalid remote branch name: ${remoteBranch}`);
+    }
+
+    // Verify the remote ref actually exists locally (user may need to fetch first)
+    try {
+      await execAsync(`git rev-parse --verify "refs/remotes/${remoteBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+    } catch {
+      throw new Error(`Remote branch "${remoteBranch}" not found — try fetching first`);
+    }
+
+    const slug = this.slugify(localBranch);
+    if (!slug) {
+      throw new Error(`Branch name produced an empty slug: ${localBranch}`);
+    }
+    let worktreePath = `${projectPath}--${slug}`;
+    let suffix = 1;
+    while (fs.existsSync(worktreePath)) {
+      suffix++;
+      worktreePath = `${projectPath}--${slug}-${suffix}`;
+    }
+
+    // Detect whether a local branch with the same name already exists
+    let localExists = false;
+    try {
+      await execAsync(`git rev-parse --verify "refs/heads/${localBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      localExists = true;
+    } catch {
+      localExists = false;
+    }
+
+    log.info(` Creating worktree for remote branch ${remoteBranch} at ${worktreePath}`);
+
+    if (localExists) {
+      // Reuse existing local branch — git will refuse if already checked out elsewhere
+      await execAsync(`git worktree add "${worktreePath}" "${localBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 30000,
+      });
+    } else {
+      // Create a new local branch tracking the remote ref
+      await execAsync(`git worktree add --track -b "${localBranch}" "${worktreePath}" "${remoteBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 30000,
+      });
+    }
+
+    log.info(` Worktree created successfully`);
+
+    return { worktreePath, branchName: localBranch };
+  }
+
   async listStartPoints(projectPath: string): Promise<Array<{ name: string; isRemote: boolean; isDefault: boolean }>> {
     const defaultBranch = await this.getDefaultBranch(projectPath);
 

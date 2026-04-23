@@ -2,6 +2,16 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.23.0]
+
+### Features
+
+- **Check out a remote branch into a worktree** — `LaunchModal`'s *Branches* tab used to cover local branches only, which meant pulling down a colleague's branch required dropping to a terminal (`git fetch origin && git worktree add … origin/feat/foo`). The tab now shows two sections: *Local* (existing behavior — convert a local branch to a worktree) and *Remote · origin*. Clicking a remote row runs `git worktree add --track -b <branch> <path> origin/<branch>` so the new worktree tracks the remote ref; if a local branch with the same name already exists, git reuses it instead. A new `WorktreeManager.remoteBranchToWorktree()` backs a `POST /api/git/remote-to-worktree` endpoint.
+
+  On large repos the full list is unusable — the test target (`di-aggregator-app`) has ~400 remote branches. The list is therefore capped at the 50 most recent by `committerdate` (`git for-each-ref --sort=-committerdate refs/remotes/origin/`), with a `/`-focused search input that filters client-side over the 50 and, when no match is found locally, surfaces a "Search all N branches" escape hatch that re-queries the backend with a substring filter over the full ref set. Remote branches that already have a same-named local branch are filtered out server-side (they'd duplicate the *Local* section) and the reported `total` reflects the candidate count — so the UI's "X / Y" never shows a mysterious gap. Rows past the top 6 are dimmed progressively (0.85, 0.65) so recency is legible without extra chrome.
+
+  A manual **Fetch** button (`POST /api/git/fetch` → `git fetch origin --prune`) sits next to the search input and reloads the list silently (`silent: true` so the rows stay visible); the "Last fetched" caption reads `.git/FETCH_HEAD`'s mtime (worktree-aware via `getFetchTime()`, which follows the `gitdir:` pointer). No auto-fetch on modal open — the user triggers it when they know a colleague just pushed.
+
 ## [0.22.3]
 
 ### Fixes

@@ -496,6 +496,42 @@ export function createRoutes(
     res.json(result);
   }));
 
+  // Git — remote branches (origin), sorted by committerdate desc, optional substring search
+  router.get('/api/git/remote-branches', asyncHandler(async (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+    const search = (req.query.search as string | undefined)?.trim() || undefined;
+    const result = await worktreeManager.listRemoteBranches(projectPath, { limit, search });
+    res.json(result);
+  }));
+
+  // Git — fetch origin (manual trigger from the branches modal)
+  router.post('/api/git/fetch', asyncHandler(async (req, res) => {
+    const { projectPath } = req.body as { projectPath?: string };
+    if (!projectPath) {
+      res.status(400).json({ error: 'projectPath is required' });
+      return;
+    }
+    const result = await worktreeManager.fetchRemote(projectPath);
+    res.json(result);
+  }));
+
+  // Git — checkout a remote branch into a new worktree (with tracking)
+  router.post('/api/git/remote-to-worktree', asyncHandler(async (req, res) => {
+    const { projectPath, remoteBranch } = req.body as { projectPath?: string; remoteBranch?: string };
+    if (!projectPath || !remoteBranch) {
+      res.status(400).json({ error: 'projectPath and remoteBranch are required' });
+      return;
+    }
+    const result = await worktreeManager.remoteBranchToWorktree(projectPath, remoteBranch);
+    refreshProjectsInBackground(scanner);
+    res.json(result);
+  }));
+
   // Git — checkout default branch
   router.post('/api/git/checkout-default', asyncHandler(async (req, res) => {
     const { projectPath } = req.body as { projectPath?: string };

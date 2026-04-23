@@ -1,7 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap, MessageSquare, Terminal } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Play, X, GitBranch, ArrowRightLeft, Loader2, FolderGit2, Zap, MessageSquare, Terminal, Cloud, Search, RefreshCw } from 'lucide-react';
 import type { Project, HistoryTask } from '../types';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+
+interface RemoteBranchInfo {
+  name: string;
+  committerDate: number;
+  authorName: string;
+  hasLocalBranch: boolean;
+}
+
+function relativeTime(unixSeconds: number): string {
+  if (!unixSeconds) return '';
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000 - unixSeconds));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
 
 const MAIN_BRANCHES = ['main', 'master', 'develop'];
 
@@ -52,6 +77,17 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
   const [startPoint, setStartPoint] = useState<string>('');
   const [history, setHistory] = useState<HistoryTask[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  // Remote branches state
+  const [remoteBranches, setRemoteBranches] = useState<RemoteBranchInfo[]>([]);
+  const [remoteTotal, setRemoteTotal] = useState(0);
+  const [remoteLastFetched, setRemoteLastFetched] = useState<number | null>(null);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteFetching, setRemoteFetching] = useState(false);
+  const [remoteCheckingOut, setRemoteCheckingOut] = useState<string | null>(null);
+  const [remoteSearch, setRemoteSearch] = useState('');
+  const [remoteServerSearching, setRemoteServerSearching] = useState(false);
+  const [remoteServerSearchQuery, setRemoteServerSearchQuery] = useState<string | null>(null);
+  const remoteSearchRef = useRef<HTMLInputElement>(null);
   const modalRef = useFocusTrap<HTMLDivElement>();
 
   const fetchHistory = useCallback(async () => {
@@ -103,6 +139,92 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
     }
   }, [mode, branches.length, fetchBranches]);
 
+  const fetchRemoteBranches = useCallback(async (opts: { search?: string; silent?: boolean } = {}) => {
+    // `silent` reloads the list without blanking the UI — used after a manual Fetch
+    // so the existing rows stay visible while the refresh completes.
+    if (!opts.silent) {
+      if (opts.search) {
+        setRemoteServerSearching(true);
+      } else {
+        setRemoteLoading(true);
+      }
+    }
+    try {
+      const params = new URLSearchParams({ path: project.path, limit: '50' });
+      if (opts.search) params.set('search', opts.search);
+      const res = await fetch(`/api/git/remote-branches?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch remote branches');
+      const data: { branches: RemoteBranchInfo[]; total: number; lastFetched: number | null } = await res.json();
+      setRemoteBranches(data.branches);
+      setRemoteTotal(data.total);
+      setRemoteLastFetched(data.lastFetched);
+      setRemoteServerSearchQuery(opts.search ?? null);
+    } catch (err) {
+      console.error('[LaunchModal] Error fetching remote branches:', err);
+      if (!opts.silent) {
+        setRemoteBranches([]);
+        setRemoteTotal(0);
+      }
+    } finally {
+      setRemoteLoading(false);
+      setRemoteServerSearching(false);
+    }
+  }, [project.path]);
+
+  useEffect(() => {
+    if (mode === 'branches' && isGit && remoteBranches.length === 0 && !remoteLoading && remoteLastFetched === null) {
+      fetchRemoteBranches();
+    }
+  }, [mode, isGit, remoteBranches.length, remoteLoading, remoteLastFetched, fetchRemoteBranches]);
+
+  // If the user was in server-search mode and clears the search, reload the default top-recent list
+  useEffect(() => {
+    if (remoteServerSearchQuery !== null && remoteSearch.trim() === '') {
+      fetchRemoteBranches();
+    }
+  }, [remoteSearch, remoteServerSearchQuery, fetchRemoteBranches]);
+
+  const handleFetchOrigin = useCallback(async () => {
+    setRemoteFetching(true);
+    try {
+      const res = await fetch('/api/git/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath: project.path }),
+      });
+      if (!res.ok) throw new Error('Fetch failed');
+      // Silently reload the remote list so the existing rows stay visible while updating
+      await fetchRemoteBranches({ silent: true });
+      setRemoteServerSearchQuery(null);
+    } catch (err) {
+      console.error('[LaunchModal] Error fetching origin:', err);
+    } finally {
+      setRemoteFetching(false);
+    }
+  }, [project.path, fetchRemoteBranches]);
+
+  const handleRemoteToWorktree = async (remoteBranch: string) => {
+    setRemoteCheckingOut(remoteBranch);
+    try {
+      const res = await fetch('/api/git/remote-to-worktree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath: project.path, remoteBranch }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? 'Failed');
+      }
+      const result = await res.json();
+      onRefreshProjects();
+      onLaunch(result.worktreePath, undefined, undefined, undefined, launchMode);
+      onClose();
+    } catch (err) {
+      console.error('[LaunchModal] Error checking out remote branch:', err);
+      setRemoteCheckingOut(null);
+    }
+  };
+
   const fetchStartPoints = useCallback(async () => {
     try {
       const res = await fetch(`/api/git/start-points?path=${encodeURIComponent(project.path)}`);
@@ -126,10 +248,18 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
+      if (e.key === '/' && mode === 'branches') {
+        const active = document.activeElement;
+        const isTyping = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+        if (!isTyping) {
+          e.preventDefault();
+          remoteSearchRef.current?.focus();
+        }
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+  }, [onClose, mode]);
 
   const handleSubmitNew = () => {
     const desc = taskDescription.trim();
@@ -352,37 +482,168 @@ export default function LaunchModal({ project, worktrees, onLaunch, onClose, onR
             ))}
           </div>
         ) : mode === 'branches' ? (
-          /* Branches list */
-          <div className="flex max-h-48 flex-col gap-1 overflow-y-auto pr-4">
-            {branchesLoading ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-4 w-4 animate-spin text-muted" />
-              </div>
-            ) : availableBranches.length === 0 ? (
-              <p className="py-4 text-center text-xs text-muted">
-                No branches available to convert
-              </p>
-            ) : (
-              availableBranches.map(branch => (
-                <button
-                  key={branch.name}
-                  onClick={() => handleBranchToWorktree(branch.name)}
-                  disabled={convertingBranch !== null}
-                  className="group flex items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-elevated disabled:opacity-50"
-                >
-                  <GitBranch className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-primary" title={branch.name}>
-                    {branch.name}
-                  </span>
-                  {convertingBranch === branch.name ? (
-                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-400" />
-                  ) : (
-                    <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-blue-400" />
+          /* Branches: Local + Remote sections with search + fetch */
+          (() => {
+            const search = remoteSearch.trim().toLowerCase();
+            const visibleRemote = remoteBranches.filter(
+              b => !b.hasLocalBranch
+                && (!search || b.name.toLowerCase().includes(search) || b.authorName.toLowerCase().includes(search)),
+            );
+            const serverSearchMatches = remoteServerSearchQuery !== null
+              && remoteServerSearchQuery.trim().toLowerCase() === search;
+            const canServerSearch = search.length > 0
+              && !remoteLoading
+              && !remoteServerSearching
+              && !serverSearchMatches
+              && visibleRemote.length === 0
+              && remoteTotal > remoteBranches.length;
+
+            return (
+              <div className="flex flex-col gap-2">
+                {/* Search + fetch toolbar */}
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-1 items-center gap-1.5 rounded-md border border-border-input bg-elevated px-2 py-1.5 focus-within:border-border-focus focus-within:ring-1 focus-within:ring-border-focus">
+                    <Search className="h-3 w-3 shrink-0 text-muted" />
+                    <input
+                      ref={remoteSearchRef}
+                      type="text"
+                      value={remoteSearch}
+                      onChange={e => setRemoteSearch(e.target.value)}
+                      placeholder="Search branches…"
+                      className="min-w-0 flex-1 bg-transparent text-xs text-primary outline-none placeholder:text-placeholder"
+                    />
+                    {remoteSearch
+                      ? (
+                        <button
+                          onClick={() => setRemoteSearch('')}
+                          className="text-faint hover:text-muted"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )
+                      : <span className="font-mono text-[10px] text-faint">/</span>
+                    }
+                  </div>
+                  <button
+                    onClick={handleFetchOrigin}
+                    disabled={remoteFetching}
+                    className="flex items-center gap-1 rounded-md border border-border-input bg-elevated px-2.5 py-1.5 text-[11px] text-tertiary transition-colors hover:bg-hover hover:text-primary disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${remoteFetching ? 'animate-spin' : ''}`} />
+                    Fetch
+                  </button>
+                </div>
+
+                {/* Last-fetched caption */}
+                {remoteLastFetched !== null && (
+                  <div className="px-1 text-[11px] text-faint">
+                    Last fetched {relativeTime(Math.floor(remoteLastFetched / 1000))}
+                    {remoteTotal > 0 && <> · {remoteTotal} remote {remoteTotal === 1 ? 'branch' : 'branches'}</>}
+                  </div>
+                )}
+
+                <div className="flex max-h-64 flex-col gap-0.5 overflow-y-auto pr-1">
+                  {/* Local */}
+                  {availableBranches.length > 0 && (
+                    <>
+                      <div className="px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-faint">
+                        Local · {availableBranches.length}
+                      </div>
+                      {availableBranches.map(branch => (
+                        <button
+                          key={branch.name}
+                          onClick={() => handleBranchToWorktree(branch.name)}
+                          disabled={convertingBranch !== null || remoteCheckingOut !== null}
+                          className="group flex items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-elevated disabled:opacity-50"
+                        >
+                          <GitBranch className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                          <span className="min-w-0 flex-1 truncate font-mono text-xs text-primary" title={branch.name}>
+                            {branch.name}
+                          </span>
+                          {convertingBranch === branch.name ? (
+                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-400" />
+                          ) : (
+                            <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-blue-400" />
+                          )}
+                        </button>
+                      ))}
+                    </>
                   )}
-                </button>
-              ))
-            )}
-          </div>
+
+                  {/* Remote */}
+                  {(remoteLoading || remoteServerSearching || branchesLoading) ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted" />
+                    </div>
+                  ) : (
+                    <>
+                      {(visibleRemote.length > 0 || search.length > 0) && (
+                        <div className="mt-1 flex items-center justify-between px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-faint">
+                          <span>Remote · origin</span>
+                          {remoteTotal > 0 && (
+                            <span className="font-normal normal-case tracking-normal text-muted">
+                              {visibleRemote.length} / {remoteTotal}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {visibleRemote.map((branch, idx) => {
+                        const opacity = idx < 6 ? 1 : idx < 10 ? 0.85 : 0.65;
+                        const shortName = branch.name.replace(/^[^/]+\//, '');
+                        return (
+                          <button
+                            key={branch.name}
+                            onClick={() => handleRemoteToWorktree(branch.name)}
+                            disabled={convertingBranch !== null || remoteCheckingOut !== null}
+                            style={{ opacity }}
+                            className="group flex items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-elevated disabled:opacity-50"
+                          >
+                            <Cloud className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-mono text-xs text-primary" title={branch.name}>
+                                <span className="text-faint">origin/</span>{shortName}
+                              </div>
+                              {(branch.authorName || branch.committerDate > 0) && (
+                                <div className="truncate text-[11px] text-muted">
+                                  {branch.authorName}
+                                  {branch.authorName && branch.committerDate > 0 && ' · '}
+                                  {branch.committerDate > 0 && relativeTime(branch.committerDate)}
+                                </div>
+                              )}
+                            </div>
+                            {remoteCheckingOut === branch.name ? (
+                              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-violet-400" />
+                            ) : (
+                              <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-medium text-violet-300">
+                                track
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                      {canServerSearch && (
+                        <div className="mt-1 flex items-center gap-2 rounded border-l-2 border-violet-500/30 bg-violet-500/5 px-3 py-2 text-[11px] text-tertiary">
+                          <span>Not finding it?</span>
+                          <button
+                            onClick={() => fetchRemoteBranches({ search: remoteSearch })}
+                            className="font-medium text-violet-300 underline-offset-2 hover:underline"
+                          >
+                            Search all {remoteTotal} branches
+                          </button>
+                        </div>
+                      )}
+                      {!remoteLoading && availableBranches.length === 0 && visibleRemote.length === 0 && !canServerSearch && (
+                        <p className="py-4 text-center text-xs text-muted">
+                          {search ? 'No matching branches' : 'No branches available'}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()
         ) : mode === 'history' ? (
           /* Session history for this project */
           <div className="flex max-h-48 flex-col gap-1 overflow-y-auto">
