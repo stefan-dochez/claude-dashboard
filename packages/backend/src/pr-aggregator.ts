@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { createLogger } from './logger.js';
 import { TIMEOUTS } from './constants.js';
@@ -8,8 +9,10 @@ import { TIMEOUTS } from './constants.js';
 const execFileAsync = promisify(execFile);
 const log = createLogger('pr-aggregator');
 
-const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes — fresh window
+const STALE_TTL_MS = 24 * 60 * 60 * 1000; // 24h — beyond this, ignore on-disk cache
 const SEARCH_BATCH_SIZE = 20; // max repos per GitHub search query
+const COUNTS_CACHE_FILE = path.join(os.homedir(), '.claude-dashboard', 'pr-counts-cache.json');
 
 export type ReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 export type MergeableState = 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
@@ -149,7 +152,43 @@ export class PrAggregator {
   private cache = new Map<string, CacheEntry>();
   private slugCache = new Map<string, string | null>(); // dir → GitHub slug (never changes)
   private countsCache: { data: Record<string, { total: number; mine: number }>; fetchedAt: number } | null = null;
+  private countsCacheLoaded = false;
+  private backgroundRefresh: Promise<void> | null = null;
   private ghUser: string | null = null;
+
+  /** Lazy-load the on-disk counts cache on first access. */
+  private async loadCountsCacheFromDisk(): Promise<void> {
+    if (this.countsCacheLoaded) return;
+    this.countsCacheLoaded = true;
+    try {
+      const raw = await fs.readFile(COUNTS_CACHE_FILE, 'utf-8');
+      const parsed = JSON.parse(raw) as {
+        data: Record<string, { total: number; mine: number }>;
+        fetchedAt: number;
+      };
+      if (parsed && typeof parsed.fetchedAt === 'number' && parsed.data) {
+        this.countsCache = parsed;
+        log.info(`Loaded PR counts cache from disk (${Object.keys(parsed.data).length} entries, age ${Math.round((Date.now() - parsed.fetchedAt) / 1000)}s)`);
+      }
+    } catch {
+      // No cache file yet, or unreadable — ignore.
+    }
+  }
+
+  /** Persist the counts cache to disk. Errors are swallowed (cache is best-effort). */
+  private async persistCountsCache(): Promise<void> {
+    if (!this.countsCache) return;
+    try {
+      await fs.mkdir(path.dirname(COUNTS_CACHE_FILE), { recursive: true });
+      await fs.writeFile(
+        COUNTS_CACHE_FILE,
+        JSON.stringify(this.countsCache, null, 2),
+        'utf-8',
+      );
+    } catch (err) {
+      log.warn('Failed to persist PR counts cache:', err instanceof Error ? err.message : err);
+    }
+  }
 
   /** Return the authenticated GitHub username (cached). */
   async getGitHubUser(): Promise<string | null> {
@@ -181,10 +220,69 @@ export class PrAggregator {
   async getPrCounts(
     projects: Array<{ path: string; type: string }>,
   ): Promise<Record<string, { total: number; mine: number }>> {
-    if (this.countsCache && Date.now() - this.countsCache.fetchedAt < CACHE_TTL_MS) {
-      return this.countsCache.data;
+    await this.loadCountsCacheFromDisk();
+
+    const now = Date.now();
+    const cache = this.countsCache;
+
+    // Fresh cache covering every requested project — return immediately.
+    if (cache && now - cache.fetchedAt < CACHE_TTL_MS && this.cacheCoversAll(cache.data, projects)) {
+      return this.subsetForProjects(cache.data, projects);
     }
 
+    // Stale-but-usable cache covering every requested project — return stale,
+    // refresh in background. Avoids the cold-start latency for badges.
+    if (cache && now - cache.fetchedAt < STALE_TTL_MS && this.cacheCoversAll(cache.data, projects)) {
+      this.triggerBackgroundRefresh(projects);
+      return this.subsetForProjects(cache.data, projects);
+    }
+
+    // No usable cache (missing entries or too old) — full fetch.
+    const result = await this.fetchCountsAndUpdateCache(projects);
+    return this.subsetForProjects(result, projects);
+  }
+
+  /** True if every requested project has an entry in the cached data. */
+  private cacheCoversAll(
+    data: Record<string, { total: number; mine: number }>,
+    projects: Array<{ path: string; type: string }>,
+  ): boolean {
+    return projects.every(p => Object.prototype.hasOwnProperty.call(data, p.path));
+  }
+
+  /** Return only the entries matching the requested projects. */
+  private subsetForProjects(
+    data: Record<string, { total: number; mine: number }>,
+    projects: Array<{ path: string; type: string }>,
+  ): Record<string, { total: number; mine: number }> {
+    const out: Record<string, { total: number; mine: number }> = {};
+    for (const p of projects) {
+      if (data[p.path]) out[p.path] = data[p.path];
+    }
+    return out;
+  }
+
+  /** Kick off a background refresh; coalesce concurrent triggers. */
+  private triggerBackgroundRefresh(projects: Array<{ path: string; type: string }>): void {
+    if (this.backgroundRefresh) return;
+    this.backgroundRefresh = (async () => {
+      try {
+        await this.fetchCountsAndUpdateCache(projects);
+      } catch (err) {
+        log.warn('Background PR counts refresh failed:', err instanceof Error ? err.message : err);
+      } finally {
+        this.backgroundRefresh = null;
+      }
+    })();
+  }
+
+  /**
+   * Do the actual GitHub fetch, merge into the cache, and persist to disk.
+   * Returns the full updated cache data (not just the requested subset).
+   */
+  private async fetchCountsAndUpdateCache(
+    projects: Array<{ path: string; type: string }>,
+  ): Promise<Record<string, { total: number; mine: number }>> {
     const ghUser = await this.getGitHubUser();
     const isMyPr = (pr: PullRequest) =>
       ghUser && (pr.author === ghUser || pr.assignees.includes(ghUser) || pr.reviewers.includes(ghUser));
@@ -201,13 +299,13 @@ export class PrAggregator {
       }
     }
 
-    const result: Record<string, { total: number; mine: number }> = {};
+    const fresh: Record<string, { total: number; mine: number }> = {};
 
     // Parent projects: reuse getPrs (same cache as the PR view)
     await Promise.all(parentProjects.map(async (project) => {
       const prs = await this.getPrs(project.path);
       const mine = prs.filter(isMyPr).length;
-      result[project.path] = { total: prs.length, mine: ghUser ? mine : prs.length };
+      fresh[project.path] = { total: prs.length, mine: ghUser ? mine : prs.length };
     }));
 
     // Simple repos: resolve slugs and batch-fetch
@@ -237,13 +335,17 @@ export class PrAggregator {
         const prs = prsBySlug.get(slug) ?? [];
         const mine = prs.filter(isMyPr).length;
         for (const projectPath of projectPaths) {
-          result[projectPath] = { total: prs.length, mine: ghUser ? mine : prs.length };
+          fresh[projectPath] = { total: prs.length, mine: ghUser ? mine : prs.length };
         }
       }
     }
 
-    this.countsCache = { data: result, fetchedAt: Date.now() };
-    return result;
+    // Merge with any existing cache so projects not requested this round
+    // (e.g. ones removed from the sidebar momentarily) aren't dropped.
+    const merged = { ...(this.countsCache?.data ?? {}), ...fresh };
+    this.countsCache = { data: merged, fetchedAt: Date.now() };
+    void this.persistCountsCache();
+    return merged;
   }
 
   /**

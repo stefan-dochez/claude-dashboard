@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.30.0]
+
+### Fixes
+
+- **PR count badges no longer wait on a cold GitHub round-trip at startup** — `PrAggregator.countsCache` was in-memory only, so every backend restart paid the full `gh api graphql` cost (1–2 s with batching, more on slow links) before any badge could render in the sidebar. The cache is now persisted to `~/.claude-dashboard/pr-counts-cache.json` after every successful refresh and lazy-loaded on the first `getPrCounts` call. Lookup now follows a stale-while-revalidate pattern: a fresh entry (< 2 min) returns immediately as before; a stale-but-recent entry (< 24 h) returns the cached counts immediately *and* fires a background refresh (coalesced via `backgroundRefresh` so concurrent triggers share one fetch); only a missing or > 24 h-old entry falls back to the synchronous fetch. The cache is keyed per-project path with a `cacheCoversAll` guard so adding a new project to the sidebar still triggers a real fetch instead of returning a half-empty subset, and refresh results are merged into the existing cache rather than replacing it so projects momentarily absent from the request don't get evicted. Disk writes are best-effort (errors logged, never thrown).
+
 ## [0.29.0]
 
 ### Features
