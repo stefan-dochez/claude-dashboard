@@ -138,6 +138,15 @@ export interface SessionInfo {
   permissionMode?: string;
 }
 
+export type PrReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+export type PrMergeableState = 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+export type PrCiState = 'SUCCESS' | 'FAILURE' | 'PENDING' | null;
+
+export interface PrLabel {
+  name: string;
+  color: string; // hex, no leading #
+}
+
 export interface PullRequest {
   repo: string;
   repoName: string;
@@ -152,6 +161,12 @@ export interface PullRequest {
   isDraft: boolean;
   createdAt: string;
   updatedAt: string;
+  labels: PrLabel[];
+  reviewDecision: PrReviewDecision;
+  approvalCount: number;
+  changesRequestedCount: number;
+  mergeable: PrMergeableState;
+  ciState: PrCiState;
 }
 
 export interface AttentionQueueItem {

@@ -2,6 +2,18 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.25.0]
+
+### Features
+
+- **"Open Pull Requests" view now surfaces what needs attention** — `AggregatedPrView` previously listed title / author / branch / updatedAt only, which said *a PR exists* but not *whether it needs action*. The row now renders colored GitHub labels (with automatic black/white text based on the label's sRGB luminance), a review-state badge (`✓ N approved` / `✕ changes requested` / `⏱ review needed` driven by `reviewDecision`), a CI status dot (green / red / amber-pulsing fed by `statusCheckRollup.state`), a red `conflicts` badge when `mergeable === 'CONFLICTING'`, and turns the time-ago caption amber when a PR hasn't been updated in ≥ 7 days. The updated `PullRequest` type carries `labels`, `reviewDecision`, `approvalCount`, `changesRequestedCount`, `mergeable`, `ciState` on both sides of the wire.
+
+- **PR aggregation migrated to GitHub GraphQL** — `PrAggregator.fetchPrs` used to call the REST `search/issues` endpoint, which didn't return `headRefName`, `baseRefName`, or requested reviewers (so the branch column was empty and the "Mine" filter missed review assignments). It now issues a single `gh api graphql` query per batch of ≤ 20 repos that asks for every field in one round-trip — labels, `reviewDecision`, `mergeable`, `statusCheckRollup`, `latestReviews`, `reviewRequests`, head/base refs — and paginates with `{ hasNextPage, endCursor }` up to 20 pages. The per-repo `gh pr list` fallback was extended with the same `--json` fields (`labels,reviewDecision,mergeable,latestReviews,statusCheckRollup`) and a `computeCiStateFromRollup()` helper that collapses the rollup array into `SUCCESS` / `FAILURE` / `PENDING`, so both code paths now return the same shape.
+
+### Fixes
+
+- **"View open PRs" button was gated wrong** — `ProjectRow` showed the hover-toolbar PR button only when `prCount > 0`, which meant a repo with no open PRs couldn't reach its (empty) PR view. It also showed the button on `workspace`-type projects (e.g. `prj-banking-fees`), which don't have a `.git` of their own and shouldn't expose a per-project PR button at all. The toolbar button now renders for every `project.type !== 'workspace'` regardless of count; the inline count pill keeps its `prCount > 0` guard and gains the same workspace exclusion.
+
 ## [0.24.0]
 
 ### Features

@@ -55,6 +55,38 @@
 - Branch cleanup automatique (worktrees/branches mergees apres X jours)
 - Stash management depuis l'UI
 
+### Open Pull Requests (AggregatedPrView)
+
+Etat actuel : liste groupee par repo, filtre Mine/All, refresh 2 min, champs titre/auteur/branche/draft/updatedAt, clic -> GitHub.
+
+**Dettes techniques connues**
+- Pagination de la search API GitHub (risque de manquer des PRs au-dela de 100)
+- Reviewers absents quand la search API primaire est utilisee (presents seulement via le fallback `gh pr list`)
+
+**Phase 1 — Signal "waiting on me" (recommandation, priorite haute)**
+
+Migrer la requete backend vers GraphQL (`gh api graphql`) pour recuperer en un seul appel tous les champs manquants. Regle au passage les 2 dettes techniques.
+
+- Labels colores (nom + couleur depuis GitHub)
+- Etat de review : `reviewDecision` (APPROVED / CHANGES_REQUESTED / REVIEW_REQUIRED) + compteur "2/3 approvals"
+- Etat CI : agregat des check-runs (success / failure / pending) en une pastille
+- Mergeable state : badge "conflicts" quand `mergeable = CONFLICTING`
+- Age PR : highlight visuel si >7j sans update
+
+**Phase 2 — Filtres & tri**
+
+- Filtre "A reviewer par moi" (reviewRequests contient l'utilisateur courant)
+- Filtres additionnels : drafts on/off, avec conflits, par label
+- Tri configurable : age, nombre d'approvals manquants, auteur
+- Recherche texte (titre + auteur)
+- Groupements alternatifs : "waiting on me" / "waiting on others" / "mine"
+
+**Phase 3 — Actions directes**
+
+- Bouton "Open in worktree" : cree un worktree sur la branche de la PR + lance Claude dessus (reutilise l'infra worktree existante)
+- Approve / Request changes / Comment via `gh pr review` (a debattre : casse le modele read-only actuel)
+- Checkout rapide de la branche dans une instance existante
+
 ### Recherche et navigation
 - Go to definition basique (click symbole -> occurrences)
 - Historique de navigation (back/forward fichiers consultes)

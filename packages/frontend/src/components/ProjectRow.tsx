@@ -118,7 +118,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
         {worktrees.length > 0 && (
           <span className="text-[10px] text-faint">{worktrees.length} wt</span>
         )}
-        {prCount > 0 && (
+        {prCount > 0 && project.type !== 'workspace' && (
           <span
             onClick={e => { e.stopPropagation(); onViewPrs(project.path); }}
             className="flex items-center gap-0.5 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-400 transition-opacity group-hover/row:opacity-0"
@@ -130,7 +130,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
         )}
 
         <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-elevated/80 px-0.5 opacity-0 transition-opacity group-hover/row:opacity-100">
-          {prCount > 0 && (
+          {project.type !== 'workspace' && (
             <span
               onClick={e => { e.stopPropagation(); onViewPrs(project.path); }}
               className="rounded p-0.5 text-faint transition-colors hover:text-blue-400"

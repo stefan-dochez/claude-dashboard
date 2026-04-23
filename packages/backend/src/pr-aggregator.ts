@@ -11,6 +11,15 @@ const log = createLogger('pr-aggregator');
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 const SEARCH_BATCH_SIZE = 20; // max repos per GitHub search query
 
+export type ReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+export type MergeableState = 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+export type PrCiState = 'SUCCESS' | 'FAILURE' | 'PENDING' | null;
+
+export interface PrLabel {
+  name: string;
+  color: string; // hex, no leading #
+}
+
 export interface PullRequest {
   repo: string;       // "owner/repo"
   repoName: string;   // short name, e.g. "di-banking-fees-app"
@@ -25,11 +34,115 @@ export interface PullRequest {
   isDraft: boolean;
   createdAt: string;
   updatedAt: string;
+  labels: PrLabel[];
+  reviewDecision: ReviewDecision;
+  approvalCount: number;
+  changesRequestedCount: number;
+  mergeable: MergeableState;
+  ciState: PrCiState;
 }
 
 interface CacheEntry {
   prs: PullRequest[];
   fetchedAt: number;
+}
+
+interface GraphQLPrNode {
+  number: number;
+  title: string;
+  url: string;
+  isDraft: boolean;
+  createdAt: string;
+  updatedAt: string;
+  headRefName: string;
+  baseRefName: string;
+  mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  repository: { nameWithOwner: string } | null;
+  author: { login: string } | null;
+  assignees: { nodes: Array<{ login: string }> };
+  reviewRequests: { nodes: Array<{ requestedReviewer: { login?: string } | null }> };
+  labels: { nodes: Array<{ name: string; color: string }> };
+  latestReviews: { nodes: Array<{ state: string }> };
+  commits: { nodes: Array<{ commit: { statusCheckRollup: { state: string } | null } }> };
+}
+
+interface GraphQLSearchResponse {
+  data?: {
+    search: {
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      nodes: Array<GraphQLPrNode | null>;
+    };
+  };
+  errors?: unknown;
+}
+
+/**
+ * Aggregate `gh pr list --json statusCheckRollup` into a single CI state.
+ * Pending if any check is still running, failure if any has a bad conclusion,
+ * success if all completed cleanly, null if no checks at all.
+ */
+function computeCiStateFromRollup(
+  rollup: Array<{ status?: string; conclusion?: string }> | undefined,
+): PrCiState {
+  if (!rollup || rollup.length === 0) return null;
+  let hasPending = false;
+  let hasFailure = false;
+  for (const check of rollup) {
+    const status = check.status?.toUpperCase();
+    const conclusion = check.conclusion?.toUpperCase();
+    if (status && status !== 'COMPLETED') hasPending = true;
+    if (conclusion === 'FAILURE' || conclusion === 'TIMED_OUT' || conclusion === 'CANCELLED' || conclusion === 'ACTION_REQUIRED') {
+      hasFailure = true;
+    }
+  }
+  if (hasFailure) return 'FAILURE';
+  if (hasPending) return 'PENDING';
+  return 'SUCCESS';
+}
+
+/** Map a GraphQL PullRequest node to our internal shape. */
+function mapPrNode(node: GraphQLPrNode, repoNameMap: Map<string, string>): PullRequest {
+  const slug = node.repository?.nameWithOwner ?? '';
+  const reviewers = node.reviewRequests.nodes
+    .map(n => n.requestedReviewer?.login)
+    .filter((login): login is string => Boolean(login));
+
+  let approvalCount = 0;
+  let changesRequestedCount = 0;
+  for (const review of node.latestReviews.nodes) {
+    if (review.state === 'APPROVED') approvalCount++;
+    else if (review.state === 'CHANGES_REQUESTED') changesRequestedCount++;
+  }
+
+  const rollup = node.commits.nodes[0]?.commit.statusCheckRollup?.state ?? null;
+  const ciState: PrCiState =
+    rollup === 'SUCCESS' ? 'SUCCESS'
+    : rollup === 'FAILURE' || rollup === 'ERROR' ? 'FAILURE'
+    : rollup === 'PENDING' || rollup === 'EXPECTED' ? 'PENDING'
+    : null;
+
+  return {
+    repo: slug,
+    repoName: repoNameMap.get(slug) ?? slug.split('/').pop() ?? slug,
+    number: node.number,
+    title: node.title,
+    url: node.url,
+    author: node.author?.login ?? 'unknown',
+    assignees: node.assignees.nodes.map(a => a.login),
+    reviewers,
+    branch: node.headRefName,
+    baseBranch: node.baseRefName,
+    isDraft: node.isDraft,
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    labels: node.labels.nodes.map(l => ({ name: l.name, color: l.color })),
+    reviewDecision: node.reviewDecision,
+    approvalCount,
+    changesRequestedCount,
+    mergeable: node.mergeable,
+    ciState,
+  };
 }
 
 export class PrAggregator {
@@ -239,64 +352,98 @@ export class PrAggregator {
   }
 
   /**
-   * Fetch open PRs for all repos in a single GitHub search API call.
-   * Falls back to per-repo `gh pr list` if search fails.
+   * Fetch open PRs for all repos via a single GraphQL search query.
+   * Returns labels, review decision, mergeable state, CI status in one call.
+   * Paginates by 100 until `hasNextPage` is false. Falls back to per-repo
+   * `gh pr list` if the GraphQL call fails.
    */
   private async fetchPrs(
     repos: Array<{ slug: string; name: string }>,
   ): Promise<PullRequest[]> {
+    if (repos.length === 0) return [];
     const repoNameMap = new Map(repos.map(r => [r.slug, r.name]));
-
-    // Build search query: is:pr is:open repo:a repo:b ...
-    const repoQualifiers = repos.map(r => `repo:${r.slug}`).join('+');
-    const query = `is:pr+is:open+${repoQualifiers}`;
+    const repoQualifiers = repos.map(r => `repo:${r.slug}`).join(' ');
+    const searchQuery = `is:pr is:open ${repoQualifiers}`;
 
     try {
-      const { stdout } = await execFileAsync(
-        'gh', [
-          'api', `search/issues?q=${query}&per_page=100&sort=updated&order=desc`,
-          '--cache', '1m',
-        ],
-        { timeout: TIMEOUTS.GH_CLI * 3 }, // allow more time for search
-      );
-
-      const data = JSON.parse(stdout) as {
-        items: Array<{
-          number: number;
-          title: string;
-          html_url: string;
-          user: { login: string };
-          assignees: Array<{ login: string }>;
-          draft?: boolean;
-          created_at: string;
-          updated_at: string;
-          pull_request: { html_url: string };
-          repository_url: string; // https://api.github.com/repos/owner/repo
-        }>;
-      };
-
-      return data.items.map((item) => {
-        const slug = item.repository_url.replace('https://api.github.com/repos/', '');
-        return {
-          repo: slug,
-          repoName: repoNameMap.get(slug) ?? slug.split('/').pop() ?? slug,
-          number: item.number,
-          title: item.title,
-          url: item.html_url,
-          author: item.user.login,
-          assignees: item.assignees?.map(a => a.login) ?? [],
-          reviewers: [], // search API doesn't return reviewers
-          branch: '', // search API doesn't return branch
-          baseBranch: '',
-          isDraft: item.draft ?? false,
-          createdAt: item.created_at,
-          updatedAt: item.updated_at,
-        };
-      });
+      return await this.fetchPrsViaGraphQL(searchQuery, repoNameMap);
     } catch (err) {
-      log.warn('Search API failed, falling back to per-repo gh pr list:', err instanceof Error ? err.message : err);
+      log.warn(
+        'GraphQL search failed, falling back to per-repo gh pr list:',
+        err instanceof Error ? err.message : err,
+      );
       return this.fetchPrsFallback(repos);
     }
+  }
+
+  private async fetchPrsViaGraphQL(
+    searchQuery: string,
+    repoNameMap: Map<string, string>,
+  ): Promise<PullRequest[]> {
+    const query = `
+      query($q: String!, $cursor: String) {
+        search(query: $q, type: ISSUE, first: 100, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            ... on PullRequest {
+              number
+              title
+              url
+              isDraft
+              createdAt
+              updatedAt
+              headRefName
+              baseRefName
+              mergeable
+              reviewDecision
+              repository { nameWithOwner }
+              author { login }
+              assignees(first: 10) { nodes { login } }
+              reviewRequests(first: 10) {
+                nodes { requestedReviewer { ... on User { login } } }
+              }
+              labels(first: 20) { nodes { name color } }
+              latestReviews(first: 20) { nodes { state } }
+              commits(last: 1) {
+                nodes { commit { statusCheckRollup { state } } }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const all: PullRequest[] = [];
+    let cursor: string | null = null;
+
+    for (let page = 0; page < 20; page++) {
+      const args: string[] = [
+        'api', 'graphql',
+        '-f', `query=${query}`,
+        '-f', `q=${searchQuery}`,
+      ];
+      if (cursor) args.push('-f', `cursor=${cursor}`);
+
+      const { stdout } = await execFileAsync('gh', args, {
+        timeout: TIMEOUTS.GH_CLI * 3,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
+      const parsed = JSON.parse(stdout) as GraphQLSearchResponse;
+      const search = parsed.data?.search;
+      if (!search) break;
+
+      for (const node of search.nodes) {
+        if (!node || !node.repository) continue;
+        all.push(mapPrNode(node, repoNameMap));
+      }
+
+      if (!search.pageInfo.hasNextPage) break;
+      cursor = search.pageInfo.endCursor;
+    }
+
+    all.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    return all;
   }
 
   /** Fallback: call `gh pr list` on each repo individually. */
@@ -311,7 +458,7 @@ export class PrAggregator {
           'gh', [
             'pr', 'list',
             '--repo', slug,
-            '--json', 'number,title,url,author,assignees,reviewRequests,headRefName,baseRefName,isDraft,createdAt,updatedAt',
+            '--json', 'number,title,url,author,assignees,reviewRequests,headRefName,baseRefName,isDraft,createdAt,updatedAt,labels,reviewDecision,mergeable,latestReviews,statusCheckRollup',
             '--limit', '30',
           ],
           { timeout: TIMEOUTS.GH_CLI * 2 },
@@ -323,29 +470,61 @@ export class PrAggregator {
           url: string;
           author: { login: string };
           assignees: Array<{ login: string }>;
-          reviewRequests: Array<{ login: string }>;
+          reviewRequests: Array<{ login?: string; slug?: string }>;
           headRefName: string;
           baseRefName: string;
           isDraft: boolean;
           createdAt: string;
           updatedAt: string;
+          labels?: Array<{ name: string; color: string }>;
+          reviewDecision?: string;
+          mergeable?: string;
+          latestReviews?: Array<{ state: string }>;
+          statusCheckRollup?: Array<{ status?: string; conclusion?: string }>;
         }>;
 
-        return prs.map((pr) => ({
-          repo: slug,
-          repoName: name,
-          number: pr.number,
-          title: pr.title,
-          url: pr.url,
-          author: pr.author.login,
-          assignees: pr.assignees?.map(a => a.login) ?? [],
-          reviewers: pr.reviewRequests?.map(r => r.login) ?? [],
-          branch: pr.headRefName,
-          baseBranch: pr.baseRefName,
-          isDraft: pr.isDraft,
-          createdAt: pr.createdAt,
-          updatedAt: pr.updatedAt,
-        }));
+        return prs.map((pr): PullRequest => {
+          let approvalCount = 0;
+          let changesRequestedCount = 0;
+          for (const r of pr.latestReviews ?? []) {
+            if (r.state === 'APPROVED') approvalCount++;
+            else if (r.state === 'CHANGES_REQUESTED') changesRequestedCount++;
+          }
+
+          const ciState: PrCiState = computeCiStateFromRollup(pr.statusCheckRollup);
+          const mergeable: MergeableState = (pr.mergeable === 'MERGEABLE' || pr.mergeable === 'CONFLICTING')
+            ? pr.mergeable
+            : 'UNKNOWN';
+          const reviewDecision: ReviewDecision = (
+            pr.reviewDecision === 'APPROVED'
+            || pr.reviewDecision === 'CHANGES_REQUESTED'
+            || pr.reviewDecision === 'REVIEW_REQUIRED'
+          ) ? pr.reviewDecision : null;
+
+          return {
+            repo: slug,
+            repoName: name,
+            number: pr.number,
+            title: pr.title,
+            url: pr.url,
+            author: pr.author.login,
+            assignees: pr.assignees?.map(a => a.login) ?? [],
+            reviewers: (pr.reviewRequests ?? [])
+              .map(r => r.login)
+              .filter((login): login is string => Boolean(login)),
+            branch: pr.headRefName,
+            baseBranch: pr.baseRefName,
+            isDraft: pr.isDraft,
+            createdAt: pr.createdAt,
+            updatedAt: pr.updatedAt,
+            labels: pr.labels ?? [],
+            reviewDecision,
+            approvalCount,
+            changesRequestedCount,
+            mergeable,
+            ciState,
+          };
+        });
       }),
     );
 
