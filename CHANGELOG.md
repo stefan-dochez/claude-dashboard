@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.31.2]
+
+### Fixes
+
+- **Selection detection also works for files whose extension isn't in `EXT_TO_LANG`** — the 0.31.1 fix rewrote `handleMouseUp` to resolve line numbers from the nearest `[data-line]` ancestor, which works for the SyntaxHighlighter branch (`lineProps` tags each line wrapper) but the plain `<pre>` fallback rendered `{content}` as a single text node with no line markers, so `closest('[data-line]')` returned `null` and the handler bailed out with `setSelectionInfo(null)`. Any file with an unmapped extension — `.props`, `.csproj`, `.targets`, `.lock`, arbitrary no-language files — therefore had no selection feedback at all (no "Send L{X}-{Y} to chat" button, no violet line highlight, no IDE `selection_changed` notification). The fallback now renders one `<div data-line={n}>` per line (same `inSelection` / `highlightLine` styling as the syntax-highlighted branch), so the DOM-based resolution finds a wrapper regardless of whether a Prism language was detected. Split uses `/\r?\n/` so CRLF-terminated files don't carry a stray `\r` in each line.
+
 ## [0.31.1]
 
 ### Fixes

@@ -224,7 +224,26 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
           </SyntaxHighlighter>
         ) : (
           <pre className="p-3 text-[12px] leading-relaxed text-muted">
-            {content}
+            {content?.split(/\r?\n/).map((line, i) => {
+              const lineNumber = i + 1;
+              const inSelection = selectionInfo
+                && lineNumber >= selectionInfo.startLine
+                && lineNumber <= selectionInfo.endLine;
+              return (
+                <div
+                  key={lineNumber}
+                  data-line={lineNumber}
+                  style={{
+                    backgroundColor:
+                      inSelection ? 'rgba(139, 92, 246, 0.18)'
+                      : lineNumber === highlightLine ? 'rgba(250, 204, 21, 0.15)'
+                      : undefined,
+                  }}
+                >
+                  {line || ' '}
+                </div>
+              );
+            })}
           </pre>
         )}
       </div>
