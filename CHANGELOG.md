@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.31.3]
+
+### Fixes
+
+- **`FileViewer` plain-pre fallback no longer churns the whole app** — 0.31.2 replaced the single-text-node `<pre>{content}</pre>` fallback with one `<div data-line={n}>` per line to make selection detection work on unmapped extensions, but `FileViewer` re-renders on a lot of parent-driven state changes (typing in the chat input, incoming socket events, status transitions, etc.) — and none of the new markup was memoized. Every one of those renders re-split the file string, re-ran the `.map`, re-created N `<div>` JSX elements with fresh inline `style` objects, and paid a full reconciliation pass; for a several-thousand-line file this cost enough per frame to make the whole UI feel laggy. The fallback is now split into two `React.memo` components: `FallbackLines` (shallow-compares `content` / `selStart` / `selEnd` / `highlightLine` and skips the entire split+map when none changed) and `FallbackLine` (per-line; a selection flip only re-renders the lines whose `inSelection` / `isHighlighted` flag actually changed, not the thousands of untouched ones). The content split is now `useMemo`'d on `[content]` so it doesn't even run on selection changes.
+
 ## [0.31.2]
 
 ### Fixes

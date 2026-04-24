@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { FileText, X, Loader2, MessageSquare, Code, BookOpen } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -78,6 +78,8 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
   const fileName = filePath.split('/').pop() ?? filePath;
   const language = detectLanguage(filePath);
   const isMarkdown = language === 'markdown';
+  const selStart = selectionInfo?.startLine ?? null;
+  const selEnd = selectionInfo?.endLine ?? null;
 
   useEffect(() => {
     setLoading(true);
@@ -224,29 +226,74 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
           </SyntaxHighlighter>
         ) : (
           <pre className="p-3 text-[12px] leading-relaxed text-muted">
-            {content?.split(/\r?\n/).map((line, i) => {
-              const lineNumber = i + 1;
-              const inSelection = selectionInfo
-                && lineNumber >= selectionInfo.startLine
-                && lineNumber <= selectionInfo.endLine;
-              return (
-                <div
-                  key={lineNumber}
-                  data-line={lineNumber}
-                  style={{
-                    backgroundColor:
-                      inSelection ? 'rgba(139, 92, 246, 0.18)'
-                      : lineNumber === highlightLine ? 'rgba(250, 204, 21, 0.15)'
-                      : undefined,
-                  }}
-                >
-                  {line || ' '}
-                </div>
-              );
-            })}
+            <FallbackLines
+              content={content}
+              selStart={selStart}
+              selEnd={selEnd}
+              highlightLine={highlightLine ?? null}
+            />
           </pre>
         )}
       </div>
     </div>
   );
 }
+
+// Rendering N <div data-line> elements for a large file is expensive. FileViewer re-renders
+// on many parent-triggered state changes (keystrokes in chat, socket events, status changes).
+// Memoize on the props that actually affect output so those re-renders skip the whole block.
+// Within the block, each line is its own memoized component so that a selection change only
+// re-renders the lines whose inSelection flag actually flips.
+const FallbackLines = memo(function FallbackLines({
+  content,
+  selStart,
+  selEnd,
+  highlightLine,
+}: {
+  content: string | null;
+  selStart: number | null;
+  selEnd: number | null;
+  highlightLine: number | null;
+}) {
+  const lines = useMemo(() => (content == null ? [] : content.split(/\r?\n/)), [content]);
+  return (
+    <>
+      {lines.map((line, i) => {
+        const lineNumber = i + 1;
+        const inSelection = selStart != null && selEnd != null && lineNumber >= selStart && lineNumber <= selEnd;
+        return (
+          <FallbackLine
+            key={lineNumber}
+            lineNumber={lineNumber}
+            text={line}
+            inSelection={inSelection}
+            isHighlighted={lineNumber === highlightLine}
+          />
+        );
+      })}
+    </>
+  );
+});
+
+const FallbackLine = memo(function FallbackLine({
+  lineNumber,
+  text,
+  inSelection,
+  isHighlighted,
+}: {
+  lineNumber: number;
+  text: string;
+  inSelection: boolean;
+  isHighlighted: boolean;
+}) {
+  const background = inSelection
+    ? 'rgba(139, 92, 246, 0.18)'
+    : isHighlighted
+      ? 'rgba(250, 204, 21, 0.15)'
+      : undefined;
+  return (
+    <div data-line={lineNumber} style={background ? { backgroundColor: background } : undefined}>
+      {text.length === 0 ? ' ' : text}
+    </div>
+  );
+});
