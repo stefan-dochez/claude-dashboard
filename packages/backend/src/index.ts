@@ -109,6 +109,56 @@ async function main(): Promise<void> {
     log.warn('Initial scan failed:', err);
   });
 
+  // Branch-refresh loop — instances can switch the checked-out branch of their
+  // project/parent (e.g. `git checkout -b …` from a terminal instance), and
+  // the scanner cache holds the branch seen at scan time. Re-query gitBranch
+  // for every project that has at least one active instance (plus its
+  // parent, in case the instance runs in a worktree pointing back to the
+  // main repo), and emit `project:updated` when it actually changes.
+  const collectActiveProjectPaths = (): Set<string> => {
+    const paths = new Set<string>();
+    for (const inst of processManager.getAll()) {
+      if (inst.projectPath) paths.add(inst.projectPath);
+      if (inst.parentProjectPath) paths.add(inst.parentProjectPath);
+    }
+    for (const inst of streamProcess.getAll()) {
+      if (inst.projectPath) paths.add(inst.projectPath);
+      if (inst.parentProjectPath) paths.add(inst.parentProjectPath);
+    }
+    return paths;
+  };
+
+  const refreshBranchesFor = async (paths: Iterable<string>): Promise<void> => {
+    for (const p of paths) {
+      try {
+        const updated = await scanner.refreshProjectBranch(p);
+        if (updated) {
+          io.emit('project:updated', updated);
+        }
+      } catch (err) {
+        log.warn(`Branch refresh failed for ${p}:`, err);
+      }
+    }
+  };
+
+  const BRANCH_REFRESH_INTERVAL_MS = 20_000;
+  const branchRefreshTimer = setInterval(() => {
+    const paths = collectActiveProjectPaths();
+    if (paths.size === 0) return;
+    refreshBranchesFor(paths).catch(() => { /* already logged per-path */ });
+  }, BRANCH_REFRESH_INTERVAL_MS);
+
+  const onInstanceExited = (instanceId: string): void => {
+    const inst = processManager.get(instanceId) ?? streamProcess.get(instanceId);
+    const paths = new Set<string>();
+    if (inst?.projectPath) paths.add(inst.projectPath);
+    if (inst?.parentProjectPath) paths.add(inst.parentProjectPath);
+    if (paths.size === 0) return;
+    refreshBranchesFor(paths).catch(() => { /* already logged per-path */ });
+  };
+  processManager.on('exited', onInstanceExited);
+  streamProcess.on('exited', onInstanceExited);
+
   // Health check at startup
   runHealthCheck().catch(err => {
     log.warn('Health check failed:', err);
@@ -124,6 +174,7 @@ async function main(): Promise<void> {
     shuttingDown = true;
     log.info('Shutting down...');
     statusMonitor.stop();
+    clearInterval(branchRefreshTimer);
 
     // End all active tasks in the store before killing processes
     for (const inst of processManager.getAll()) {

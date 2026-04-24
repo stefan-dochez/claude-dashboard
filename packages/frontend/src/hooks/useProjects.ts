@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Project } from '../types';
+import { useSocketEvent } from './useSocket';
 
 export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -56,6 +57,16 @@ export function useProjects() {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  useSocketEvent<Project>('project:updated', useCallback((updated) => {
+    setProjects(prev => {
+      const idx = prev.findIndex(p => p.path === updated.path);
+      if (idx === -1) return prev;
+      const next = prev.slice();
+      next[idx] = { ...prev[idx], ...updated };
+      return next;
+    });
+  }, []));
 
   return { projects, loading, refreshing, refreshProjects, deleteWorktree };
 }

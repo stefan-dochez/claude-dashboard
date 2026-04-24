@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.31.0]
+
+### Features
+
+- **Project branch auto-refresh while instances run** — the scanner cache captured `gitBranch` once at scan time, so if a terminal/Claude instance did `git checkout` (or `checkout -b`) in the project or its parent, the sidebar kept showing the old branch. `LaunchModal` then rendered "Launch on `<old-branch>`" and the `canDetach` guard (`LaunchModal.tsx:67`) could hide the "Move branch to worktree" banner incorrectly because it was comparing against the stale value. The backend now emits a new `project:updated` socket event whenever the tracked branch actually changes: a 20 s tick iterates the `projectPath` + `parentProjectPath` of every active `ProcessManager` / `StreamProcessManager` instance and a dedicated `scanner.refreshProjectBranch(path)` re-queries just `getGitBranch` and mutates the cache in place. The same refresh also fires on every `instance:exited` so the UI settles within a fetch of the final state. Only projects whose branch *changed* trigger an emit (cheap no-op otherwise). `useProjects` merges the incoming project by `path`, so the sidebar tree, top bar title, and LaunchModal all reflect the new branch without the user having to hit refresh.
+
 ## [0.30.1]
 
 ### Fixes

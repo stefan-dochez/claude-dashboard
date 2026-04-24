@@ -84,6 +84,23 @@ export class ProjectScanner {
     return this.scan();
   }
 
+  /**
+   * Re-query only the git branch for a single cached project. Used by the
+   * periodic branch-refresh tick so that branch changes made from inside an
+   * instance show up in the UI without a full re-scan. Returns the updated
+   * project only when the branch actually changed; returns null otherwise
+   * (unknown path, no cache yet, git call failed, or branch unchanged).
+   */
+  async refreshProjectBranch(projectPath: string): Promise<Project | null> {
+    if (!this.cache) return null;
+    const project = this.cache.find(p => p.path === projectPath);
+    if (!project) return null;
+    const branch = await this.getGitBranch(project.path);
+    if (branch === project.gitBranch) return null;
+    project.gitBranch = branch;
+    return project;
+  }
+
   private async scanDirectory(
     dir: string,
     markers: string[],
