@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.30.1]
+
+### Fixes
+
+- **Sending a prompt in one session no longer silently switches you to another session** — `useAttentionQueue` auto-selected the new front of the attention queue whenever the front id changed, which broke in a specific multi-session scenario: with sessions A (selected) and B both in `waiting_input`, sending a prompt to A moved A out of the queue (to `processing`), which left B alone at the front and triggered `onSelectInstance(B)`. The `typingLocked` guard didn't cover it because the input field had already cleared by the time the status event arrived. The hook now only auto-selects when the new front is a *genuinely new arrival* (not already in the previous queue snapshot), so B being promoted solely because A left no longer steals focus. `prevQueueIdsRef` is also kept in sync while `typingLocked` is active, so the first post-typing queue change isn't misread as a fresh arrival.
+
 ## [0.30.0]
 
 ### Fixes

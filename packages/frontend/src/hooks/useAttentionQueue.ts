@@ -21,6 +21,7 @@ export function useAttentionQueue({
   const [queue, setQueue] = useState<AttentionQueueItem[]>([]);
   const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set());
   const prevFrontRef = useRef<string | null>(null);
+  const prevQueueIdsRef = useRef<Set<string>>(new Set());
 
   // Rebuild queue whenever instances or skippedIds change.
   // Queue = all instances waiting for user input minus manually skipped.
@@ -82,15 +83,25 @@ export function useAttentionQueue({
     });
   }, [instances]);
 
-  // Auto-select front of queue when it changes — but NOT while user is typing
+  // Auto-select the front only when a NEW instance enters the queue.
+  // If the front just changed because the previous front left (e.g. the user
+  // sent input to the selected instance and it moved to processing), don't
+  // switch — the new front was already waiting and didn't earn focus.
   useEffect(() => {
-    if (typingLocked) return;
+    if (typingLocked) {
+      prevFrontRef.current = queue.length > 0 ? queue[0].instanceId : null;
+      prevQueueIdsRef.current = new Set(queue.map(q => q.instanceId));
+      return;
+    }
 
     const frontId = queue.length > 0 ? queue[0].instanceId : null;
-    if (frontId && frontId !== prevFrontRef.current) {
+    const frontIsNewArrival = frontId !== null && !prevQueueIdsRef.current.has(frontId);
+
+    if (frontId && frontId !== prevFrontRef.current && frontIsNewArrival) {
       onSelectInstance(frontId);
     }
     prevFrontRef.current = frontId;
+    prevQueueIdsRef.current = new Set(queue.map(q => q.instanceId));
   }, [queue, onSelectInstance, typingLocked]);
 
   const skipInstance = useCallback((id: string) => {

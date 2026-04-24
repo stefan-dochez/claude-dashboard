@@ -1,7 +1,7 @@
 {
   "name": "@claude-dashboard/electron",
   "productName": "Claude Dashboard",
-  "version": "0.30.0",
+  "version": "0.30.1",
   "private": true,
   "description": "Desktop app for Claude Dashboard",
   "author": "Claude Dashboard",
