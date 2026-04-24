@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.31.1]
+
+### Fixes
+
+- **`FileViewer` line detection no longer jumps to the first duplicate occurrence** — the selection-to-line-number step used `content.indexOf(selectedText)`, which returns the *first* match in the file. If the user selected text that appeared anywhere earlier in the file (common words, repeated identifiers, short snippets like `return null;`), the highlighted range and the "Send L{start}-{end} to chat" chip reported the line numbers of that earlier occurrence instead of the actual selection — and the IDE `selection_changed` notification pushed the wrong range to Claude. The handler now reads line numbers straight from the DOM: `selection.getRangeAt(0)` → walk up from `startContainer` / `endContainer` to `closest('[data-line]')`, which SyntaxHighlighter already tags per line via `lineProps`. This is robust against duplicate text because it uses the actual selected nodes instead of matching a string. Added a small clamp so a selection ending at column 0 of the next line (or with a trailing `\n`) reports the last *visually* selected line, not the unselected one past it.
+
 ## [0.31.0]
 
 ### Features

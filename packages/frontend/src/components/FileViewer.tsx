@@ -26,37 +26,54 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
 
   const handleMouseUp = useCallback(() => {
     const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !content) {
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
       setSelectionInfo(null);
       onSelectionChange?.(null);
       return;
     }
-    const text = selection.toString().trim();
-    if (!text) {
+    const text = selection.toString();
+    const trimmed = text.trim();
+    if (!trimmed) {
       setSelectionInfo(null);
       onSelectionChange?.(null);
       return;
     }
 
-    // Find line numbers from selection
-    const lines = content.split('\n');
-    const beforeStart = content.indexOf(text);
-    if (beforeStart < 0) {
+    const range = selection.getRangeAt(0);
+    const scroller = scrollContainerRef.current;
+    if (!scroller || !scroller.contains(range.commonAncestorContainer)) {
       setSelectionInfo(null);
       onSelectionChange?.(null);
       return;
     }
-    let startLine = 1;
-    let charCount = 0;
-    for (let i = 0; i < lines.length; i++) {
-      if (charCount + lines[i].length >= beforeStart) { startLine = i + 1; break; }
-      charCount += lines[i].length + 1;
+
+    // Resolve each range endpoint to its surrounding [data-line] wrapper.
+    // This is reliable even when the selected text occurs multiple times in the file.
+    const lineOf = (node: Node): number | null => {
+      const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+      const lineEl = el?.closest<HTMLElement>('[data-line]');
+      const n = lineEl?.dataset.line;
+      return n ? Number(n) : null;
+    };
+
+    const startLineRaw = lineOf(range.startContainer);
+    let endLineRaw = lineOf(range.endContainer);
+    if (startLineRaw == null || endLineRaw == null) {
+      setSelectionInfo(null);
+      onSelectionChange?.(null);
+      return;
     }
-    const endLine = startLine + text.split('\n').length - 1;
-    const info = { startLine, endLine, text };
+    // Selection ending at offset 0 of the next line (or with a trailing newline) doesn't
+    // actually cover that line visually — clamp back to the previous one.
+    if (endLineRaw > startLineRaw && (range.endOffset === 0 || text.endsWith('\n'))) {
+      endLineRaw -= 1;
+    }
+    const startLine = Math.min(startLineRaw, endLineRaw);
+    const endLine = Math.max(startLineRaw, endLineRaw);
+    const info = { startLine, endLine, text: trimmed };
     setSelectionInfo(info);
     onSelectionChange?.({ filePath, ...info });
-  }, [content, filePath, onSelectionChange]);
+  }, [filePath, onSelectionChange]);
 
   const fileName = filePath.split('/').pop() ?? filePath;
   const language = detectLanguage(filePath);
