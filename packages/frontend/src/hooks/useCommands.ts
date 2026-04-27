@@ -36,7 +36,7 @@ interface UseCommandsOptions {
 
   // Tabs
   activeTab: string;
-  onSetTab: (tab: 'main' | 'changes' | 'pr' | 'file') => void;
+  onSetTab: (tab: 'main' | 'changes' | 'pr') => void;
   selectedInstance: Instance | undefined;
 
   // Modals

@@ -152,8 +152,9 @@ export default function App() {
   });
 
   // Center tabs — restore last selected instance + tab from localStorage
-  const [activeTab, setActiveTab] = useState<'main' | 'changes' | 'pr' | 'file'>(() => {
-    return (localStorage.getItem('dashboard:activeTab') as 'main' | 'changes' | 'pr' | 'file') ?? 'main';
+  const [activeTab, setActiveTab] = useState<'main' | 'changes' | 'pr'>(() => {
+    const stored = localStorage.getItem('dashboard:activeTab');
+    return stored === 'changes' || stored === 'pr' ? stored : 'main';
   });
   const [openFiles, setOpenFiles] = useState<{ path: string; highlightLine?: number }[]>(() => {
     try {
@@ -234,7 +235,6 @@ export default function App() {
       return [...prev, { path: filePath, highlightLine: line }];
     });
     setActiveFilePath(filePath);
-    setActiveTab('file');
   }, []);
 
   const handleCloseFile = useCallback((filePath: string) => {
@@ -245,7 +245,6 @@ export default function App() {
     if (activeFilePath === filePath) {
       if (next.length === 0) {
         setActiveFilePath(null);
-        setActiveTab('main');
       } else {
         setActiveFilePath(next[Math.min(idx, next.length - 1)].path);
       }
@@ -254,6 +253,7 @@ export default function App() {
 
   const handleSendToChat = useCallback((filePath: string, startLine: number, endLine: number, code: string) => {
     setCodeSelection({ filePath, startLine, endLine, code });
+    setActiveTab('main');
   }, []);
 
   const { queue, skipInstance: _skipInstance, jumpToInstance: _jumpToInstance } = useAttentionQueue({
@@ -547,9 +547,6 @@ export default function App() {
       setActiveFilePath(null);
     }
   }, [selectedInstanceId, instances]);
-  useEffect(() => {
-    if (activeTab === 'file' && !activeFilePath) setActiveTab('main');
-  }, [activeTab, activeFilePath]);
   // Keep activeFilePath in sync with openFiles (e.g. stale localStorage restore)
   useEffect(() => {
     if (activeFilePath && !openFiles.some(f => f.path === activeFilePath)) {
@@ -808,39 +805,27 @@ export default function App() {
         <main className="flex flex-1 flex-col overflow-hidden rounded-xl bg-surface">
           <UpdateBanner />
           <HealthBanner />
-          {/* Panel toggles (only when instance selected). The main chat/terminal is always visible now;
-              clicking a toggle opens/closes a side panel beside it. */}
+          {/* Tabs (only when instance selected). Changes/PR replace the chat/terminal in the
+              main panel; opened files always appear in a separate side panel. */}
           {selectedInstance && (
             <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border-default px-3">
-              <div className="flex items-center gap-1.5 px-1.5 py-1 text-[11px] font-medium text-secondary">
-                {selectedInstance.mode === 'chat' ? (
-                  <MessageSquare className="h-3 w-3" />
-                ) : (
-                  <Terminal className="h-3 w-3" />
-                )}
-                {selectedInstance.mode === 'chat' ? 'Chat' : 'Terminal'}
-              </div>
-              <div className="mx-1 h-4 w-px bg-border-default" />
               {([
+                {
+                  key: 'main' as const,
+                  label: selectedInstance.mode === 'chat' ? 'Chat' : 'Terminal',
+                  Icon: selectedInstance.mode === 'chat' ? MessageSquare : Terminal,
+                },
                 { key: 'changes' as const, label: 'Changes', Icon: FileCode2 },
                 { key: 'pr' as const, label: 'PR', Icon: GitPullRequest },
-                ...(openFiles.length > 0 ? [{
-                  key: 'file' as const,
-                  label: openFiles.length === 1
-                    ? (openFiles[0].path.split('/').pop() ?? 'File')
-                    : `Files (${openFiles.length})`,
-                  Icon: FileCode2,
-                }] : []),
               ]).map(({ key, label, Icon }) => (
                 <button
                   key={key}
-                  onClick={() => setActiveTab(activeTab === key ? 'main' : key)}
+                  onClick={() => setActiveTab(key)}
                   className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors ${
                     activeTab === key
                       ? 'bg-elevated/50 text-primary'
                       : 'text-muted hover:text-secondary'
                   }`}
-                  title={activeTab === key ? 'Close side panel' : `Open ${label} panel`}
                 >
                   <Icon className="h-3 w-3" />
                   {label}
@@ -906,12 +891,24 @@ export default function App() {
             </div>
           )}
 
-          {/* Content row: chat/terminal stays visible at all times; Changes / PR / FileViewer
-              live in a resizable side panel that pushes the chat instead of replacing it. */}
+          {/* Content row: the main column shows chat/terminal, Changes or PR depending on the
+              active tab. Opened files always live in a separate resizable side panel that
+              pushes the main column instead of replacing it. */}
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               {selectedInstance ? (
-                isSplitMode ? (
+                activeTab === 'changes' ? (
+                  <ChangesView
+                    key={`changes-${selectedInstance.id}`}
+                    projectPath={instanceProjectPath!}
+                  />
+                ) : activeTab === 'pr' ? (
+                  <PullRequestView
+                    key={`pr-${selectedInstance.id}`}
+                    projectPath={instanceProjectPath!}
+                    branchName={selectedInstance.branchName}
+                  />
+                ) : isSplitMode ? (
                   <SplitTerminalView
                     instanceIds={splitInstanceIds}
                     instances={instances}
@@ -981,7 +978,7 @@ export default function App() {
               )}
             </div>
 
-            {selectedInstance && activeTab !== 'main' && (
+            {selectedInstance && activeFilePath && (
               <>
                 <ResizeHandle
                   side="right"
@@ -991,61 +988,46 @@ export default function App() {
                   style={{ width: workspacePanelWidth }}
                   className="flex shrink-0 flex-col overflow-hidden border-l border-border-default"
                 >
-                  {activeTab === 'file' && activeFilePath && (
-                    <div className="flex min-h-0 flex-1 flex-col">
-                      {openFiles.length > 1 && (
-                        <div className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border-default bg-surface px-1">
-                          {openFiles.map(f => (
-                            <button
-                              key={f.path}
-                              onClick={() => setActiveFilePath(f.path)}
-                              className={`group flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[11px] ${
-                                activeFilePath === f.path
-                                  ? 'bg-elevated/50 text-primary'
-                                  : 'text-muted hover:text-secondary'
-                              }`}
-                              title={f.path}
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    {openFiles.length > 1 && (
+                      <div className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border-default bg-surface px-1">
+                        {openFiles.map(f => (
+                          <button
+                            key={f.path}
+                            onClick={() => setActiveFilePath(f.path)}
+                            className={`group flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-[11px] ${
+                              activeFilePath === f.path
+                                ? 'bg-elevated/50 text-primary'
+                                : 'text-muted hover:text-secondary'
+                            }`}
+                            title={f.path}
+                          >
+                            <FileCode2 className="h-3 w-3" />
+                            <span className="max-w-[160px] truncate">{f.path.split('/').pop()}</span>
+                            <span
+                              role="button"
+                              onClick={e => { e.stopPropagation(); handleCloseFile(f.path); }}
+                              onMouseDown={e => e.stopPropagation()}
+                              className="rounded p-0.5 text-faint opacity-60 transition-opacity hover:bg-elevated hover:text-secondary group-hover:opacity-100"
+                              title="Close file"
                             >
-                              <FileCode2 className="h-3 w-3" />
-                              <span className="max-w-[160px] truncate">{f.path.split('/').pop()}</span>
-                              <span
-                                role="button"
-                                onClick={e => { e.stopPropagation(); handleCloseFile(f.path); }}
-                                onMouseDown={e => e.stopPropagation()}
-                                className="rounded p-0.5 text-faint opacity-60 transition-opacity hover:bg-elevated hover:text-secondary group-hover:opacity-100"
-                                title="Close file"
-                              >
-                                <X className="h-3 w-3" />
-                              </span>
-                            </button>
-                          ))}
-                        </div>
+                              <X className="h-3 w-3" />
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <FileViewer
+                      key={activeFilePath}
+                      filePath={activeFilePath}
+                      highlightLine={openFiles.find(f => f.path === activeFilePath)?.highlightLine}
+                      onClose={() => handleCloseFile(activeFilePath)}
+                      onSendToChat={selectedInstance.mode === 'chat' ? handleSendToChat : undefined}
+                      onSelectionChange={sel => setCodeSelection(
+                        sel ? { filePath: sel.filePath, startLine: sel.startLine, endLine: sel.endLine, code: sel.text } : null,
                       )}
-                      <FileViewer
-                        key={activeFilePath}
-                        filePath={activeFilePath}
-                        highlightLine={openFiles.find(f => f.path === activeFilePath)?.highlightLine}
-                        onClose={() => handleCloseFile(activeFilePath)}
-                        onSendToChat={selectedInstance.mode === 'chat' ? handleSendToChat : undefined}
-                        onSelectionChange={sel => setCodeSelection(
-                          sel ? { filePath: sel.filePath, startLine: sel.startLine, endLine: sel.endLine, code: sel.text } : null,
-                        )}
-                      />
-                    </div>
-                  )}
-                  {activeTab === 'changes' && (
-                    <ChangesView
-                      key={`changes-${selectedInstance.id}`}
-                      projectPath={instanceProjectPath!}
                     />
-                  )}
-                  {activeTab === 'pr' && (
-                    <PullRequestView
-                      key={`pr-${selectedInstance.id}`}
-                      projectPath={instanceProjectPath!}
-                      branchName={selectedInstance.branchName}
-                    />
-                  )}
+                  </div>
                 </div>
               </>
             )}

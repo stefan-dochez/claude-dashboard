@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.32.0]
+
+### UX
+
+- **Changes / PR are tabs in the main panel again, files keep the side panel** — the v0.29.0 push layout (3dc37f5) had moved Changes, PR *and* the file viewer into a shared resizable side panel that pushed the chat/terminal aside, but in practice Changes and PR want the full width to be readable (long file lists, large diffs, PR descriptions, CI sections) while only the file viewer benefits from sitting beside the chat for "select a snippet, send to chat" flows. The center tab row now exposes Chat/Terminal, Changes and PR as mutually-exclusive tabs that each take the whole main column (so clicking Changes/PR hides the chat the same way it did pre-v0.29). Opening a file no longer changes the active tab — the file viewer mounts in its own resizable side panel (`workspacePanelWidth`, 320–900px, persisted) that appears whenever `activeFilePath` is set and disappears when the last file is closed. The multi-file tab strip stays inside this side panel. `activeTab` dropped its `'file'` variant; `useCommands` and the localStorage-restored value were updated accordingly (a stale `'file'` value falls back to `'main'`).
+
 ## [0.31.3]
 
 ### Fixes
