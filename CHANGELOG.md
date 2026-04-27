@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.32.1]
+
+### Performance
+
+- **Selecting text in a large file is now responsive again** — the SyntaxHighlighter branch of `FileViewer` passed a `lineProps` callback that closed over `selectionInfo`, so every mouseup re-instantiated the callback and forced react-syntax-highlighter to re-tokenize the whole file with Prism and reconcile every per-line `<span>`. On large files (a few thousand lines) the work was big enough to delay both the violet selection highlight and the `socket.emit('ide:state', ...)` batched in the same React commit — Claude on the IDE side picked up the new selection only after that paint settled. The highlighter is now wrapped in a `MemoSyntaxView` memoized on `(content, language)` so selection changes don't bust its render cache; selection and `highlightLine` backgrounds are painted by a `useLayoutEffect` in the parent that mutates `style.backgroundColor` directly on the `[data-line]` wrappers. Per-selection cost drops from "tokenize + reconcile N lines" to "iterate N DOM nodes and write at most a couple of style strings" — the highlight follows the cursor and the IDE socket emit lands without a perceptible gap. The `<pre>` fallback path (already memoized in 0.31.3) is unchanged.
+
 ## [0.32.0]
 
 ### UX
