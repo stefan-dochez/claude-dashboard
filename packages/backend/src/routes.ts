@@ -427,7 +427,7 @@ export function createRoutes(
     const prefix = slashIdx > 0 ? trimmed.slice(0, slashIdx) : 'claude';
     const taskDescription = slashIdx > 0 ? trimmed.slice(slashIdx + 1) : trimmed;
 
-    const { worktreePath, branchName: finalBranch } = await worktreeManager.createWorktree(
+    const { worktreePath, branchName: finalBranch } = await worktreeManager.forkCurrentToWorktree(
       repoPath,
       taskDescription,
       prefix,

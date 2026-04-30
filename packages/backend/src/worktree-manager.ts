@@ -90,6 +90,128 @@ export class WorktreeManager {
       .slice(0, 60);
   }
 
+  // Fork the source repo's *current state* — uncommitted changes plus any
+  // commits ahead of upstream — onto a new branch in a worktree, leaving the
+  // source branch reset to its remote tracking branch (if safe to do so).
+  // Used by the "Fork to worktree" feature so an investigation that touched
+  // files on main carries those edits forward instead of leaving them behind.
+  async forkCurrentToWorktree(
+    projectPath: string,
+    taskDescription: string,
+    branchPrefix?: string,
+  ): Promise<WorktreeResult> {
+    const slug = this.slugify(taskDescription);
+    if (!slug) {
+      throw new Error('Task description produced an empty slug');
+    }
+
+    const prefix = branchPrefix ?? 'claude';
+    const baseBranchName = `${prefix}/${slug}`;
+    let worktreePath = `${projectPath}--${slug}`;
+
+    let suffix = 1;
+    while (fs.existsSync(worktreePath)) {
+      suffix++;
+      worktreePath = `${projectPath}--${slug}-${suffix}`;
+    }
+    const finalBranch = suffix > 1 ? `${baseBranchName}-${suffix}` : baseBranchName;
+
+    const sourceBranch = await this.getGitBranch(projectPath);
+    if (!sourceBranch) {
+      throw new Error('Cannot determine current branch on source repo');
+    }
+
+    // Step 1: stash anything in the working tree (incl. untracked files) so
+    // we can carry it across to the worktree atomically.
+    const stashLabel = `claude-dashboard: fork ${sourceBranch} to ${finalBranch}`;
+    const { stdout: stashOutput } = await execAsync(
+      `git stash push -u -m ${JSON.stringify(stashLabel)}`,
+      { cwd: projectPath, encoding: 'utf-8', timeout: 15000 },
+    );
+    const hasStash = !stashOutput.includes('No local changes');
+    if (hasStash) {
+      log.info(` Stashed local changes on ${sourceBranch}`);
+    }
+
+    // Step 2: create the new branch + worktree starting from the current HEAD,
+    // so any commits that were ahead of upstream travel onto the new branch.
+    log.info(` Forking ${sourceBranch}'s state to worktree at ${worktreePath} (branch: ${finalBranch})`);
+    try {
+      await execAsync(
+        `git worktree add -b "${finalBranch}" "${worktreePath}" HEAD`,
+        { cwd: projectPath, encoding: 'utf-8', timeout: 30000 },
+      );
+    } catch (err) {
+      // Roll back the stash on the source repo so the user doesn't end up
+      // with their working tree silently parked on the stash list.
+      if (hasStash) {
+        try {
+          await execAsync('git stash pop', {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            timeout: 15000,
+          });
+        } catch (popErr) {
+          log.warn(`Failed to restore stash after worktree-add failure: ${popErr instanceof Error ? popErr.message : popErr}`);
+        }
+      }
+      throw cleanGitError(err, 'git worktree add failed');
+    }
+
+    // Step 3: pop the stash inside the worktree so the working-tree edits
+    // surface there instead of on the source branch.
+    if (hasStash) {
+      try {
+        await execAsync('git stash pop', {
+          cwd: worktreePath,
+          encoding: 'utf-8',
+          timeout: 15000,
+        });
+        log.info(` Restored stashed changes inside the worktree`);
+      } catch (err) {
+        // Pop failed (likely a conflict, but the stash entry stays on the
+        // list so the user can retry manually). Non-fatal.
+        log.warn(` Stash pop in worktree failed — entry preserved on stash list: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    // Step 4: roll the source branch back to its upstream so it ends up clean,
+    // matching the "main redevient propre" semantic. Only safe when the
+    // upstream is an ancestor of HEAD (i.e. we'd just be discarding commits
+    // we already preserved on the new branch). Anything else (no upstream,
+    // diverged history) leaves the source branch alone.
+    let upstreamRef: string | null = null;
+    try {
+      const { stdout } = await execAsync(
+        'git rev-parse --abbrev-ref --symbolic-full-name @{u}',
+        { cwd: projectPath, encoding: 'utf-8', timeout: 5000 },
+      );
+      upstreamRef = stdout.trim() || null;
+    } catch {
+      upstreamRef = null;
+    }
+
+    if (upstreamRef) {
+      try {
+        await execAsync(
+          `git merge-base --is-ancestor "${upstreamRef}" HEAD`,
+          { cwd: projectPath, encoding: 'utf-8', timeout: 5000 },
+        );
+        await execAsync(
+          `git reset --hard "${upstreamRef}"`,
+          { cwd: projectPath, encoding: 'utf-8', timeout: 10000 },
+        );
+        log.info(` Reset ${sourceBranch} to ${upstreamRef}`);
+      } catch {
+        log.info(` ${sourceBranch} has diverged from ${upstreamRef}, leaving source branch as-is`);
+      }
+    } else {
+      log.info(` ${sourceBranch} has no upstream — source branch left as-is`);
+    }
+
+    return { worktreePath, branchName: finalBranch };
+  }
+
   async createWorktree(
     projectPath: string,
     taskDescription: string,

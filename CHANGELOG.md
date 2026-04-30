@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.33.1]
+
+### Fixes
+
+- **Fork to worktree now carries working-tree changes across instead of leaving them on main** — the v0.33.0 fork created the worktree from `origin/<defaultBranch>` (via `WorktreeManager.createWorktree`), which meant any uncommitted edits or local commits ahead of upstream made during the investigation stayed silently on the source branch and the new worktree started clean. That's surprising when the whole point of forking is to continue work that's already begun. A new `WorktreeManager.forkCurrentToWorktree` is wired to `POST /api/instances/:id/fork` and runs the four steps that actually express "move the current state to a new branch": stash the working tree (including untracked files), create the worktree on a new branch starting from the source repo's `HEAD` (so any commits ahead of upstream travel onto it), pop the stash inside the worktree, and finally — only when the source branch's upstream is an ancestor of `HEAD` — `git reset --hard <upstream>` so the source branch ends up matching its remote. If the upstream is missing or the history has diverged the source branch is left alone, and if `git worktree add` fails the source-side stash is popped back so the user doesn't end up with their working tree silently parked on the stash list.
+
 ## [0.33.0]
 
 ### Features
