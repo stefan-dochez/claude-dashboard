@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
-  Terminal, MessageSquare, GitBranch, PanelLeft, Loader2,
+  Terminal, MessageSquare, GitBranch, GitBranchPlus, PanelLeft, Loader2,
   FileCode2, GitPullRequest, FolderOpen, Info, Sun, Moon, Download,
   Columns2, Maximize2, Radio, Package, X,
 } from 'lucide-react';
@@ -26,6 +26,8 @@ import CostDashboard from './components/CostDashboard';
 import ToastContainer from './components/ToastContainer';
 import StashConfirmModal from './components/StashConfirmModal';
 import WhatsNewModal, { type ChangelogEntry } from './components/WhatsNewModal';
+import ForkToWorktreeModal from './components/ForkToWorktreeModal';
+import type { Instance } from './types';
 import { useProjects } from './hooks/useProjects';
 import { useInstances } from './hooks/useInstances';
 import { useConfig } from './hooks/useConfig';
@@ -64,7 +66,7 @@ export default function App() {
   const socketConnected = useSocketStatus();
   const { config, updateConfig } = useConfig();
   const { projects, loading: projectsLoading, refreshing: projectsRefreshing, refreshProjects, deleteWorktree } = useProjects();
-  const { instances, spawnInstance, killInstance, dismissInstance, refetch: refetchInstances } = useInstances();
+  const { instances, spawnInstance, killInstance, dismissInstance, addInstance, refetch: refetchInstances } = useInstances();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(() => {
     return localStorage.getItem('dashboard:selectedInstanceId');
   });
@@ -80,6 +82,10 @@ export default function App() {
   const [costDashboardOpen, setCostDashboardOpen] = useState(false);
   const [prViewProject, setPrViewProject] = useState<{ path: string; name: string } | null>(null);
   const [whatsNew, setWhatsNew] = useState<{ currentVersion: string; previousVersion: string | null; entries: ChangelogEntry[] } | null>(null);
+  // Source instance for the Fork-to-worktree modal. null = modal closed.
+  const [forkSource, setForkSource] = useState<Instance | null>(null);
+  // Ephemeral filiation map: forked-instance-id → source-instance-id. Lost on app restart.
+  const [forkParents, setForkParents] = useState<Map<string, string>>(new Map());
   const autoOpenedRef = useRef(false);
   const selectedInstanceIdRef = useRef(selectedInstanceId);
   selectedInstanceIdRef.current = selectedInstanceId;
@@ -809,6 +815,29 @@ export default function App() {
               main panel; opened files always appear in a separate side panel. */}
           {selectedInstance && (
             <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border-default px-3">
+              {(() => {
+                const parentId = forkParents.get(selectedInstance.id);
+                if (!parentId) return null;
+                const parent = instances.find(i => i.id === parentId);
+                const parentLabel = parent?.branchName ?? parent?.projectName ?? 'source';
+                const parentAlive = !!parent && parent.status !== 'exited';
+                return (
+                  <button
+                    onClick={() => parentAlive && handleSelectInstance(parentId)}
+                    disabled={!parentAlive}
+                    title={parentAlive ? `Switch to source: ${parentLabel}` : 'Source session ended'}
+                    className={`mr-1 flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                      parentAlive
+                        ? 'border-violet-500/30 bg-violet-500/10 text-violet-200 hover:border-violet-400/60 hover:bg-violet-500/20 cursor-pointer'
+                        : 'border-border-input bg-elevated text-faint cursor-default'
+                    }`}
+                  >
+                    <GitBranchPlus className="h-2.5 w-2.5" />
+                    <span>forked from</span>
+                    <span className="font-mono">{parentLabel}</span>
+                  </button>
+                );
+              })()}
               {([
                 {
                   key: 'main' as const,
@@ -833,6 +862,18 @@ export default function App() {
               ))}
               {/* Right-aligned actions */}
               <div className="ml-auto flex items-center gap-1">
+                {selectedInstance.mode === 'chat'
+                  && selectedInstance.status !== 'exited'
+                  && !selectedInstance.worktreePath && (
+                  <button
+                    onClick={() => setForkSource(selectedInstance)}
+                    className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1 text-[11px] font-medium text-violet-200 transition-colors hover:border-violet-400/60 hover:bg-violet-500/20"
+                    title="Fork this investigation into a new branch + worktree"
+                  >
+                    <GitBranchPlus className="h-3 w-3" />
+                    Fork to worktree
+                  </button>
+                )}
                 {selectedInstance.mode === 'terminal' && selectedInstance.status !== 'exited' && (
                   <>
                     {isSplitMode ? (
@@ -1151,6 +1192,29 @@ export default function App() {
             handleCheckoutDefault(projectPath, true);
           }}
           onCancel={() => setStashConfirm(null)}
+        />
+      )}
+
+      {forkSource && (
+        <ForkToWorktreeModal
+          source={forkSource}
+          onClose={() => setForkSource(null)}
+          onForked={(newInstance, sourceInstanceId) => {
+            addInstance(newInstance);
+            setForkParents(prev => {
+              const next = new Map(prev);
+              next.set(newInstance.id, sourceInstanceId);
+              return next;
+            });
+            handleSelectInstance(newInstance.id);
+            addToast(
+              'success',
+              `Forked into ${newInstance.branchName ?? newInstance.projectName}`,
+              'Worktree created · new instance launched with handoff',
+            );
+            refreshProjects();
+          }}
+          onError={message => addToast('error', 'Fork failed', message)}
         />
       )}
 

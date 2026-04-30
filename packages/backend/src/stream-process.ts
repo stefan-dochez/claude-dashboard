@@ -608,6 +608,73 @@ export class StreamProcessManager extends EventEmitter {
     return handle ? [...handle.instance.messages] : [];
   }
 
+  // Side query that resumes the instance's session, asks for a handoff brief,
+  // and returns the assistant's text. Does NOT push to instance.messages and
+  // does NOT emit any events — keeps the user-visible chat clean.
+  async summarizeForFork(instanceId: string): Promise<string> {
+    const handle = this.handles.get(instanceId);
+    if (!handle) throw new Error(`Instance ${instanceId} not found`);
+
+    const instance = handle.instance;
+    if (!instance.sessionId) {
+      throw new Error('Instance has no session yet — send at least one message first');
+    }
+    if (instance.messages.length === 0) {
+      throw new Error('Nothing to summarize — instance has no conversation history');
+    }
+
+    const cwd = instance.worktreePath ?? instance.projectPath;
+
+    const summaryPrompt = [
+      'You are about to be forked into a new git worktree to continue this work in isolation.',
+      '',
+      'Produce a Markdown handoff brief so a fresh Claude Code instance can pick up exactly where you left off. The fresh instance will receive your brief as its first user message — write it for that audience.',
+      '',
+      'Structure (omit sections that do not apply):',
+      '',
+      '## Goal',
+      'What we are trying to accomplish, 1-2 sentences.',
+      '',
+      '## Findings',
+      'Key facts uncovered. Cite files as `path:line` when relevant.',
+      '',
+      '## Next steps',
+      'First concrete actions the fresh instance should take.',
+      '',
+      'Output the Markdown only — no preamble, no sign-off, no questions. Keep it under 250 words.',
+    ].join('\n');
+
+    const conversation = query({
+      prompt: summaryPrompt,
+      options: {
+        cwd,
+        resume: instance.sessionId,
+        permissionMode: 'plan',
+        includePartialMessages: false,
+        ...(instance.model ? { model: instance.model } : {}),
+      },
+    });
+
+    let summary = '';
+    try {
+      for await (const msg of conversation) {
+        if (msg.type === 'assistant') {
+          for (const block of msg.message.content) {
+            if (block.type === 'text') summary += block.text;
+          }
+        }
+      }
+    } finally {
+      try { conversation.return(undefined); } catch { /* ignore */ }
+    }
+
+    const trimmed = summary.trim();
+    if (!trimmed) {
+      throw new Error('Source instance returned an empty summary');
+    }
+    return trimmed;
+  }
+
   async kill(instanceId: string): Promise<void> {
     const handle = this.handles.get(instanceId);
     if (!handle) throw new Error(`Instance ${instanceId} not found`);

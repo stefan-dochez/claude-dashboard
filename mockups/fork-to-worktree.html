@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fork to worktree — mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --bg-page: #0d0d0d;
+    --bg-surface: #161616;
+    --bg-elevated: #1e1e1e;
+    --bg-subtle: #1a1a1a;
+    --border-input: #2a2a2a;
+    --border-subtle: #232323;
+    --text-primary: #e5e5e5;
+    --text-secondary: #d4d4d4;
+    --text-muted: #737373;
+    --text-faint: #525252;
+  }
+  html, body { background: var(--bg-page); color: var(--text-primary); font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  .surface { background: var(--bg-surface); }
+  .elevated { background: var(--bg-elevated); }
+  .subtle { background: var(--bg-subtle); }
+  .border-input { border-color: var(--border-input); }
+  .border-subtle { border-color: var(--border-subtle); }
+  .text-primary { color: var(--text-primary); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-muted { color: var(--text-muted); }
+  .text-faint { color: var(--text-faint); }
+  .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+  .scroll-pretty::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-pretty::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+  .scroll-pretty::-webkit-scrollbar-track { background: transparent; }
+  textarea { resize: none; }
+  /* skeleton shimmer */
+  @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+  .shimmer { background: linear-gradient(90deg, #1e1e1e 0%, #262626 50%, #1e1e1e 100%); background-size: 800px 100%; animation: shimmer 1.6s infinite linear; }
+  /* tab indicator */
+  .pill { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+  /* state switcher */
+  .state-btn[data-active="true"] { background: #2a2a2a; color: var(--text-primary); }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- top bar to switch between mockup states -->
+<div class="sticky top-0 z-40 flex items-center gap-2 border-b border-subtle bg-[#0a0a0a] px-4 py-2 text-xs">
+  <span class="text-muted">State:</span>
+  <button class="state-btn rounded px-2 py-1 text-muted hover:text-primary" data-state="closed" data-active="false">1 · Instance header</button>
+  <button class="state-btn rounded px-2 py-1 text-muted hover:text-primary" data-state="loading" data-active="true">2 · Modal (loading)</button>
+  <button class="state-btn rounded px-2 py-1 text-muted hover:text-primary" data-state="ready" data-active="false">3 · Modal (ready)</button>
+  <button class="state-btn rounded px-2 py-1 text-muted hover:text-primary" data-state="toast" data-active="false">4 · After fork</button>
+  <span class="ml-auto text-faint">Fork to worktree — UX mockup</span>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<!-- Background app shell (always visible)                              -->
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<div class="flex h-[calc(100vh-37px)]">
+
+  <!-- Sidebar -->
+  <aside class="w-[260px] shrink-0 border-r border-subtle subtle p-3 flex flex-col gap-3">
+    <div class="flex items-center gap-2 px-1 py-1">
+      <div class="grid h-6 w-6 place-items-center rounded bg-violet-500/15 text-violet-300">
+        <i data-lucide="layout-dashboard" class="h-3.5 w-3.5"></i>
+      </div>
+      <span class="text-sm font-semibold">Claude Dashboard</span>
+    </div>
+
+    <div class="text-[10px] font-medium uppercase tracking-wider text-faint px-1">Instances</div>
+
+    <button class="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-2 text-left">
+      <span class="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+      <div class="min-w-0 flex-1">
+        <div class="truncate text-xs font-medium text-primary">payment-service</div>
+        <div class="flex items-center gap-1.5 text-[11px] text-muted">
+          <i data-lucide="git-branch" class="h-3 w-3"></i><span>main</span>
+          <span class="text-faint">·</span><span>12 msg</span>
+        </div>
+      </div>
+    </button>
+
+    <button class="flex items-start gap-2 rounded-md px-2.5 py-2 text-left hover:bg-elevated">
+      <span class="mt-1 h-1.5 w-1.5 rounded-full bg-blue-400/70"></span>
+      <div class="min-w-0 flex-1">
+        <div class="truncate text-xs text-secondary">notification-svc</div>
+        <div class="flex items-center gap-1.5 text-[11px] text-muted">
+          <i data-lucide="git-branch" class="h-3 w-3"></i><span>fix/sse-leak</span>
+        </div>
+      </div>
+    </button>
+
+    <button class="flex items-start gap-2 rounded-md px-2.5 py-2 text-left hover:bg-elevated">
+      <span class="mt-1 h-1.5 w-1.5 rounded-full bg-zinc-500"></span>
+      <div class="min-w-0 flex-1">
+        <div class="truncate text-xs text-secondary">checkout-app</div>
+        <div class="flex items-center gap-1.5 text-[11px] text-faint">
+          <i data-lucide="git-branch" class="h-3 w-3"></i><span>main</span>
+          <span>· idle</span>
+        </div>
+      </div>
+    </button>
+  </aside>
+
+  <!-- Main panel -->
+  <main class="relative flex-1 flex flex-col overflow-hidden">
+
+    <!-- Instance header -->
+    <header id="instance-header" class="flex items-center gap-3 border-b border-subtle px-4 py-2.5 surface">
+      <div class="flex items-center gap-2">
+        <i data-lucide="folder-git-2" class="h-4 w-4 text-violet-300"></i>
+        <span class="text-sm font-semibold">payment-service</span>
+        <span class="rounded bg-elevated px-1.5 py-0.5 text-[11px] text-muted mono">main</span>
+      </div>
+      <div class="flex items-center gap-2 text-[11px] text-muted">
+        <span class="flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>running</span>
+        <span class="text-faint">·</span>
+        <span>12 msg</span>
+        <span class="text-faint">·</span>
+        <span>$0.34</span>
+      </div>
+
+      <div class="ml-auto flex items-center gap-1.5">
+        <!-- THE NEW BUTTON -->
+        <button id="fork-btn" class="group flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-[12px] font-medium text-violet-200 transition-colors hover:border-violet-400/60 hover:bg-violet-500/20">
+          <i data-lucide="git-branch-plus" class="h-3.5 w-3.5"></i>
+          <span>Fork to worktree</span>
+        </button>
+
+        <button class="rounded-md p-1.5 text-muted hover:bg-elevated hover:text-primary" title="Restart">
+          <i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>
+        </button>
+        <button class="rounded-md p-1.5 text-muted hover:bg-rose-500/15 hover:text-rose-300" title="Kill">
+          <i data-lucide="x" class="h-3.5 w-3.5"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="flex items-center gap-1 border-b border-subtle px-4 py-1.5 surface">
+      <button class="rounded px-2.5 py-1 text-[12px] text-primary bg-elevated">Chat</button>
+      <button class="rounded px-2.5 py-1 text-[12px] text-muted hover:bg-elevated">Changes</button>
+      <button class="rounded px-2.5 py-1 text-[12px] text-muted hover:bg-elevated">PR</button>
+    </div>
+
+    <!-- Fake chat content -->
+    <div class="flex-1 overflow-y-auto scroll-pretty px-6 py-5 space-y-4">
+      <div class="max-w-[640px]">
+        <div class="text-[10px] font-medium uppercase tracking-wider text-faint mb-1">User</div>
+        <div class="rounded-lg subtle border border-subtle px-3.5 py-2.5 text-sm">
+          Pourquoi les webhooks de remboursement Stripe sont parfois traités deux fois ?
+        </div>
+      </div>
+      <div class="max-w-[680px]">
+        <div class="text-[10px] font-medium uppercase tracking-wider text-faint mb-1">Claude</div>
+        <div class="rounded-lg surface border border-subtle px-3.5 py-2.5 text-sm space-y-2">
+          <p>J'ai regardé <span class="mono text-violet-300">RefundHandler.cs:142</span> — la clé d'idempotence est vérifiée uniquement contre un cache mémoire (TTL 1min). Si Stripe rejoue après 30s sur un autre pod, le cache est froid et on retraite.</p>
+          <p class="text-secondary">Il y a une table <span class="mono text-violet-300">idempotency_keys</span> en base, mais elle n'est pas branchée sur ce handler.</p>
+        </div>
+      </div>
+      <div class="max-w-[640px]">
+        <div class="text-[10px] font-medium uppercase tracking-wider text-faint mb-1">User</div>
+        <div class="rounded-lg subtle border border-subtle px-3.5 py-2.5 text-sm">
+          OK, on va le brancher sur la table. On part sur un worktree.
+        </div>
+      </div>
+    </div>
+
+    <!-- Composer -->
+    <div class="border-t border-subtle px-4 py-3 surface">
+      <div class="flex items-center gap-2 rounded-lg border border-input elevated px-3 py-2">
+        <i data-lucide="message-square" class="h-4 w-4 text-muted"></i>
+        <span class="flex-1 text-[13px] text-faint">Type a message…</span>
+        <span class="text-[10px] text-faint mono">⌘ ↵</span>
+      </div>
+    </div>
+
+    <!-- ─────────────────────────────────────────────────────────────── -->
+    <!-- Toast (state 4)                                                -->
+    <!-- ─────────────────────────────────────────────────────────────── -->
+    <div id="toast" class="hidden absolute bottom-20 right-6 flex items-center gap-3 rounded-lg border border-violet-500/30 surface px-3.5 py-2.5 shadow-xl">
+      <div class="grid h-7 w-7 place-items-center rounded-md bg-violet-500/15 text-violet-300">
+        <i data-lucide="git-branch-plus" class="h-3.5 w-3.5"></i>
+      </div>
+      <div class="text-[12px]">
+        <div class="text-primary font-medium">Forked into <span class="mono text-violet-300">refund-idempotency-fix</span></div>
+        <div class="text-muted">Worktree created · new instance launched with handoff</div>
+      </div>
+      <button class="ml-2 rounded-md border border-input px-2 py-1 text-[11px] text-secondary hover:bg-elevated">Open ↗</button>
+      <button class="text-faint hover:text-primary"><i data-lucide="x" class="h-3.5 w-3.5"></i></button>
+    </div>
+
+  </main>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<!-- Modal overlay                                                      -->
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<div id="modal-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+  <div class="mx-4 w-full max-w-[560px] rounded-xl border border-input surface shadow-2xl">
+
+    <!-- Modal header -->
+    <div class="flex items-center justify-between border-b border-subtle px-4 py-3">
+      <div class="flex items-center gap-2">
+        <div class="grid h-7 w-7 place-items-center rounded-md bg-violet-500/15 text-violet-300">
+          <i data-lucide="git-branch-plus" class="h-4 w-4"></i>
+        </div>
+        <div>
+          <div class="text-sm font-semibold text-primary">Fork to worktree</div>
+          <div class="text-[11px] text-muted">Continue this investigation on a new branch</div>
+        </div>
+      </div>
+      <button class="rounded p-1 text-muted hover:bg-elevated hover:text-secondary" onclick="setState('closed')">
+        <i data-lucide="x" class="h-4 w-4"></i>
+      </button>
+    </div>
+
+    <!-- Source -->
+    <div class="flex items-center gap-2 border-b border-subtle px-4 py-2.5 text-[12px]">
+      <span class="text-faint">From</span>
+      <span class="flex items-center gap-1.5 rounded bg-elevated px-1.5 py-0.5 mono text-secondary">
+        <i data-lucide="folder-git-2" class="h-3 w-3 text-violet-300"></i>
+        payment-service
+      </span>
+      <span class="text-faint">·</span>
+      <span class="flex items-center gap-1 mono text-secondary">
+        <i data-lucide="git-branch" class="h-3 w-3"></i>main
+      </span>
+      <span class="ml-auto text-faint">12 msg · $0.34</span>
+    </div>
+
+    <!-- Body -->
+    <div class="px-4 py-4 space-y-4">
+
+      <!-- Branch name -->
+      <div>
+        <label class="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-faint">Branch name</label>
+        <div class="flex items-center gap-2 rounded-md border border-input elevated px-2.5 py-1.5 focus-within:border-violet-500/50">
+          <i data-lucide="git-branch" class="h-3.5 w-3.5 text-muted"></i>
+          <input id="branch-name" value="feat/refund-idempotency-fix"
+                 class="flex-1 bg-transparent text-[13px] mono text-primary outline-none placeholder:text-faint" />
+          <button class="rounded p-1 text-muted hover:bg-[#2a2a2a] hover:text-violet-300" title="Re-suggest from summary">
+            <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
+          </button>
+        </div>
+        <div class="mt-1 flex items-center gap-1.5 text-[11px] text-faint">
+          <i data-lucide="folder" class="h-3 w-3"></i>
+          <span class="mono">~/dev/payment-service-wt/refund-idempotency-fix</span>
+        </div>
+      </div>
+
+      <!-- Handoff summary -->
+      <div>
+        <div class="mb-1.5 flex items-center justify-between">
+          <label class="text-[11px] font-medium uppercase tracking-wider text-faint">Handoff summary</label>
+          <button id="regen-btn" class="flex items-center gap-1 text-[11px] text-muted hover:text-violet-300">
+            <i data-lucide="rotate-cw" class="h-3 w-3"></i>
+            Regenerate
+          </button>
+        </div>
+
+        <!-- LOADING state -->
+        <div id="summary-loading" class="rounded-md border border-input elevated p-3 space-y-2">
+          <div class="flex items-center gap-2 text-[11px] text-muted">
+            <i data-lucide="loader-2" class="h-3 w-3 animate-spin text-violet-300"></i>
+            <span>Asking the source instance to summarize the investigation…</span>
+          </div>
+          <div class="space-y-2 pt-1">
+            <div class="shimmer h-2.5 w-3/4 rounded"></div>
+            <div class="shimmer h-2.5 w-full rounded"></div>
+            <div class="shimmer h-2.5 w-5/6 rounded"></div>
+            <div class="shimmer h-2.5 w-2/3 rounded"></div>
+          </div>
+        </div>
+
+        <!-- READY state -->
+        <div id="summary-ready" class="hidden">
+          <textarea rows="11" class="w-full rounded-md border border-input elevated px-3 py-2.5 text-[12.5px] mono text-secondary outline-none focus:border-violet-500/50 scroll-pretty">## Goal
+Investigate why Stripe refund webhooks get processed twice when retries land within 30s.
+
+## Findings
+- RefundHandler.cs:142 checks the idempotency key only against an in-memory cache (TTL 1 min).
+- Cross-pod retries miss the cache → handler re-runs.
+- Table `idempotency_keys` exists in DB but is unused by this handler.
+
+## Next steps
+- Wire RefundHandler to the DB-backed idempotency store (RefundsDbContext).
+- Add an integration test that double-delivers the same event id within 5 min.</textarea>
+          <div class="mt-1 flex items-center justify-between text-[11px] text-faint">
+            <span>Editable · markdown · ~180 tokens</span>
+            <span class="flex items-center gap-1"><i data-lucide="info" class="h-3 w-3"></i>Sent as the first message to the new instance</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Options -->
+      <div class="space-y-2 pt-1">
+        <label class="flex items-center gap-2 text-[12px] text-secondary cursor-pointer">
+          <input type="checkbox" checked class="h-3.5 w-3.5 rounded border-input bg-elevated accent-violet-500" />
+          Keep original instance running
+        </label>
+        <label class="flex items-center gap-2 text-[12px] text-secondary cursor-pointer">
+          <input type="checkbox" class="h-3.5 w-3.5 rounded border-input bg-elevated accent-violet-500" />
+          Auto-attach to the new instance
+        </label>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center justify-between gap-2 border-t border-subtle bg-[#141414] px-4 py-3 rounded-b-xl">
+      <div class="flex items-center gap-1.5 text-[11px] text-faint">
+        <i data-lucide="keyboard" class="h-3 w-3"></i>
+        <span class="mono">⌘ ↵</span>
+        <span>to launch · </span>
+        <span class="mono">Esc</span>
+        <span>to cancel</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="rounded-md border border-input px-3 py-1.5 text-[12px] text-secondary hover:bg-elevated" onclick="setState('closed')">Cancel</button>
+        <button id="primary-btn" class="flex items-center gap-1.5 rounded-md bg-violet-500/90 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-violet-500/30 disabled:text-white/60">
+          <i data-lucide="play" class="h-3.5 w-3.5"></i>
+          <span id="primary-label">Create worktree &amp; launch</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  lucide.createIcons();
+
+  const states = {
+    closed:  { overlay: false, loading: false, ready: false, toast: false, primaryDisabled: false, primaryLabel: 'Create worktree & launch' },
+    loading: { overlay: true,  loading: true,  ready: false, toast: false, primaryDisabled: true,  primaryLabel: 'Waiting for summary…' },
+    ready:   { overlay: true,  loading: false, ready: true,  toast: false, primaryDisabled: false, primaryLabel: 'Create worktree & launch' },
+    toast:   { overlay: false, loading: false, ready: false, toast: true,  primaryDisabled: false, primaryLabel: 'Create worktree & launch' },
+  };
+
+  function setState(name) {
+    const s = states[name];
+    document.getElementById('modal-overlay').classList.toggle('hidden', !s.overlay);
+    document.getElementById('summary-loading').classList.toggle('hidden', !s.loading);
+    document.getElementById('summary-ready').classList.toggle('hidden', !s.ready);
+    document.getElementById('toast').classList.toggle('hidden', !s.toast);
+    const btn = document.getElementById('primary-btn');
+    btn.disabled = s.primaryDisabled;
+    document.getElementById('primary-label').textContent = s.primaryLabel;
+    document.querySelectorAll('.state-btn').forEach(b => {
+      b.dataset.active = (b.dataset.state === name) ? 'true' : 'false';
+    });
+  }
+
+  document.querySelectorAll('.state-btn').forEach(b => {
+    b.addEventListener('click', () => setState(b.dataset.state));
+  });
+  document.getElementById('fork-btn').addEventListener('click', () => setState('loading'));
+  document.getElementById('regen-btn').addEventListener('click', () => {
+    setState('loading');
+    setTimeout(() => setState('ready'), 1200);
+  });
+  document.getElementById('primary-btn').addEventListener('click', () => setState('toast'));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setState('closed'); });
+
+  // initial
+  setState('loading');
+</script>
+</body>
+</html>

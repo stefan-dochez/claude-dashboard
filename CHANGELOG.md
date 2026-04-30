@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.33.0]
+
+### Features
+
+- **Fork to worktree from a chat investigation** — when you start a chat investigation on a project's main branch and decide partway through that the work warrants its own branch, you used to either lose the conversation context (start a fresh instance on a new worktree) or stay on `main` and risk dirtying the working tree. Chat instances on a non-worktree path now show a violet `Fork to worktree` button in the toolbar that opens a modal: the source instance is asked (via a side SDK query in `plan` permission mode, with no events emitted to the user-visible chat) to produce a Markdown handoff brief — Goal / Findings / Next steps — which loads into an editable textarea. A branch name is auto-suggested from the brief's goal line (with a ✨ button to re-suggest after edits), and the destination worktree path is previewed underneath. Confirming creates the branch + worktree (reusing `WorktreeManager.createWorktree`), spawns a fresh chat instance inside it, and seeds it with the (possibly user-edited) brief as its first user message — the new instance acknowledges and waits for instructions. The forked instance carries an ephemeral "forked from `<branch>`" badge to the left of its tab bar that clicks back to the source if it's still alive (greyed when the source has ended); the filiation lives in app memory only and is lost on reload, as agreed when scoping the feature. Phase 1 is chat-mode only — the button is hidden on terminal-mode instances since extracting a clean summary from raw PTY output would require ANSI parsing for marginal benefit.
+
 ## [0.32.1]
 
 ### Performance

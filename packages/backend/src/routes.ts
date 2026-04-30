@@ -375,6 +375,108 @@ export function createRoutes(
     res.json({ ok: true });
   }));
 
+  // Fork to worktree — chat mode only.
+  // Step 1: produce a handoff summary by side-querying the source instance.
+  router.post('/api/instances/:id/summarize', asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const streamInstance = streamProcess.get(id);
+    if (!streamInstance) {
+      res.status(404).json({ error: `Chat instance ${id} not found` });
+      return;
+    }
+    const summary = await streamProcess.summarizeForFork(id);
+    res.json({ summary });
+  }));
+
+  // Step 2: create the worktree, spawn a fresh chat instance in it, and seed it
+  // with the (possibly user-edited) summary as its first message.
+  router.post('/api/instances/:id/fork', asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const { branchName, summary, killSource } = req.body as {
+      branchName?: string;
+      summary?: string;
+      killSource?: boolean;
+    };
+    if (!branchName?.trim()) {
+      res.status(400).json({ error: 'branchName is required' });
+      return;
+    }
+    if (!summary?.trim()) {
+      res.status(400).json({ error: 'summary is required' });
+      return;
+    }
+
+    const source = streamProcess.get(id);
+    if (!source) {
+      res.status(404).json({ error: `Chat instance ${id} not found` });
+      return;
+    }
+
+    // Worktrees branch off the parent repo, not the worktree itself.
+    const repoPath = source.parentProjectPath ?? source.projectPath;
+    if (!(await worktreeManager.isGitRepo(repoPath))) {
+      res.status(400).json({ error: `${repoPath} is not a git repo` });
+      return;
+    }
+
+    // The branch name from the UI may include a prefix (e.g. "feat/refund-fix").
+    // Split it so worktreeManager.createWorktree can rebuild "<prefix>/<slug>"
+    // and apply its collision suffixing.
+    const trimmed = branchName.trim();
+    const slashIdx = trimmed.indexOf('/');
+    const prefix = slashIdx > 0 ? trimmed.slice(0, slashIdx) : 'claude';
+    const taskDescription = slashIdx > 0 ? trimmed.slice(slashIdx + 1) : trimmed;
+
+    const { worktreePath, branchName: finalBranch } = await worktreeManager.createWorktree(
+      repoPath,
+      taskDescription,
+      prefix,
+    );
+    refreshProjectsInBackground(scanner);
+
+    const forked = await streamProcess.createInstance({
+      projectPath: repoPath,
+      worktreePath,
+      parentProjectPath: repoPath,
+      branchName: finalBranch,
+      taskDescription,
+      model: source.model ?? undefined,
+      effort: source.effort ?? undefined,
+      permissionMode: source.permissionMode ?? undefined,
+    });
+
+    // Inject the handoff brief as the new instance's first user message.
+    const handoffMessage = [
+      'You are continuing an investigation started in another session, now in this fresh git worktree. Here is the handoff brief from the previous session:',
+      '',
+      '---',
+      summary.trim(),
+      '---',
+      '',
+      'Acknowledge the brief in 1-2 sentences and wait for further instructions.',
+    ].join('\n');
+
+    // Don't await — let the SDK conversation start in the background so the
+    // HTTP response returns quickly. The frontend will see the message stream
+    // in once it attaches to the new instance.
+    streamProcess.sendMessage(forked.id, handoffMessage).catch(err => {
+      log.error(`Failed to seed forked instance ${forked.id}:`, err);
+    });
+
+    if (killSource) {
+      streamProcess.kill(id).catch(err => {
+        log.warn(`Failed to kill source instance ${id} after fork:`, err);
+      });
+    }
+
+    res.status(201).json({
+      instance: { ...forked, mode: 'chat' as const, pid: 0 },
+      sourceInstanceId: id,
+      branchName: finalBranch,
+      worktreePath,
+    });
+  }));
+
   router.delete('/api/instances/:id', asyncHandler(async (req, res) => {
     const deleteWt = req.query.deleteWorktree === 'true';
     const id = req.params.id;

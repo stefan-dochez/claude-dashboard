@@ -96,5 +96,11 @@ export function useInstances() {
     setInstances(prev => prev.filter(i => i.id !== instanceId));
   }, []);
 
-  return { instances, loading, spawnInstance, killInstance, dismissInstance, refetch: fetchInstances };
+  // Used by flows where the backend creates the instance via a non-spawn endpoint
+  // (e.g. /fork) and we need to register it in the local list without re-fetching.
+  const addInstance = useCallback((instance: Instance) => {
+    setInstances(prev => prev.some(i => i.id === instance.id) ? prev : [...prev, instance]);
+  }, []);
+
+  return { instances, loading, spawnInstance, killInstance, dismissInstance, addInstance, refetch: fetchInstances };
 }
