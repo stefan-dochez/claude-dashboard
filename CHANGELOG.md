@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.34.0]
+
+### Features
+
+- **PR review comments in the PR tab, with one-click hand-off to the active session** — the PR view now fetches review-level summaries (`reviews`) and inline review threads (`reviewThreads`, including `isResolved`/`isOutdated`/`diffHunk`) via a single GraphQL call exposed by `GET /api/git/pr-comments`. The endpoint resolves the PR through `gh pr view --json url,number`, parses `owner/repo` from the URL, and runs the GraphQL query with `execFile` (not `exec`) so the multi-token query string isn't mangled by shell escaping. A new collapsible section sits between the PR header and the diff (max 40vh, internal scroll) listing reviews with a state badge (approved/changes_requested/commented/dismissed) and threads grouped by `path:line` with resolved/outdated badges; resolved threads are hidden by default behind a `Show resolved (N)` toggle. Each individual comment exposes a hover-revealed **Send** button, and threads with more than one reply expose a **Thread** button on the header that ships the whole exchange. The handler in `App.tsx` dispatches on `selectedInstance.mode`: chat instances reuse the existing `pendingTemplateContent` mechanism so the formatted comment lands in the textarea (the user can prefix "fix this:" before submitting), while terminal instances receive the same text wrapped in bracketed-paste markers (`\x1b[200~…\x1b[201~`) so embedded newlines from the diff hunk don't auto-submit; a toast reminds the user to press Enter. The send formats include the author, file location, a quoted `diffHunk` excerpt, and the body so the receiving session has enough context to act without round-tripping to GitHub.
+
 ## [0.33.1]
 
 ### Fixes

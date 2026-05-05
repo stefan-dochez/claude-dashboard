@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { Server as SocketServer } from 'socket.io';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import os from 'os';
@@ -26,6 +26,7 @@ import { IS_WINDOWS, PATH_SEP, getExtraPaths } from './platform.js';
 
 const log = createLogger('routes');
 const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile);
 
 // On Windows, Electron-spawned backends don't always inherit the user's full
 // PATH, so `git` / `gh` can fail with ENOENT. Enrich the env with
@@ -798,6 +799,76 @@ export function createRoutes(
       res.json({ url: parsed.url ?? null, state });
     } catch {
       res.json({ url: null, state: null });
+    }
+  });
+
+  // Git — PR review comments (reviews + inline review threads)
+  router.get('/api/git/pr-comments', async (req, res) => {
+    const projectPath = req.query.path as string | undefined;
+    if (!projectPath) {
+      res.status(400).json({ error: 'path query parameter is required' });
+      return;
+    }
+    try {
+      const { stdout: viewStdout } = await execAsync('gh pr view --json url,number', {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: TIMEOUTS.GH_CLI,
+      });
+      const view = JSON.parse(viewStdout) as { url?: string; number?: number };
+      const m = view.url?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\//);
+      if (!m || typeof view.number !== 'number') {
+        res.json({ reviews: [], threads: [] });
+        return;
+      }
+      const [, owner, repo] = m;
+
+      const query = `query($owner:String!, $repo:String!, $num:Int!) { repository(owner:$owner, name:$repo) { pullRequest(number:$num) { reviews(first:50) { nodes { id author { login } body state submittedAt url } } reviewThreads(first:50) { nodes { id isResolved isOutdated path line diffSide comments(first:30) { nodes { id author { login } body url createdAt diffHunk path line } } } } } } }`;
+      const { stdout: gqlStdout } = await execFilePromise(
+        'gh',
+        ['api', 'graphql', '-f', `query=${query}`, '-F', `owner=${owner}`, '-F', `repo=${repo}`, '-F', `num=${view.number}`],
+        { cwd: projectPath, encoding: 'utf-8', timeout: TIMEOUTS.GH_CLI, maxBuffer: 5 * 1024 * 1024, ...(extraEnv ? { env: extraEnv } : {}) },
+      );
+      type GqlComment = { id: string; author: { login: string } | null; body: string; url: string; createdAt: string; diffHunk: string; path: string | null; line: number | null };
+      type GqlThread = { id: string; isResolved: boolean; isOutdated: boolean; path: string | null; line: number | null; diffSide: 'LEFT' | 'RIGHT' | null; comments: { nodes: GqlComment[] } };
+      type GqlReview = { id: string; author: { login: string } | null; body: string; state: string; submittedAt: string | null; url: string };
+      const parsed = JSON.parse(gqlStdout) as {
+        data?: { repository?: { pullRequest?: { reviews?: { nodes: GqlReview[] }; reviewThreads?: { nodes: GqlThread[] } } } };
+      };
+      const pr = parsed.data?.repository?.pullRequest;
+      const reviews = (pr?.reviews?.nodes ?? [])
+        // Skip reviews with empty body and no inline comments — they're noise
+        .filter(r => r.body?.trim().length > 0 || r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED')
+        .map(r => ({
+          id: r.id,
+          author: r.author?.login ?? 'unknown',
+          body: r.body,
+          state: r.state,
+          submittedAt: r.submittedAt,
+          url: r.url,
+        }));
+      const threads = (pr?.reviewThreads?.nodes ?? []).map(t => ({
+        id: t.id,
+        isResolved: t.isResolved,
+        isOutdated: t.isOutdated,
+        path: t.path,
+        line: t.line,
+        diffSide: t.diffSide,
+        comments: t.comments.nodes.map(c => ({
+          id: c.id,
+          author: c.author?.login ?? 'unknown',
+          body: c.body,
+          url: c.url,
+          createdAt: c.createdAt,
+          diffHunk: c.diffHunk,
+          path: c.path,
+          line: c.line,
+        })),
+      }));
+      res.json({ reviews, threads });
+    } catch (err) {
+      log.warn('pr-comments fetch failed:', err instanceof Error ? err.message : err);
+      res.json({ reviews: [], threads: [] });
     }
   });
 

@@ -262,6 +262,22 @@ export default function App() {
     setActiveTab('main');
   }, []);
 
+  const handleSendToSession = useCallback((text: string) => {
+    const instance = instances.find(i => i.id === selectedInstanceIdRef.current);
+    if (!instance) return;
+    if (instance.mode === 'chat') {
+      setPendingTemplateContent(text);
+      setActiveTab('main');
+      return;
+    }
+    // Terminal: wrap in bracketed-paste so multi-line text doesn't auto-submit
+    const PASTE_START = '\x1b[200~';
+    const PASTE_END = '\x1b[201~';
+    socket.emit('terminal:input', { instanceId: instance.id, data: `${PASTE_START}${text}${PASTE_END}` });
+    setActiveTab('main');
+    addToast('info', 'Pasted into terminal — press Enter to submit');
+  }, [instances, socket, addToast]);
+
   const { queue, skipInstance: _skipInstance, jumpToInstance: _jumpToInstance } = useAttentionQueue({
     instances,
     selectedInstanceId,
@@ -948,6 +964,7 @@ export default function App() {
                     key={`pr-${selectedInstance.id}`}
                     projectPath={instanceProjectPath!}
                     branchName={selectedInstance.branchName}
+                    onSendToSession={handleSendToSession}
                   />
                 ) : isSplitMode ? (
                   <SplitTerminalView

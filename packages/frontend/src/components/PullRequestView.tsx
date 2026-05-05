@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy, ExternalLink, CheckCircle2, XCircle, CircleDot, GitMerge } from 'lucide-react';
+import { RefreshCw, GitBranch, GitCommit, Plus, Minus, FileText, Info, Copy, ExternalLink, CheckCircle2, XCircle, CircleDot, GitMerge, MessageSquare, Send, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
 import DiffViewer from './DiffViewer';
-import type { BranchDiffResponse } from '../types';
+import type { BranchDiffResponse, PrCommentsResponse, PrReviewComment, PrReviewThread, PrReviewSummary } from '../types';
 
 interface CheckRun {
   name: string;
@@ -46,17 +46,46 @@ function deriveCiState(checks: CheckRun[]): CiState {
 interface PullRequestViewProps {
   projectPath: string;
   branchName: string | null;
+  onSendToSession?: (text: string) => void;
+}
+
+function formatLocation(path: string | null, line: number | null): string {
+  if (!path) return '(general)';
+  return line ? `${path}:${line}` : path;
+}
+
+function quoteHunk(diffHunk: string | undefined | null): string {
+  if (!diffHunk?.trim()) return '';
+  return '\n' + diffHunk.split('\n').map(l => `> ${l}`).join('\n') + '\n';
+}
+
+function formatComment(c: PrReviewComment): string {
+  return `PR review comment by @${c.author} on ${formatLocation(c.path, c.line)}${quoteHunk(c.diffHunk)}\n${c.body}`;
+}
+
+function formatThread(t: PrReviewThread): string {
+  const first = t.comments[0];
+  const hunk = quoteHunk(first?.diffHunk);
+  const body = t.comments.map(c => `@${c.author}: ${c.body}`).join('\n\n');
+  return `PR review thread on ${formatLocation(t.path, t.line)}${hunk}\n${body}`;
+}
+
+function formatReview(r: PrReviewSummary): string {
+  return `PR review by @${r.author} — ${r.state}\n\n${r.body}`;
 }
 
 const DEFAULT_BRANCHES = ['main', 'master', 'develop'];
 
-export default function PullRequestView({ projectPath, branchName }: PullRequestViewProps) {
+export default function PullRequestView({ projectPath, branchName, onSendToSession }: PullRequestViewProps) {
   const [data, setData] = useState<BranchDiffResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [prUrl, setPrUrl] = useState<string | null>(null);
   const [prState, setPrState] = useState<'OPEN' | 'MERGED' | 'CLOSED' | null>(null);
   const [checks, setChecks] = useState<CheckRun[]>([]);
+  const [comments, setComments] = useState<PrCommentsResponse>({ reviews: [], threads: [] });
+  const [showResolved, setShowResolved] = useState(false);
+  const [commentsCollapsed, setCommentsCollapsed] = useState(false);
 
   const isDefaultBranch = !branchName || DEFAULT_BRANCHES.includes(branchName);
   const headSha = data && data.commits.length > 0 ? data.commits[data.commits.length - 1].hash : null;
@@ -108,15 +137,38 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
     }
   }, [projectPath]);
 
+  const fetchComments = useCallback(async () => {
+    if (isDefaultBranch) return;
+    try {
+      const res = await fetch(`/api/git/pr-comments?path=${encodeURIComponent(projectPath)}`);
+      if (res.ok) setComments(await res.json());
+    } catch {
+      setComments({ reviews: [], threads: [] });
+    }
+  }, [projectPath, isDefaultBranch]);
+
   useEffect(() => {
     fetchBranchDiff();
     fetchPrUrl();
-  }, [fetchBranchDiff, fetchPrUrl]);
+    fetchComments();
+  }, [fetchBranchDiff, fetchPrUrl, fetchComments]);
 
   useEffect(() => {
     if (headSha) fetchChecks(headSha);
     else setChecks([]);
   }, [headSha, fetchChecks]);
+
+  const visibleThreads = useMemo(
+    () => showResolved ? comments.threads : comments.threads.filter(t => !t.isResolved),
+    [comments.threads, showResolved],
+  );
+  const visibleReviews = useMemo(
+    () => comments.reviews.filter(r => r.body?.trim().length > 0),
+    [comments.reviews],
+  );
+  const totalCount = visibleReviews.length + visibleThreads.length;
+  const hiddenResolvedCount = comments.threads.length - comments.threads.filter(t => !t.isResolved).length;
+  const hasAnyComments = comments.reviews.length > 0 || comments.threads.length > 0;
 
   const ciState = useMemo(() => deriveCiState(checks), [checks]);
   const ciSummary = useMemo(() => {
@@ -249,7 +301,7 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
               );
             })()}
             <button
-              onClick={() => { fetchBranchDiff(); fetchPrUrl(); if (headSha) fetchChecks(headSha); }}
+              onClick={() => { fetchBranchDiff(); fetchPrUrl(); fetchComments(); if (headSha) fetchChecks(headSha); }}
               className="rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-secondary"
               title="Refresh"
               aria-label="Refresh"
@@ -303,6 +355,49 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
         )}
       </div>
 
+      {/* Comments section */}
+      {hasAnyComments && (
+        <div className="flex max-h-[40vh] shrink-0 flex-col border-b border-border-default bg-root">
+          <div className="flex shrink-0 items-center gap-2 px-3 py-1.5 text-[11px]">
+            <button
+              onClick={() => setCommentsCollapsed(c => !c)}
+              className="flex items-center gap-1 text-secondary transition-colors hover:text-primary"
+              aria-label={commentsCollapsed ? 'Expand comments' : 'Collapse comments'}
+            >
+              {commentsCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              <MessageSquare className="h-3 w-3" />
+              <span className="font-medium">
+                {totalCount} comment{totalCount !== 1 ? 's' : ''}
+              </span>
+            </button>
+            {hiddenResolvedCount > 0 && (
+              <button
+                onClick={() => setShowResolved(s => !s)}
+                className="ml-auto rounded px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:bg-elevated hover:text-secondary"
+                title={showResolved ? 'Hide resolved threads' : 'Show resolved threads'}
+              >
+                {showResolved ? 'Hide resolved' : `Show resolved (${hiddenResolvedCount})`}
+              </button>
+            )}
+          </div>
+          {!commentsCollapsed && (
+            <div className="flex-1 overflow-y-auto px-3 pb-2">
+              <div className="flex flex-col gap-2">
+                {visibleReviews.map(r => (
+                  <ReviewCard key={r.id} review={r} onSendToSession={onSendToSession} />
+                ))}
+                {visibleThreads.map(t => (
+                  <ThreadCard key={t.id} thread={t} onSendToSession={onSendToSession} />
+                ))}
+                {totalCount === 0 && (
+                  <div className="py-2 text-[11px] text-muted">No unresolved comments</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Diff content */}
       <div className="flex-1 overflow-hidden">
         {data.diff ? (
@@ -312,6 +407,116 @@ export default function PullRequestView({ projectPath, branchName }: PullRequest
             No differences with {data.baseBranch}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function reviewStateBadge(state: string): { label: string; className: string } {
+  switch (state) {
+    case 'APPROVED':
+      return { label: 'approved', className: 'bg-green-500/15 text-green-400' };
+    case 'CHANGES_REQUESTED':
+      return { label: 'changes requested', className: 'bg-rose-500/15 text-rose-400' };
+    case 'COMMENTED':
+      return { label: 'commented', className: 'bg-violet-500/15 text-violet-300' };
+    case 'DISMISSED':
+      return { label: 'dismissed', className: 'bg-hover/50 text-faint' };
+    default:
+      return { label: state.toLowerCase(), className: 'bg-hover/50 text-secondary' };
+  }
+}
+
+interface ReviewCardProps {
+  review: PrReviewSummary;
+  onSendToSession?: (text: string) => void;
+}
+
+function ReviewCard({ review, onSendToSession }: ReviewCardProps) {
+  const badge = reviewStateBadge(review.state);
+  return (
+    <div className="rounded border border-border-default bg-elevated/40 px-2 py-1.5">
+      <div className="flex items-center gap-1.5 text-[11px]">
+        <span className="font-medium text-secondary">@{review.author}</span>
+        <span className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${badge.className}`}>{badge.label}</span>
+        {onSendToSession && review.body?.trim() && (
+          <button
+            onClick={() => onSendToSession(formatReview(review))}
+            className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:bg-hover hover:text-secondary"
+            title="Send to session"
+          >
+            <Send className="h-2.5 w-2.5" />
+            Send
+          </button>
+        )}
+      </div>
+      {review.body?.trim() && (
+        <div className="mt-1 whitespace-pre-wrap text-[11px] text-tertiary">{review.body}</div>
+      )}
+    </div>
+  );
+}
+
+interface ThreadCardProps {
+  thread: PrReviewThread;
+  onSendToSession?: (text: string) => void;
+}
+
+function ThreadCard({ thread, onSendToSession }: ThreadCardProps) {
+  const loc = formatLocation(thread.path, thread.line);
+  const multiple = thread.comments.length > 1;
+  return (
+    <div className={`rounded border bg-elevated/40 px-2 py-1.5 ${thread.isResolved ? 'border-border-default/50 opacity-60' : 'border-border-default'}`}>
+      <div className="flex items-center gap-1.5 text-[11px]">
+        <span className="truncate font-mono text-[10px] text-violet-300/80" title={loc}>{loc}</span>
+        {thread.isResolved && (
+          <span className="flex items-center gap-0.5 rounded bg-green-500/15 px-1 py-0.5 text-[9px] font-medium text-green-400">
+            <CheckCircle className="h-2.5 w-2.5" />
+            resolved
+          </span>
+        )}
+        {thread.isOutdated && (
+          <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-medium text-amber-400">outdated</span>
+        )}
+        {onSendToSession && multiple && (
+          <button
+            onClick={() => onSendToSession(formatThread(thread))}
+            className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:bg-hover hover:text-secondary"
+            title="Send full thread to session"
+          >
+            <Send className="h-2.5 w-2.5" />
+            Thread
+          </button>
+        )}
+      </div>
+      <div className="mt-1 flex flex-col gap-1">
+        {thread.comments.map((c, i) => (
+          <div key={c.id} className="group flex flex-col gap-0.5 rounded bg-root/40 px-1.5 py-1">
+            <div className="flex items-center gap-1.5 text-[10px]">
+              <span className="font-medium text-secondary">@{c.author}</span>
+              <a
+                href={c.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-faint transition-colors hover:text-secondary"
+                title="Open in GitHub"
+              >
+                <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+              {onSendToSession && (
+                <button
+                  onClick={() => onSendToSession(i === 0 && !multiple ? formatThread(thread) : formatComment(c))}
+                  className="ml-auto flex items-center gap-1 rounded px-1 py-0.5 text-muted opacity-0 transition-colors hover:bg-hover hover:text-secondary group-hover:opacity-100"
+                  title="Send to session"
+                >
+                  <Send className="h-2.5 w-2.5" />
+                  Send
+                </button>
+              )}
+            </div>
+            <div className="whitespace-pre-wrap text-[11px] text-tertiary">{c.body}</div>
+          </div>
+        ))}
       </div>
     </div>
   );

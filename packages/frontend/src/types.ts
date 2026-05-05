@@ -169,6 +169,41 @@ export interface PullRequest {
   ciState: PrCiState;
 }
 
+export interface PrReviewComment {
+  id: string;
+  author: string;
+  body: string;
+  url: string;
+  createdAt: string;
+  diffHunk: string;
+  path: string | null;
+  line: number | null;
+}
+
+export interface PrReviewThread {
+  id: string;
+  isResolved: boolean;
+  isOutdated: boolean;
+  path: string | null;
+  line: number | null;
+  diffSide: 'LEFT' | 'RIGHT' | null;
+  comments: PrReviewComment[];
+}
+
+export interface PrReviewSummary {
+  id: string;
+  author: string;
+  body: string;
+  state: string;
+  submittedAt: string | null;
+  url: string;
+}
+
+export interface PrCommentsResponse {
+  reviews: PrReviewSummary[];
+  threads: PrReviewThread[];
+}
+
 export interface AttentionQueueItem {
   instanceId: string;
   projectName: string;
