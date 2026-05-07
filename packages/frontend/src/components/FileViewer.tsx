@@ -20,6 +20,10 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
   const [error, setError] = useState<string | null>(null);
   const [size, setSize] = useState(0);
   const [selectionInfo, setSelectionInfo] = useState<{ startLine: number; endLine: number; text: string } | null>(null);
+  // Callout anchor in scroller-relative coords — scrolls naturally with content because it
+  // lives inside scrollContainerRef. Captured at mouseup time from the live Range so it tracks
+  // the actual end of the selection rather than the (potentially huge) line bounding box.
+  const [calloutPos, setCalloutPos] = useState<{ top: number; left: number } | null>(null);
   // Markdown can't scroll to a source line when rendered, so show source when highlighting.
   const [showSource, setShowSource] = useState(highlightLine != null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -28,6 +32,7 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
       setSelectionInfo(null);
+      setCalloutPos(null);
       onSelectionChange?.(null);
       return;
     }
@@ -35,6 +40,7 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
     const trimmed = text.trim();
     if (!trimmed) {
       setSelectionInfo(null);
+      setCalloutPos(null);
       onSelectionChange?.(null);
       return;
     }
@@ -43,6 +49,7 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
     const scroller = scrollContainerRef.current;
     if (!scroller || !scroller.contains(range.commonAncestorContainer)) {
       setSelectionInfo(null);
+      setCalloutPos(null);
       onSelectionChange?.(null);
       return;
     }
@@ -60,6 +67,7 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
     let endLineRaw = lineOf(range.endContainer);
     if (startLineRaw == null || endLineRaw == null) {
       setSelectionInfo(null);
+      setCalloutPos(null);
       onSelectionChange?.(null);
       return;
     }
@@ -71,6 +79,18 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
     const startLine = Math.min(startLineRaw, endLineRaw);
     const endLine = Math.max(startLineRaw, endLineRaw);
     const info = { startLine, endLine, text: trimmed };
+
+    // Anchor the callout to the *last visual line* of the selection (where the mouse just
+    // released), not the union bounding box — that box can span the full content width on
+    // multi-line selections, which would push the callout way off-target.
+    const rects = range.getClientRects();
+    const anchor = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
+    const containerRect = scroller.getBoundingClientRect();
+    setCalloutPos({
+      top: anchor.bottom - containerRect.top + scroller.scrollTop + 4,
+      left: Math.max(8, anchor.left - containerRect.left + scroller.scrollLeft),
+    });
+
     setSelectionInfo(info);
     onSelectionChange?.({ filePath, ...info });
   }, [filePath, onSelectionChange]);
@@ -158,22 +178,9 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
             {showSource ? 'Preview' : 'Source'}
           </button>
         )}
-        {selectionInfo && onSendToChat && (
-          <button
-            onClick={() => {
-              onSendToChat(filePath, selectionInfo.startLine, selectionInfo.endLine, selectionInfo.text);
-              setSelectionInfo(null);
-            }}
-            className="ml-auto flex items-center gap-1 rounded bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium text-violet-300 transition-colors hover:bg-violet-500/30"
-            title="Send selection to chat"
-          >
-            <MessageSquare className="h-2.5 w-2.5" />
-            Send L{selectionInfo.startLine}-{selectionInfo.endLine} to chat
-          </button>
-        )}
         <button
           onClick={onClose}
-          className={`${selectionInfo && onSendToChat ? '' : 'ml-auto '}rounded p-0.5 text-faint transition-colors hover:bg-elevated hover:text-secondary`}
+          className="ml-auto rounded p-0.5 text-faint transition-colors hover:bg-elevated hover:text-secondary"
           title="Close file"
         >
           <X className="h-3.5 w-3.5" />
@@ -181,7 +188,7 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
       </div>
 
       {/* Content */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto" onMouseUp={handleMouseUp}>
+      <div ref={scrollContainerRef} className="relative flex-1 overflow-auto" onMouseUp={handleMouseUp}>
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <Loader2 className="h-5 w-5 animate-spin text-faint" />
@@ -227,6 +234,26 @@ export default function FileViewer({ filePath, onClose, onSendToChat, onSelectio
               highlightLine={highlightLine ?? null}
             />
           </pre>
+        )}
+        {selectionInfo && calloutPos && onSendToChat && (
+          <button
+            // preventDefault on mousedown keeps the text selection alive long enough for the
+            // click handler to read selectionInfo — without it, clicking the button collapses
+            // the selection and our handleMouseUp would clear state before onClick fires.
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => {
+              onSendToChat(filePath, selectionInfo.startLine, selectionInfo.endLine, selectionInfo.text);
+              setSelectionInfo(null);
+              setCalloutPos(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+            style={{ top: calloutPos.top, left: calloutPos.left }}
+            className="absolute z-10 flex items-center gap-1.5 rounded bg-violet-500 px-2.5 py-1 text-[11px] font-medium text-white shadow-lg shadow-black/40 transition-colors hover:bg-violet-400"
+            title="Send selection to chat"
+          >
+            <MessageSquare className="h-3 w-3" />
+            Send L{selectionInfo.startLine}-{selectionInfo.endLine} to chat
+          </button>
         )}
       </div>
     </div>

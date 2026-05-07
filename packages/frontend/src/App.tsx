@@ -258,9 +258,21 @@ export default function App() {
   }, [openFiles, activeFilePath]);
 
   const handleSendToChat = useCallback((filePath: string, startLine: number, endLine: number, code: string) => {
+    const inst = instances.find(i => i.id === selectedInstanceIdRef.current);
+    if (inst?.mode === 'terminal') {
+      // Terminal mode: notify Claude via the IDE MCP server. Claude treats `at_mentioned` as
+      // explicit context for the next prompt — same path Claude Code uses for IDE @-mentions.
+      socket.emit('ide:at_mentioned', {
+        instanceId: inst.id,
+        selection: { filePath, startLine, endLine, text: code },
+      });
+      const fileName = filePath.split('/').pop() ?? filePath;
+      addToast('info', `Sent ${fileName}:${startLine}-${endLine} to Claude`);
+      return;
+    }
     setCodeSelection({ filePath, startLine, endLine, code });
     setActiveTab('main');
-  }, []);
+  }, [instances, socket, addToast]);
 
   const handleSendToSession = useCallback((text: string) => {
     const instance = instances.find(i => i.id === selectedInstanceIdRef.current);
@@ -1080,7 +1092,7 @@ export default function App() {
                       filePath={activeFilePath}
                       highlightLine={openFiles.find(f => f.path === activeFilePath)?.highlightLine}
                       onClose={() => handleCloseFile(activeFilePath)}
-                      onSendToChat={selectedInstance.mode === 'chat' ? handleSendToChat : undefined}
+                      onSendToChat={handleSendToChat}
                       onSelectionChange={sel => setCodeSelection(
                         sel ? { filePath: sel.filePath, startLine: sel.startLine, endLine: sel.endLine, code: sel.text } : null,
                       )}

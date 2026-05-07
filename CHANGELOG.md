@@ -2,6 +2,13 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.36.0]
+
+### Features
+
+- **IDE integration Stage B2 — `at_mentioned` works in terminal mode** — The "Send L{start}-{end} to chat" action in `FileViewer` is no longer gated to chat-mode instances. In terminal mode, clicking it now emits `ide:at_mentioned` over socket.io, which the backend forwards to the per-instance MCP WebSocket server as a JSON-RPC `at_mentioned` notification with `{ filePath, lineStart, lineEnd }`. Claude Code consumes that notification as explicit context for the next prompt — same path the upstream IDE extensions use for @-mentions. Brings the terminal mode to parity with chat mode, which already had the chip + `buildContextPayload` flow. The frontend handler in `App.tsx` (`handleSendToChat`) branches on `selectedInstance.mode` to pick socket emit vs. `setCodeSelection`, and a toast confirms the file/range that was sent.
+- **Selection callout floats next to the selection** — The "Send to chat" button has been moved out of the `FileViewer` toolbar into a floating callout that appears anchored to the end of the user's text selection (Notion/Linear style). The callout is positioned in scroller-relative coords from the live `Range`'s last `getClientRects()` rect — multi-line selections anchor to the actual mouse-release point, not the union bounding box that would span the full content width. Because the callout is rendered inside the scroll container, it scrolls naturally with content. `onMouseDown` calls `preventDefault` so clicking the callout doesn't collapse the selection before the click handler reads `selectionInfo`. Benefits both terminal and chat modes.
+
 ## [0.35.0]
 
 ### Features

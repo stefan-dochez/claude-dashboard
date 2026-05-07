@@ -1,132 +1,71 @@
 # Claude Dashboard — Roadmap
 
-## v0.5–v0.11 (Complete)
-
-### 1. ~~Command Palette (Cmd+K)~~ (done — v0.5.5)
-- ~~Launcher universel a la VS Code~~
-- ~~Recherche fuzzy : fichiers, instances, projets, commandes, raccourcis~~
-- ~~Actions rapides : lancer instance, kill, switch tab, toggle panels~~
-- ~~Extensible : chaque composant peut enregistrer ses propres commandes~~
-
-### 2. ~~Templates de prompts reutilisables~~ (done — v0.5.6)
-- ~~Bibliotheque de prompts sauvegardes par projet ou globalement~~
-- ~~Variables dans les templates : `{{file}}`, `{{branch}}`, `{{selection}}`~~
-- ~~Import/export de templates (partage en equipe)~~
-- ~~Historique des prompts les plus utilises avec auto-suggestion~~
-
-### 3. ~~Notifications systeme~~ (done — v0.6.0)
-- ~~Notifications macOS/Windows quand une instance passe en `waiting_input` hors focus~~
-- ~~Son optionnel (configurable) pour les evenements importants~~
-- ~~Badge sur l'icone Electron avec le nombre d'instances en attente~~
-- ~~Integration Slack : envoyer un message quand une tache est terminee~~ → deplace en v0.12+
-
-### 4. ~~Split terminal~~ (done — v0.8.0–v0.11.0)
-- ~~Afficher 2-4 instances cote a cote (grid layout)~~
-- ~~Broadcast mode : envoyer le meme input a plusieurs instances simultanement~~
-- ~~Recherche dans le terminal (Cmd+F dans le buffer xterm)~~
-- ~~Export de session : sauvegarder le contenu complet en `.md` ou `.txt`~~
-
-### 5. ~~Dashboard de couts et analytics~~ (done — v0.6.0)
-- ~~Cout par jour/semaine/mois (graphique)~~
-- ~~Cout par projet~~
-- ~~Repartition input/output tokens~~
-- ~~Comparaison Opus vs Sonnet vs Haiku (cout/efficacite)~~
-- ~~Budget alert : notification si le cout journalier depasse un seuil~~ → deplace en v0.12+
+Version courante : **v0.36.0**
 
 ---
 
-## v0.12+ (Prochaines priorites)
+## v0.30+ — Prochaines priorites
 
-### Restes de v0.5–v0.11
-- Integration Slack : envoyer un message quand une tache est terminee
-- Budget alert : notification si le cout journalier depasse un seuil
+### IDE integration (suite du Stage B1 livre en v0.29.0)
 
-### ChatView
-- Branching de conversation (revenir en arriere, re-prompter)
-- Favoris/bookmarks sur des messages specifiques
-- ~~Copier des blocs de code en un clic~~ (done — v0.6.1)
-- Image support : drag & drop screenshots (vision API)
-- Resume automatique des longues conversations
-- ~~**Execution de skills via le chat**~~ (done — v0.6.1) : ~~permettre de lancer des slash commands (`/commit`, `/review-pr`, `/ship`, etc.) directement depuis l'input du chat. Autocompletion des skills disponibles avec `/`, description inline, et execution transparente comme si on etait dans le terminal Claude Code~~
+Phase 1 livree en v0.29.0 : serveur MCP WebSocket par instance terminal, lockfile `~/.claude/ide/<port>.lock`, env vars `CLAUDE_CODE_SSE_PORT` + `ENABLE_IDE_INTEGRATION`, notifications `selection_changed` au bon format LSP, tools `getOpenEditors` / `getCurrentSelection` / `getLatestSelection` / `getWorkspaceFolders` / `openFile` / `close_tab`, highlight violet persistant dans `FileViewer`.
 
-### Git workflow
-- Auto-commit intelligent (detection fin de travail Claude + message genere)
-- Conflict resolution UI (diff 3-way inline)
-- Branch cleanup automatique (worktrees/branches mergees apres X jours)
-- Stash management depuis l'UI
+Stage B2 livre en v0.36.0 : `ide:at_mentioned` socket emit branche dans `App.tsx` selon `selectedInstance.mode` (terminal → notif MCP, chat → `setCodeSelection`), toast confirme l'envoi.
 
-### Open Pull Requests (AggregatedPrView)
+Stage 3 UI livre en v0.36.0 : callout flottant ancre sur le dernier `getClientRects()` du `Range` (rect par ligne, pas la bounding box union qui couvrait toute la largeur). Rendu dans le scroll container, scrolle avec le contenu. `onMouseDown preventDefault` empeche le clic de collapser la selection avant `onClick`.
 
-Etat actuel : liste groupee par repo, filtre Mine/All, refresh 2 min, champs titre/auteur/branche/draft/updatedAt, clic -> GitHub.
+**Stage B3 — `openDiff` UI avec Accept/Reject** (~1j, terminal uniquement)
+- Claude appelle `mcp__ide__openDiff` quand il veut montrer un diff d'edit et *attend* que l'utilisateur accepte ou rejette. Aujourd'hui on retourne `{ accepted: false, error: ... }` → Claude fallback sur l'affichage terminal standard.
+- Implementer un mini-diff viewer modal (inspire de ChangesView) avec boutons Accept / Reject qui renvoient la reponse au tool call.
+- Amene la parite avec le chat mode qui a deja des diffs inline via `ToolDetailView`.
 
-**Dettes techniques connues**
-- Pagination de la search API GitHub (risque de manquer des PRs au-dela de 100)
-- Reviewers absents quand la search API primaire est utilisee (presents seulement via le fallback `gh pr list`)
+### Open Pull Requests
 
-**Phase 1 — Signal "waiting on me" (recommandation, priorite haute)**
-
-Migrer la requete backend vers GraphQL (`gh api graphql`) pour recuperer en un seul appel tous les champs manquants. Regle au passage les 2 dettes techniques.
-
-- Labels colores (nom + couleur depuis GitHub)
-- Etat de review : `reviewDecision` (APPROVED / CHANGES_REQUESTED / REVIEW_REQUIRED) + compteur "2/3 approvals"
-- Etat CI : agregat des check-runs (success / failure / pending) en une pastille
-- Mergeable state : badge "conflicts" quand `mergeable = CONFLICTING`
-- Age PR : highlight visuel si >7j sans update
+Phase 1 livree en v0.25.0 : labels colores, `reviewDecision`, CI rollup, badge `conflicts`, highlight age >7j, migration complete vers GitHub GraphQL (regle au passage les 2 dettes techniques : pagination search API et reviewers manquants).
 
 **Phase 2 — Filtres & tri**
-
-- Filtre "A reviewer par moi" (reviewRequests contient l'utilisateur courant)
+- Filtre "A reviewer par moi" (`reviewRequests` contient l'utilisateur courant)
 - Filtres additionnels : drafts on/off, avec conflits, par label
 - Tri configurable : age, nombre d'approvals manquants, auteur
 - Recherche texte (titre + auteur)
 - Groupements alternatifs : "waiting on me" / "waiting on others" / "mine"
 
 **Phase 3 — Actions directes**
-
-- Bouton "Open in worktree" : cree un worktree sur la branche de la PR + lance Claude dessus (reutilise l'infra worktree existante)
 - Approve / Request changes / Comment via `gh pr review` (a debattre : casse le modele read-only actuel)
 - Checkout rapide de la branche dans une instance existante
+- (Deja partiel : "Check out remote branch into worktree" livre en v0.23.0 couvre le "Open in worktree" initialement prevu ici)
+
+### ChatView
+- Branching de conversation (revenir en arriere, re-prompter)
+- Favoris/bookmarks sur des messages specifiques
+- Image support : drag & drop screenshots (vision API)
+
+### Git workflow
+- Auto-commit intelligent (detection fin de travail Claude + message genere)
+- Conflict resolution UI (diff 3-way inline)
+- Branch cleanup automatique (worktrees/branches mergees apres X jours)
+- Stash management depuis l'UI (au-dela de l'auto-stash au switch livre en v0.24.0)
 
 ### Recherche et navigation
 - Go to definition basique (click symbole -> occurrences)
 - Historique de navigation (back/forward fichiers consultes)
 - Filtres dans CodeSearch : par type de fichier, par dossier, regex toggle
 
+### Notifications & budget
+- Integration Slack : envoyer un message quand une tache est terminee
+- Budget alert : notification si le cout journalier depasse un seuil
+
 ---
 
-## v1.0 (Features ambitieuses)
-
-### Multi-instance orchestration
-- Lancer N instances en parallele sur un meme projet avec des taches differentes
-- Plan d'execution : decrire un objectif global, le dashboard le decoupe en sous-taches
-- Vue Kanban/timeline pour visualiser l'avancement
-- Merge automatique des worktrees quand toutes les sous-taches sont terminees
+## v1.0 — Features ambitieuses
 
 ### Mode "Review" collaboratif
 - Ouvrir une PR et lancer Claude en mode review
 - Commentaires inline sur le diff dans PullRequestView
 - Discussion avec le reviewer sur chaque commentaire
 
-### Mode "Watch" / CI local
-- Surveiller un repertoire, relancer Claude quand des fichiers changent
-- Integration resultats de tests : si `npm test` echoue, lancer Claude pour fixer
-- Pipeline configurable : lint -> test -> Claude fix -> re-test -> commit si vert
-
-### Plugins / Extensions
-- Architecture de plugins avec interface standard (package npm)
-- Exemples : Jira, Sentry, Docker
-- Chaque plugin etend le dashboard avec des modules custom
-
-### Collaboration multi-utilisateur
-- Mode serveur partage : plusieurs devs connectes au meme dashboard
-- Visibilite des instances des autres (read-only ou full access)
-- Chat entre utilisateurs dans le contexte d'une instance
-
-### Snapshots / Checkpoints
-- Snapshot git automatique avant chaque action destructive de Claude
-- Timeline visuelle des checkpoints avec preview du diff
-- Restore en un clic
-- Comparaison entre deux checkpoints
+### Ecosysteme plugins
+Plugins manager livre en v0.18.0. Manque une librairie d'exemples officiels (Jira, Sentry, Docker) et une doc d'ecriture de plugins tiers.
 
 ---
 
@@ -134,12 +73,45 @@ Migrer la requete backend vers GraphQL (`gh api graphql`) pour recuperer en un s
 
 | Amelioration | Effort | Impact |
 |---|---|---|
-| ~~Dark/Light theme toggle~~ (done — v0.7.0) | Faible | Moyen |
-| Drag & drop pour reordonner les favoris | Faible | Faible |
-| Indicateur de sante des instances (CPU/RAM via pidusage) | Faible | Moyen |
-| ~~Auto-scroll lock/unlock dans le terminal~~ (done — v0.7.0) | Faible | Moyen |
+| Indicateur de sante des instances (CPU/RAM via `pidusage`) | Faible | Moyen |
 | Zoom in/out sur le terminal (font size) | Faible | Faible |
-| ~~Persistence des onglets ouverts entre sessions~~ (done — v0.7.0) | Faible | Moyen |
-| ~~Raccourci Cmd+W pour fermer une instance~~ (done — v0.7.0) | Faible | Faible |
 | Status bar en bas (connexion, instances actives, cout cumule) | Moyen | Eleve |
-| Accessibilite : aria-labels complets, navigation clavier | Moyen | Moyen |
+| Accessibilite : aria-labels restants, navigation clavier avancee | Moyen | Moyen |
+
+---
+
+## Livre (archive)
+
+### v0.5.0 et avant — Coeur dashboard
+Electron app, unified sidebar, tab system, chat mode (Agent SDK), 2-column layout, context panel, file explorer, file viewer, code search modal, @-mention autocomplete, diff views, context attachments, code selection to chat, session history + resume, auto-generated session titles, rate limit countdown, git workflow (Changes + PR view), branch prefix selector, meta-projects, worktrees (detach, resume, undo delete), favorite projects, scan paths editor, tree/flat toggle, pull/update repos, Windows support, design token system, syntax highlighting, keyboard shortcuts.
+
+### v0.5.5–v0.11 — Productivite
+- **v0.5.5** : Command Palette (Cmd+K)
+- **v0.5.7** : Prompt Templates
+- **v0.6.0** : System Notifications, Cost & Analytics Dashboard
+- **v0.6.2** : Copy code blocks, slash command autocomplete
+- **v0.7.0** : Dark/Light theme toggle, auto-scroll lock, Cmd+W close instance, tab persistence
+- **v0.8.0** : Terminal search (Cmd+F)
+- **v0.9.0** : Export terminal session
+- **v0.10.0** : Split terminal view
+- **v0.11.0** : Broadcast mode, markdown rendering
+
+### v0.12–v0.36
+- **v0.12** : Open in IDE
+- **v0.13** : Aggregated PR view, PR count badge, Mine/All filter
+- **v0.14** : Dependency health check, configurable session titles, configurable terminal theme
+- **v0.16** : Custom start point for new worktree
+- **v0.17** : Update available banner
+- **v0.18** : Plugins manager
+- **v0.19** : In-app auto-updater
+- **v0.20** : "What's new" modal apres update, periodic update check
+- **v0.21** : GitHub Actions status dans la sidebar, hidden files toggle dans File Explorer
+- **v0.22** : Session picker au clic d'un worktree, power icon pour close (trash reserve a delete)
+- **v0.23** : Checkout remote branch into worktree (couvre le "Open in worktree" de PR Phase 3)
+- **v0.24** : Switch to default branch button, auto-stash confirm modal, hover-pause toasts
+- **v0.25** : Open PRs Phase 1 (labels, review state, CI, conflicts, age highlight, migration GraphQL)
+- **v0.26** : Search Everywhere modal (Cmd+T, tabs All/Files/Text), jump-to-line dans FileViewer, fusion CodeSearchModal -> SearchEverywhere
+- **v0.27** : Push layout — chat/terminal reste visible a cote de Changes/PR/FileViewer (panneau lateral redimensionnable, toggles dans la top bar)
+- **v0.28** : Multi-file tabs dans le workspace panel (openFiles[] + activeFilePath, tabs internes fermables, persistence localStorage)
+- **v0.29** : IDE integration Phase 1 — serveur MCP WebSocket par instance terminal (lockfile ~/.claude/ide/<port>.lock, env vars CLAUDE_CODE_SSE_PORT + ENABLE_IDE_INTEGRATION, tools getOpenEditors/getCurrentSelection/openFile/close_tab/getWorkspaceFolders + stubs pour diagnostics/dirty/save/diff/executeCode, notifications selection_changed au format LSP half-open, highlight violet persistant dans FileViewer)
+- **v0.36** : IDE integration Stage B2 + Stage 3 UI — `at_mentioned` actif en mode terminal (parite avec chat mode), callout flottant remplace le bouton de toolbar et s'ancre sur le dernier rect du `Range` (multi-line OK)
