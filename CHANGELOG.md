@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.34.6]
+
+### Fixes
+
+- **`processing` spinner is back when Claude is actually working, without re-introducing the stuck-on bug** — v0.34.5 over-corrected: it scanned only the last ~3 KB of the cleaned tail for `esc to interrupt`, but Claude Code's bottom hint is buried under several KB of tool-output color codes during generation, so the marker was missed and the spinner stayed off even mid-generation. The detector now looks at the *new* bytes that arrived since the previous tick (instead of a fixed-size tail), records the timestamp of the most recent `esc to interrupt` per instance, and treats the instance as PROCESSING for 1.5 s after that timestamp — long enough to bridge two `CHECK_INTERVAL` ticks without flickering, short enough that the spinner clears within ~1.5 s of generation actually ending. Stale `esc to interrupt` bytes from earlier generations are ignored because they're already past the read cursor. The bookkeeping is dropped via a new `StatusMonitor.forget(instanceId)` hook wired to `processManager.on('exited')` so the per-instance maps don't grow unbounded.
+
 ## [0.34.5]
 
 ### Fixes

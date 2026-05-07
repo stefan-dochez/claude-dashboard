@@ -101,8 +101,12 @@ async function main(): Promise<void> {
   setupSocketHandlers(io, processManager, taskStore, socketOptions);
   setupStreamSocketHandlers(io, streamProcess, taskStore, socketOptions);
 
-  // Start status monitoring
+  // Start status monitoring + drop per-instance bookkeeping when an
+  // instance exits (so the monitor's maps don't leak entries).
   statusMonitor.start();
+  processManager.on('exited', (instanceId: string) => {
+    statusMonitor.forget(instanceId);
+  });
 
   // Initial project scan
   scanner.scan().catch(err => {
