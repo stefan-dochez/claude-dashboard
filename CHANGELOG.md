@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.34.1]
+
+### Fixes
+
+- **Search Everywhere (Cmd+T) no longer returns directories** — the `/api/files/search` endpoint shells out to `find` to match paths by name, but the command was missing a `-type f` predicate, so any directory whose name matched the query (e.g. `components`, `hooks`) was returned alongside files and surfaced in the All/Files tabs of the Search Everywhere modal. Clicking such an entry then tried to open a directory as a file. Adding `-type f` to the `find` invocation in `routes.ts` restricts results to regular files, which is what the modal is built for.
+
 ## [0.34.0]
 
 ### Features

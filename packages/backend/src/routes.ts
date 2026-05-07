@@ -1226,7 +1226,7 @@ export function createRoutes(
     }
     try {
       const { stdout } = await execAsync(
-        `find . -maxdepth ${LIMITS.FILE_SEARCH_DEPTH} -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/__pycache__/*' -iname '*${query.replace(/['"\\]/g, '')}*' | head -${LIMITS.FILE_SEARCH_RESULTS}`,
+        `find . -maxdepth ${LIMITS.FILE_SEARCH_DEPTH} -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/__pycache__/*' -type f -iname '*${query.replace(/['"\\]/g, '')}*' | head -${LIMITS.FILE_SEARCH_RESULTS}`,
         { cwd: dirPath, encoding: 'utf-8', timeout: TIMEOUTS.SHELL_SEARCH },
       );
       const files = stdout.split('\n').filter(f => f.trim()).map(f => {
