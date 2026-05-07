@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.34.2]
+
+### Fixes
+
+- **Terminal "typing" badge no longer gets stuck after Esc or navigation away from the prompt** — `TerminalView` only flipped the violet `typing` chip back to off when the user pressed Enter, so any path that drained the input box without a carriage return left the chip showing. Typical cases: pressing Esc to clear the prompt (Claude Code's own cancel binding), switching to another instance mid-typing, or closing the app's prompt without submitting. The badge then looked indistinguishable from a "Claude is working" indicator even though the session was idle. The handler now also clears the lock when it sees a bare `\x1b` (Escape, but not multi-byte escape sequences like arrow keys), and arms a 4-second inactivity timer on every printable keystroke that auto-resets the lock if no further input arrives. The timer is cleared on unmount alongside the existing attach timer.
+
 ## [0.34.1]
 
 ### Fixes
