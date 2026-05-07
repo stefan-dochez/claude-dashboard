@@ -25,17 +25,6 @@ export class StatusMonitor {
   private compiledPatterns: RegExp[] = [];
   private readonly CHECK_INTERVAL = 1000; // 1 second
   private readonly IDLE_THRESHOLD = 30000; // 30 seconds
-  // Per-instance UTC timestamp of the last time `esc to interrupt` was seen
-  // in *new* PTY output. Used to debounce the PROCESSING signal so it stays
-  // sticky for one CHECK_INTERVAL after Claude Code's last redraw containing
-  // the marker — exactly long enough to bridge the gap between two ticks
-  // when generation is still active.
-  private readonly lastEscMarkerAt = new Map<string, number>();
-  // Per-instance buffer length read at the previous tick. Lets us inspect
-  // only the bytes that arrived since the last check, which avoids picking
-  // up stale `esc to interrupt` occurrences from earlier generations that
-  // are still sitting in the byte history.
-  private readonly lastReadLength = new Map<string, number>();
 
   constructor(
     private processManager: ProcessManager,
@@ -108,7 +97,7 @@ export class StatusMonitor {
       //      is present — typically a brief redraw window after switching tabs).
       try {
         const buffer = this.processManager.getBuffer(instance.id);
-        const signals = this.classifyBuffer(instance.id, buffer, now);
+        const signals = this.classifyBuffer(buffer);
 
         if (signals === 'processing') {
           this.processManager.updateStatus(instance.id, INSTANCE_STATUS.PROCESSING);
@@ -126,55 +115,30 @@ export class StatusMonitor {
     }
   }
 
-  // Drop the per-instance bookkeeping when an instance disappears. Called
-  // from the socket layer; safe to call for unknown ids.
-  forget(instanceId: string): void {
-    this.lastEscMarkerAt.delete(instanceId);
-    this.lastReadLength.delete(instanceId);
-  }
+  // No-op kept for callers; per-instance bookkeeping was removed in favour
+  // of a stateless tail scan, but we still want callers to be able to
+  // signal that an instance has gone away in case future state is added.
+  forget(_instanceId: string): void { /* nothing to clean up */ }
 
   // Classify the buffer into one of three signals:
-  //   'processing' — Claude Code is generating (esc-to-interrupt marker).
-  //   'waiting'    — at the prompt (shift+tab to cycle, accept edits on, …).
-  //   'unknown'    — neither marker present; caller should not update status.
+  //   'waiting'    — Claude is at the prompt (footer hints visible).
+  //   'processing' — Claude is generating (esc-to-interrupt visible *and* no
+  //                  prompt hints are visible — Claude Code never renders
+  //                  the prompt-mode footer hints during generation).
+  //   'unknown'    — neither signal present; caller keeps current status.
   //
-  // The PROCESSING decision is incremental: we only look at *new* bytes that
-  // arrived since the previous tick, then sticky-hold the verdict for
-  // `ESC_MARKER_TTL_MS` so a single missed redraw doesn't drop us out of
-  // PROCESSING for one frame. This avoids two failure modes the previous
-  // implementations hit:
-  //   - looking at the whole tail picks up stale `esc to interrupt` bytes
-  //     from a finished generation and keeps the spinner pinned
-  //   - looking only at a tiny tail window misses the marker because the
-  //     bottom hint is buried in a screen full of color codes
-  private readonly ESC_MARKER_TTL_MS = 1500;
-  private classifyBuffer(instanceId: string, buffer: string, now: number): 'processing' | 'waiting' | 'unknown' {
+  // PROMPT > PROCESSING priority is intentional: stale `esc to interrupt`
+  // bytes can linger in the byte history for several seconds after a
+  // generation ends, so we let the freshly-redrawn prompt-mode hints
+  // override that signal as soon as they appear.
+  private classifyBuffer(buffer: string): 'processing' | 'waiting' | 'unknown' {
     if (buffer.length === 0) return 'unknown';
 
-    // Inspect only the bytes that arrived since the previous tick.
-    const previousLength = this.lastReadLength.get(instanceId) ?? 0;
-    // `previousLength` may be greater than the current length if the buffer
-    // has been trimmed (>512 KB). In that case fall back to scanning the
-    // whole current buffer once.
-    const newDataStart = previousLength <= buffer.length ? previousLength : 0;
-    const newData = buffer.slice(newDataStart);
-    this.lastReadLength.set(instanceId, buffer.length);
-
-    if (newData.length > 0 && stripAnsi(newData).includes('esc to interrupt')) {
-      this.lastEscMarkerAt.set(instanceId, now);
-    }
-
-    const lastEsc = this.lastEscMarkerAt.get(instanceId);
-    if (lastEsc !== undefined && now - lastEsc <= this.ESC_MARKER_TTL_MS) {
-      return 'processing';
-    }
-
-    // No active processing marker — look for a prompt hint anywhere in the
-    // recent tail. Stale prompt hints are not a problem here since we only
-    // return `waiting` when there is no fresher PROCESSING signal.
     const rawTail = buffer.slice(-20000);
     const cleanedTail = stripAnsi(rawTail);
 
+    // 1. Prompt-mode hints — checked first so that a freshly-rendered
+    //    prompt frame wins over any leftover `esc to interrupt` bytes.
     const PROMPT_MARKERS = [
       'shift+tab to cycle',
       'accept edits on',
@@ -186,7 +150,12 @@ export class StatusMonitor {
       if (cleanedTail.includes(marker)) return 'waiting';
     }
 
-    // Fallback: cleaned-line scan for prompt-character endings (e.g. `❯`).
+    // 2. Active-generation marker — only meaningful when no prompt hints
+    //    are visible (which is exactly the state Claude Code's TUI is in
+    //    while it's generating).
+    if (cleanedTail.includes('esc to interrupt')) return 'processing';
+
+    // 3. Fallback: cleaned-line scan for prompt-character endings (`❯`, …).
     const lines = rawTail.split('\r').slice(-50);
     for (const line of lines) {
       const cleaned = stripAnsi(line).trim();
@@ -194,7 +163,7 @@ export class StatusMonitor {
       if (/[❯›>]\s*$/.test(cleaned)) return 'waiting';
     }
 
-    // Config-supplied patterns.
+    // 4. Config-supplied patterns.
     if (this.compiledPatterns.length > 0) {
       const cleanedLines = lines
         .map(l => stripAnsi(l).trim())

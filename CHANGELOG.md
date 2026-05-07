@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.34.7]
+
+### Fixes
+
+- **`processing` spinner now actually appears while Claude is generating** — v0.34.6's incremental detector only marked the instance as PROCESSING when `esc to interrupt` arrived in *new* bytes since the previous tick, but Claude Code's TUI writes that hint once when generation starts and then redraws only the spinner verb / token counter on subsequent frames. After the 1.5 s sticky TTL elapsed, the detector dropped back to `unknown` and the spinner stayed off for the entire generation. The classifier is now stateless and uses **prompt-priority resolution** instead: if a prompt-mode footer hint (`shift+tab to cycle`, `accept edits on`, `plan mode on`, `for shortcuts`, `? for help`) is in the cleaned tail it returns `waiting`; otherwise if `esc to interrupt` is in the cleaned tail it returns `processing`; otherwise `unknown`. Stale `esc to interrupt` bytes from a finished generation no longer pin the spinner because the freshly-rendered prompt hints win the priority tie. The previously-introduced `lastEscMarkerAt` / `lastReadLength` per-instance state is gone.
+
 ## [0.34.6]
 
 ### Fixes
