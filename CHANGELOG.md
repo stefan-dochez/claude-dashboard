@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.34.5]
+
+### Fixes
+
+- **Top-bar `processing` spinner no longer flips on after typing in the prompt then navigating away** — v0.34.4 still mis-classified the prompt as "working" in subtle cases: the previous logic was binary (`isWaiting ? waiting_input : processing`), so any momentary failure of the prompt-marker substring search forced the status to `processing`. After typing into the prompt and switching tabs, the recent buffer tail sometimes contained a redraw frame where Claude Code's footer hint had been styled in a way the marker list didn't cover, and the spinner kicked in even though no generation was happening. `StatusMonitor` now uses **two positive signals** instead of one negation: `esc to interrupt` in the most recent ~3 KB of the cleaned tail explicitly means PROCESSING (it only renders during generation), and the prompt-mode footer hints (`shift+tab to cycle`, `accept edits on`, `plan mode on`, …) explicitly mean WAITING_INPUT. When neither signal is present (e.g. a brief redraw window after switching instances), the previous status is preserved instead of being forcibly flipped to `processing`. The `esc to interrupt` window is intentionally short so a stale occurrence from a finished generation in the byte history doesn't keep the spinner pinned.
+
 ## [0.34.4]
 
 ### Fixes

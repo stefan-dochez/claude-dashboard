@@ -79,87 +79,91 @@ export class StatusMonitor {
 
       const timeSinceActivity = now - lastActivity.getTime();
 
-      // Always check buffer for prompt patterns, regardless of recent activity.
+      // Always check buffer for state markers, regardless of recent activity.
       // Claude Code's status line continuously emits output even when waiting
       // for input, so we can't rely on activity silence to trigger pattern checks.
       //
-      // State machine for active instances:
-      //   PROCESSING  — no prompt detected, Claude is working
-      //   WAITING_INPUT — prompt detected AND recent PTY activity (< IDLE_THRESHOLD)
-      //   IDLE — prompt detected BUT no activity for a while; the instance is
-      //          likely forgotten by the user and can be visually de-emphasised
-      //          in the dashboard UI to reduce cognitive noise.
+      // We use two *positive* signals rather than a single binary "is prompt"
+      // check:
+      //   - PROCESSING marker — `esc to interrupt` (Claude Code only renders
+      //     this hint while a generation is in flight).
+      //   - PROMPT markers — `shift+tab to cycle`, `accept edits on`, etc.
+      //
+      // State resolution:
+      //   1. If a PROCESSING marker is in the recent screen frame → PROCESSING.
+      //   2. Else if a PROMPT marker is anywhere in the cleaned tail →
+      //      WAITING_INPUT (or IDLE after IDLE_THRESHOLD).
+      //   3. Else → keep current status (don't oscillate when neither marker
+      //      is present — typically a brief redraw window after switching tabs).
       try {
         const buffer = this.processManager.getBuffer(instance.id);
-        const isWaiting = this.checkForPrompt(buffer);
+        const signals = this.classifyBuffer(buffer);
 
-        if (isWaiting) {
+        if (signals === 'processing') {
+          this.processManager.updateStatus(instance.id, INSTANCE_STATUS.PROCESSING);
+        } else if (signals === 'waiting') {
           if (timeSinceActivity > this.IDLE_THRESHOLD) {
             this.processManager.updateStatus(instance.id, INSTANCE_STATUS.IDLE);
           } else {
             this.processManager.updateStatus(instance.id, INSTANCE_STATUS.WAITING_INPUT);
           }
-        } else {
-          this.processManager.updateStatus(instance.id, INSTANCE_STATUS.PROCESSING);
         }
+        // 'unknown' → don't update; keep the last known status.
       } catch {
         // Instance might have been removed
       }
     }
   }
 
-  private checkForPrompt(buffer: string): boolean {
-    if (buffer.length === 0) return false;
+  // Classify the buffer into one of three signals:
+  //   'processing' — Claude Code is generating (esc-to-interrupt marker).
+  //   'waiting'    — at the prompt (shift+tab to cycle, accept edits on, …).
+  //   'unknown'    — neither marker present; caller should not update status.
+  private classifyBuffer(buffer: string): 'processing' | 'waiting' | 'unknown' {
+    if (buffer.length === 0) return 'unknown';
 
-    // Claude Code's TUI redraws the entire screen via cursor-positioning
-    // escape sequences and interleaves color/style codes inside hint
-    // strings (e.g. "shift\x1b[2m+\x1b[22mtab to cycle"), which is why a
-    // raw `includes('shift+tab to cycle')` against the byte stream is
-    // unreliable.  We strip ANSI from the tail *first* and search the
-    // cleaned text — that handles both the TUI-redraw case and the
-    // styled-substring case.
     const rawTail = buffer.slice(-20000);
     const cleanedTail = stripAnsi(rawTail);
 
-    // --- Pass 1: substring search on the cleaned tail ---
-    // "esc to interrupt" only appears WHILE Claude is generating, so it is
-    // intentionally excluded from the prompt markers.
+    // PROCESSING signal — only look at the most recent screen frame so a
+    // stale `esc to interrupt` from a previous generation in the byte history
+    // doesn't keep us pinned in PROCESSING after Claude is done. The TUI
+    // redraws the bottom status line every ~1s; the last few KB cleanly
+    // covers the latest frame in practice.
+    const recentFrame = stripAnsi(buffer.slice(-3000));
+    if (recentFrame.includes('esc to interrupt')) return 'processing';
+
+    // WAITING signal — any prompt-mode footer hint.
     const PROMPT_MARKERS = [
-      'for shortcuts',
-      '? for help',
-      'shift+tab to cycle', // mode-cycle hint, present at the prompt in all modes
+      'shift+tab to cycle',
       'accept edits on',
       'plan mode on',
+      'for shortcuts',
+      '? for help',
     ];
     for (const marker of PROMPT_MARKERS) {
-      if (cleanedTail.includes(marker)) return true;
+      if (cleanedTail.includes(marker)) return 'waiting';
     }
 
-    // --- Pass 2: per-line strip for config patterns and prompt chars ---
-    const lines = rawTail.split('\r');
-    // Only check the last ~50 lines to keep it fast
-    const recentLines = lines.slice(-50);
-    const cleanedLines: string[] = [];
-    for (const line of recentLines) {
+    // Fallback: cleaned-line scan for prompt-character endings (e.g. `❯`).
+    const lines = rawTail.split('\r').slice(-50);
+    for (const line of lines) {
       const cleaned = stripAnsi(line).trim();
-      if (cleaned.length > 0) {
-        cleanedLines.push(cleaned);
+      if (cleaned.length === 0) continue;
+      if (/[❯›>]\s*$/.test(cleaned)) return 'waiting';
+    }
+
+    // Config-supplied patterns.
+    if (this.compiledPatterns.length > 0) {
+      const cleanedLines = lines
+        .map(l => stripAnsi(l).trim())
+        .filter(l => l.length > 0);
+      const cleanedText = cleanedLines.join('\n');
+      for (const pattern of this.compiledPatterns) {
+        if (pattern.test(cleanedText)) return 'waiting';
       }
     }
-    const cleanedText = cleanedLines.join('\n');
 
-    // Check compiled config patterns against cleaned lines
-    for (const pattern of this.compiledPatterns) {
-      if (pattern.test(cleanedText)) {
-        return true;
-      }
-    }
-
-    // Check for prompt character on a cleaned line
-    for (const line of cleanedLines) {
-      if (/[❯›>]\s*$/.test(line)) return true;
-    }
-
-    return false;
+    return 'unknown';
   }
 }
