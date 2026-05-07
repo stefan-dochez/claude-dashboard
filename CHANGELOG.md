@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.35.0]
+
+### Features
+
+- **Hook-based instance status detection** — Spawned Claude Code instances now report status changes back to the dashboard via Claude Code hooks (`UserPromptSubmit`, `Stop`, `Notification`) instead of relying purely on terminal output parsing. At spawn time, the backend writes the three hook entries into `<cwd>/.claude/settings.local.json` (merging into any existing settings), passing per-instance `CLAUDE_DASHBOARD_INSTANCE_ID`, `CLAUDE_DASHBOARD_PORT`, and `CLAUDE_DASHBOARD_TOKEN` env vars to the PTY. A bundled Node hook bridge (`packages/backend/scripts/claude-dashboard-hook.mjs`) reads the JSON payload Claude Code sends on stdin and POSTs it to a new `/api/hook` endpoint, authenticated with a per-process random 32-byte bearer token. The endpoint maps `UserPromptSubmit → processing`, `Stop → idle`, `Notification → waiting_input`, and updates the instance status, which is far more reliable than terminal markers (e.g. the spinner now turns on the instant a prompt is submitted, not 1 s later when `StatusMonitor` next ticks). The terminal parser stays in place as a fallback for older Claude Code versions or when hook injection fails. On instance kill (or backend exit), the injected hook entries are stripped from `settings.local.json`; if we created the file (no pre-existing settings) and it would now be empty, it is deleted entirely. The Electron build's `extraResources` now includes `backend/scripts/` so the hook bridge ships with the packaged app.
+
 ## [0.34.7]
 
 ### Fixes

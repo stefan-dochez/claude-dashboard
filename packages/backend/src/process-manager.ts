@@ -9,6 +9,7 @@ import { IS_WINDOWS, PATH_SEP, getExtraPaths, PTY_TERM_NAME } from './platform.j
 import { TIMEOUTS, LIMITS, PTY_DEFAULTS } from './constants.js';
 import { createLogger } from './logger.js';
 import { IdeMcpServer } from './ide-mcp-server.js';
+import { injectHooks, removeHooks, type InjectedHookHandle } from './hook-injector.js';
 
 const log = createLogger('process-manager');
 
@@ -116,6 +117,7 @@ interface PtyHandle {
   bufferSize: number;
   instance: Instance;
   inputLineBuffer: string;
+  hookHandle: InjectedHookHandle | null;
 }
 
 interface InstanceContext {
@@ -127,10 +129,25 @@ export class ProcessManager extends EventEmitter {
   private handles = new Map<string, PtyHandle>();
   private ideServers = new Map<string, IdeMcpServer>();
   private readonly claudeBinary: string;
+  private hookToken: string | null = null;
+  private hookPort: number | null = null;
 
   constructor(private config: AppConfig) {
     super();
     this.claudeBinary = resolveClaudeBinary();
+  }
+
+  /**
+   * Wire the hook callback channel. Must be called before any spawn for hook
+   * injection to take effect. Token authenticates POSTs back to /api/hook.
+   */
+  configureHookChannel(port: number, token: string): void {
+    this.hookPort = port;
+    this.hookToken = token;
+  }
+
+  getHookToken(): string | null {
+    return this.hookToken;
   }
 
   getIdeServer(instanceId: string): IdeMcpServer | undefined {
@@ -180,6 +197,19 @@ export class ProcessManager extends EventEmitter {
       log.warn(`IDE MCP server failed to start for ${id}; continuing without IDE integration: ${err instanceof Error ? err.message : String(err)}`);
     }
 
+    // Inject hooks so the spawned Claude POSTs status events to /api/hook.
+    // Falls back gracefully if the channel hasn't been configured (StatusMonitor
+    // still parses the terminal in that case).
+    let hookHandle: InjectedHookHandle | null = null;
+    if (this.hookPort !== null && this.hookToken !== null) {
+      hookHandle = await injectHooks(cwd);
+      if (hookHandle) {
+        env.CLAUDE_DASHBOARD_INSTANCE_ID = id;
+        env.CLAUDE_DASHBOARD_PORT = String(this.hookPort);
+        env.CLAUDE_DASHBOARD_TOKEN = this.hookToken;
+      }
+    }
+
     log.info(`Spawning ${this.claudeBinary} in ${cwd} (session ${sessionId}, resume=${!!options.resumeSessionId})`);
 
     const ptyProcess = pty.spawn(this.claudeBinary, args, {
@@ -213,6 +243,7 @@ export class ProcessManager extends EventEmitter {
       bufferSize: 0,
       instance,
       inputLineBuffer: '',
+      hookHandle,
     };
 
     this.handles.set(id, handle);
@@ -232,6 +263,11 @@ export class ProcessManager extends EventEmitter {
       if (srv) {
         this.ideServers.delete(id);
         srv.stop().catch(err => log.warn(`IDE server stop failed for ${id}: ${err instanceof Error ? err.message : err}`));
+      }
+      if (handle.hookHandle) {
+        const h = handle.hookHandle;
+        handle.hookHandle = null;
+        removeHooks(h).catch(err => log.warn(`Hook cleanup failed for ${id}: ${err instanceof Error ? err.message : err}`));
       }
     });
 

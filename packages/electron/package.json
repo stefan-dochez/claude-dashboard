@@ -1,7 +1,7 @@
 {
   "name": "@claude-dashboard/electron",
   "productName": "Claude Dashboard",
-  "version": "0.34.7",
+  "version": "0.35.0",
   "private": true,
   "description": "Desktop app for Claude Dashboard",
   "author": "Claude Dashboard",
@@ -33,6 +33,10 @@
       {
         "from": "../backend/dist",
         "to": "backend/dist"
+      },
+      {
+        "from": "../backend/scripts",
+        "to": "backend/scripts"
       },
       {
         "from": "../backend/package.json",

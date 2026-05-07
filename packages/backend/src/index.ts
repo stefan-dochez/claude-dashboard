@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs/promises';
 import path from 'path';
+import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -50,6 +51,9 @@ async function main(): Promise<void> {
 
   const scanner = new ProjectScanner(configService);
   const processManager = new ProcessManager(config);
+  // Wire the per-process hook channel: the bundled hook script POSTs status
+  // events back here, authenticated with this token.
+  processManager.configureHookChannel(PORT, randomBytes(32).toString('hex'));
   const statusMonitor = new StatusMonitor(processManager, config);
   const worktreeManager = new WorktreeManager();
   const taskStore = new TaskStore();

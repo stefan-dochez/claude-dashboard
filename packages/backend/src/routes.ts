@@ -10,6 +10,7 @@ import type { ConfigService } from './config.js';
 import type { PromptTemplate } from './config.js';
 import type { ProjectScanner } from './scanner.js';
 import type { ProcessManager } from './process-manager.js';
+import { eventToStatus } from './hook-injector.js';
 import type { StreamProcessManager } from './stream-process.js';
 import type { WorktreeManager } from './worktree-manager.js';
 import type { TaskStore } from './task-store.js';
@@ -102,6 +103,41 @@ export function createRoutes(
     const report = await runHealthCheck();
     res.json(report);
   }));
+
+  // Status hook — called by the bundled hook script that's injected into each
+  // spawned Claude Code instance's settings.local.json. Authenticated via a
+  // per-process token shared at spawn time.
+  router.post('/api/hook', (req, res) => {
+    const expectedToken = processManager.getHookToken();
+    if (!expectedToken) {
+      res.status(503).json({ error: 'Hook channel not configured' });
+      return;
+    }
+    const auth = req.header('authorization') ?? '';
+    const provided = auth.startsWith('Bearer ') ? auth.slice('Bearer '.length) : '';
+    if (provided !== expectedToken) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const { instanceId, event } = req.body as { instanceId?: string; event?: string };
+    if (!instanceId) {
+      res.status(400).json({ error: 'instanceId is required' });
+      return;
+    }
+    const status = eventToStatus(event);
+    if (!status) {
+      // Acknowledge unrecognized events so the hook script doesn't retry,
+      // but skip the status update.
+      res.json({ ok: true, ignored: true });
+      return;
+    }
+    if (!processManager.get(instanceId)) {
+      res.status(404).json({ error: `Instance ${instanceId} not found` });
+      return;
+    }
+    processManager.updateStatus(instanceId, status);
+    res.json({ ok: true });
+  });
 
   // Version — read from backend package.json at startup
   router.get('/api/version', (_req, res) => {

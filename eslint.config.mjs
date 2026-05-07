@@ -1,10 +1,20 @@
 import js from '@eslint/js';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default tseslint.config(
   { ignores: ['**/dist/', '**/node_modules/', 'packages/electron/'] },
+
+  // Node-side .mjs scripts (postinstall, hook bridges, etc.) — give them
+  // Node globals so process/fetch/setTimeout don't trigger no-undef.
+  {
+    files: ['**/scripts/**/*.mjs'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 
   // Base JS recommended rules
   js.configs.recommended,
