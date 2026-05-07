@@ -81,27 +81,53 @@ export default function TerminalView({ instanceId, terminalTheme, onTypingChange
     // Handle user input — track typing state. The badge clears on Enter, on
     // Escape (Claude Code uses Esc to cancel/clear the prompt), or after a
     // short inactivity timeout so it never stays stuck if the user navigates
-    // away from the input without submitting.
+    // away from the input without submitting.  We must ignore data that is a
+    // pure control sequence (CSI like `\x1b[I` for focus-in, `\x1b[A` for
+    // arrows, bracketed-paste markers `\x1b[200~`/`\x1b[201~`, …) since their
+    // payload contains printable bytes that would otherwise trip the lock.
     let typingIdleTimer: ReturnType<typeof setTimeout> | undefined;
     const TYPING_IDLE_MS = 4000;
+
+    // Strip ANSI/CSI escape sequences and bracketed-paste markers so the
+    // remaining string represents only the characters the *user* typed.
+    const stripEscapes = (s: string): string =>
+      s
+        .replace(/\x1b\[[\d;?]*[a-zA-Z~]/g, '') // CSI sequences (cursor, focus, modes, paste markers)
+        .replace(/\x1b[NOP_\\\]^X]/g, '')       // SS2/SS3/DCS/APC/etc. introducers
+        .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '') // OSC sequences
+        .replace(/\x1b/g, '');                  // any leftover bare ESCs in compound payloads
+
     term.onData(data => {
       socket.emit('terminal:input', { instanceId: currentInstanceId, data });
       onInputRef.current?.(data);
 
-      if (onTypingChange) {
-        // Enter/return or a bare Escape (\x1b) releases typing lock
-        if (data.includes('\r') || data.includes('\n') || data === '\x1b') {
-          clearTimeout(typingIdleTimer);
-          onTypingChange(false);
-        } else {
-          // Any printable character sets typing lock and arms an idle timer
-          const hasPrintable = data.split('').some(ch => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) < 127);
-          if (hasPrintable) {
-            onTypingChange(true);
-            clearTimeout(typingIdleTimer);
-            typingIdleTimer = setTimeout(() => onTypingChange(false), TYPING_IDLE_MS);
-          }
-        }
+      if (!onTypingChange) return;
+
+      // Bare Escape — Claude Code cancel binding. Clears the lock.
+      if (data === '\x1b') {
+        clearTimeout(typingIdleTimer);
+        onTypingChange(false);
+        return;
+      }
+
+      // Any data that is *only* a control sequence (focus events, arrows,
+      // function keys, paste markers without a body, …) must not touch the
+      // typing state.
+      const userText = stripEscapes(data);
+      if (userText.length === 0) return;
+
+      // Enter/return inside the user-typed payload releases the lock.
+      if (userText.includes('\r') || userText.includes('\n')) {
+        clearTimeout(typingIdleTimer);
+        onTypingChange(false);
+        return;
+      }
+
+      const hasPrintable = userText.split('').some(ch => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) < 127);
+      if (hasPrintable) {
+        onTypingChange(true);
+        clearTimeout(typingIdleTimer);
+        typingIdleTimer = setTimeout(() => onTypingChange(false), TYPING_IDLE_MS);
       }
     });
 

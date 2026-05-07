@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.34.3]
+
+### Fixes
+
+- **Terminal "typing" badge no longer triggers on focus events, arrow keys, or other ANSI control sequences** — v0.34.2 still left the badge flipping on whenever the terminal got focus and Claude Code had focus reporting enabled (DECSET 1004): xterm sends `\x1b[I` on focus-in and `\x1b[O` on focus-out, both of which contain printable bytes (`[`, `I`/`O`) that the previous heuristic counted as a keystroke. Same story for arrow keys (`\x1b[A`–`D`), function keys, bracketed-paste markers, OSC sequences, etc. The `term.onData` handler now strips CSI / OSC / SS2-SS3 / DCS escape sequences from the payload before deciding whether the *user* typed a printable character, and only then arms the lock and the 4 s idle timer. A bare `\x1b` is still treated as Claude Code's Esc-cancel and clears the badge immediately.
+
 ## [0.34.2]
 
 ### Fixes
