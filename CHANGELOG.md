@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.34.4]
+
+### Fixes
+
+- **Top-bar `processing` spinner no longer stays stuck after Claude finishes** — `StatusMonitor.checkForPrompt` searched the *raw* PTY tail for hint substrings like `shift+tab to cycle`. Claude Code's TUI styles the hints with inline color codes (`shift\x1b[2m+\x1b[22mtab to cycle`) and redraws the screen via cursor-positioning escapes, so the literal substring frequently never appeared in the byte stream and the prompt detection returned false → status stayed at `processing` and the blue `Loader2` in the header kept spinning even though the session was at the prompt. The cleaned tail (`stripAnsi(rawTail)`) is now searched first; the marker list was also extended with `accept edits on` and `plan mode on` (additional footer hints visible alongside `shift+tab to cycle`), and `esc to interrupt` was removed from the markers since it only appears *during* generation and was a false-positive source in the opposite direction.
+
 ## [0.34.3]
 
 ### Fixes

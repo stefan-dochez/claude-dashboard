@@ -112,23 +112,28 @@ export class StatusMonitor {
     if (buffer.length === 0) return false;
 
     // Claude Code's TUI redraws the entire screen via cursor-positioning
-    // escape sequences.  Stripping ANSI from a contiguous tail produces
-    // mostly whitespace because the positioning info is lost.
-    //
-    // Two-pass approach:
-    //   1. Search the RAW buffer for known text markers — they are present
-    //      in the byte stream even interleaved with escape sequences.
-    //   2. Fallback: split by \r (carriage return = line redraws), strip
-    //      ANSI per line, and check the resulting cleaned lines.
+    // escape sequences and interleaves color/style codes inside hint
+    // strings (e.g. "shift\x1b[2m+\x1b[22mtab to cycle"), which is why a
+    // raw `includes('shift+tab to cycle')` against the byte stream is
+    // unreliable.  We strip ANSI from the tail *first* and search the
+    // cleaned text — that handles both the TUI-redraw case and the
+    // styled-substring case.
     const rawTail = buffer.slice(-20000);
+    const cleanedTail = stripAnsi(rawTail);
 
-    // --- Pass 1: raw substring search (fast, handles TUI redraws) ---
-    if (rawTail.includes('for shortcuts')) return true;
-    if (rawTail.includes('? for help')) return true;
-    if (rawTail.includes('esc to interrupt')) return true;
-    // Mode-cycle hint in the footer — present at the prompt in all modes
-    // (default / accept-edits / plan), disappears during generation.
-    if (rawTail.includes('shift+tab to cycle')) return true;
+    // --- Pass 1: substring search on the cleaned tail ---
+    // "esc to interrupt" only appears WHILE Claude is generating, so it is
+    // intentionally excluded from the prompt markers.
+    const PROMPT_MARKERS = [
+      'for shortcuts',
+      '? for help',
+      'shift+tab to cycle', // mode-cycle hint, present at the prompt in all modes
+      'accept edits on',
+      'plan mode on',
+    ];
+    for (const marker of PROMPT_MARKERS) {
+      if (cleanedTail.includes(marker)) return true;
+    }
 
     // --- Pass 2: per-line strip for config patterns and prompt chars ---
     const lines = rawTail.split('\r');
