@@ -230,10 +230,11 @@ function UserQuestionPrompt({ question, onAnswer }: {
 
 // --------------- Selectors ---------------
 
+// CLI aliases resolve to the latest version of each model — no pinned IDs to keep up to date
 const MODEL_OPTIONS = [
-  { value: 'claude-opus-4-6', label: 'Opus', badge: 'default' },
-  { value: 'claude-sonnet-4-6', label: 'Sonnet', badge: null },
-  { value: 'claude-haiku-4-5-20251001', label: 'Haiku', badge: null },
+  { value: 'opus', label: 'Opus', badge: 'default' },
+  { value: 'sonnet', label: 'Sonnet', badge: null },
+  { value: 'haiku', label: 'Haiku', badge: null },
 ] as const;
 
 const PERMISSION_OPTIONS = [
@@ -415,7 +416,7 @@ export default function ChatView({
   }, [pendingTemplateContent, onClearPendingTemplate]);
 
   // Selectors
-  const [selectedModel, setSelectedModel] = useState(initialModel ?? 'claude-opus-4-6');
+  const [selectedModel, setSelectedModel] = useState(initialModel ?? 'opus');
   const [permissionMode, setPermissionMode] = useState(initialPermissionMode ?? 'default');
   const [effortLevel, setEffortLevel] = useState(initialEffort ?? 'high');
 

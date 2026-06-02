@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.36.1]
+
+### Fixes
+
+- **Chat mode model selector no longer pinned to Opus 4.6** — `MODEL_OPTIONS` in `ChatView.tsx` hardcoded specific model IDs (`claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`), so chat instances could never use a newer model release (e.g. Opus 4.9). The selector now uses the CLI aliases `opus` / `sonnet` / `haiku`, which always resolve to the latest version of each model — same pattern `title-generator.ts` already used with `--model haiku`. Existing chats keep their stored pinned ID until the model is re-selected from the dropdown; new chats default to the latest Opus.
+
 ## [0.36.0]
 
 ### Features
