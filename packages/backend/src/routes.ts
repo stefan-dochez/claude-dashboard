@@ -13,6 +13,7 @@ import type { ProcessManager } from './process-manager.js';
 import { eventToStatus } from './hook-injector.js';
 import type { StreamProcessManager } from './stream-process.js';
 import type { WorktreeManager } from './worktree-manager.js';
+import type { WorkspaceManager, WorkspaceRepoSpec } from './workspace-manager.js';
 import type { TaskStore } from './task-store.js';
 import type { IdeService, IdeType } from './ide-service.js';
 import type { PrAggregator } from './pr-aggregator.js';
@@ -87,6 +88,7 @@ export function createRoutes(
   processManager: ProcessManager,
   streamProcess: StreamProcessManager,
   worktreeManager: WorktreeManager,
+  workspaceManager: WorkspaceManager,
   taskStore: TaskStore,
   appVersion: string,
   ideService: IdeService,
@@ -579,6 +581,75 @@ export function createRoutes(
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(cleanText);
   });
+
+  // Workspaces — a plain folder inside a scan path grouping repo clones +
+  // a generated CLAUDE.md. The scanner picks it up as `type: 'workspace'`.
+  // Clones run in the background after the response; per-repo progress is
+  // streamed over the socket as `workspace:progress`, and `workspace:done`
+  // fires once all clones finished and the scanner has been refreshed.
+  const cloneInBackground = (workspacePath: string, repos: WorkspaceRepoSpec[]): void => {
+    workspaceManager.cloneRepos(workspacePath, repos)
+      .then(async results => {
+        try {
+          await scanner.refresh();
+        } catch (err) {
+          log.warn('Scanner refresh after workspace clone failed:', err);
+        }
+        io.emit('workspace:done', { workspacePath, results });
+      })
+      .catch(err => {
+        log.error(`Workspace clone batch failed for ${workspacePath}:`, err);
+        io.emit('workspace:done', {
+          workspacePath,
+          results: [],
+          error: err instanceof Error ? err.message : 'Clone failed',
+        });
+      });
+  };
+
+  router.post('/api/workspaces', asyncHandler(async (req, res) => {
+    const { name, parentPath, repos } = req.body as {
+      name?: string;
+      parentPath?: string;
+      repos?: WorkspaceRepoSpec[];
+    };
+    if (!name || !parentPath) {
+      res.status(400).json({ error: 'name and parentPath are required' });
+      return;
+    }
+    const workspacePath = await workspaceManager.create({ name, parentPath, repos: repos ?? [] });
+    res.status(201).json({ workspacePath });
+    cloneInBackground(workspacePath, repos ?? []);
+  }));
+
+  router.post('/api/workspaces/repos', asyncHandler(async (req, res) => {
+    const { workspacePath, repos } = req.body as {
+      workspacePath?: string;
+      repos?: WorkspaceRepoSpec[];
+    };
+    if (!workspacePath || !repos || repos.length === 0) {
+      res.status(400).json({ error: 'workspacePath and repos are required' });
+      return;
+    }
+    // Validate before answering — the clones themselves run in the background.
+    await workspaceManager.assertWorkspace(workspacePath);
+    res.status(202).json({ ok: true });
+    cloneInBackground(workspacePath, repos);
+  }));
+
+  router.delete('/api/workspaces/repos', asyncHandler(async (req, res) => {
+    const { workspacePath, repoName } = req.body as {
+      workspacePath?: string;
+      repoName?: string;
+    };
+    if (!workspacePath || !repoName) {
+      res.status(400).json({ error: 'workspacePath and repoName are required' });
+      return;
+    }
+    await workspaceManager.removeRepo(workspacePath, repoName);
+    refreshProjectsInBackground(scanner);
+    res.json({ ok: true });
+  }));
 
   // Worktrees
   router.delete('/api/worktrees', asyncHandler(async (req, res) => {

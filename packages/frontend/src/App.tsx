@@ -27,6 +27,7 @@ import ToastContainer from './components/ToastContainer';
 import StashConfirmModal from './components/StashConfirmModal';
 import WhatsNewModal, { type ChangelogEntry } from './components/WhatsNewModal';
 import ForkToWorktreeModal from './components/ForkToWorktreeModal';
+import WorkspaceModal from './components/WorkspaceModal';
 import type { Instance } from './types';
 import { useProjects } from './hooks/useProjects';
 import { useInstances } from './hooks/useInstances';
@@ -82,6 +83,8 @@ export default function App() {
   const [costDashboardOpen, setCostDashboardOpen] = useState(false);
   const [prViewProject, setPrViewProject] = useState<{ path: string; name: string } | null>(null);
   const [whatsNew, setWhatsNew] = useState<{ currentVersion: string; previousVersion: string | null; entries: ChangelogEntry[] } | null>(null);
+  // Workspace modal — create a new workspace or manage an existing one's repos.
+  const [workspaceModal, setWorkspaceModal] = useState<{ mode: 'create' } | { mode: 'manage'; workspacePath: string } | null>(null);
   // Source instance for the Fork-to-worktree modal. null = modal closed.
   const [forkSource, setForkSource] = useState<Instance | null>(null);
   // Ephemeral filiation map: forked-instance-id → source-instance-id. Lost on app restart.
@@ -490,6 +493,14 @@ export default function App() {
     }
   }, [installedIdes, openInIde, addToast]);
 
+  const handleNewWorkspace = useCallback(() => {
+    setWorkspaceModal({ mode: 'create' });
+  }, []);
+
+  const handleManageWorkspace = useCallback((workspacePath: string) => {
+    setWorkspaceModal({ mode: 'manage', workspacePath });
+  }, []);
+
   const handleViewPrs = useCallback((projectPath: string) => {
     const project = projects.find(p => p.path === projectPath);
     setPrViewProject({ path: projectPath, name: project?.name ?? projectPath.split('/').pop() ?? projectPath });
@@ -815,6 +826,8 @@ export default function App() {
           onDeleteWorktree={handleDeleteWorktree}
           onToggleFavorite={handleToggleFavorite}
           onToggleMeta={handleToggleMeta}
+          onNewWorkspace={handleNewWorkspace}
+          onManageWorkspace={handleManageWorkspace}
           onPullProject={handlePullProject}
           onPullAll={handlePullAll}
           onCheckoutDefault={handleCheckoutDefault}
@@ -1221,6 +1234,20 @@ export default function App() {
             handleCheckoutDefault(projectPath, true);
           }}
           onCancel={() => setStashConfirm(null)}
+        />
+      )}
+
+      {workspaceModal && (
+        <WorkspaceModal
+          mode={workspaceModal.mode}
+          workspace={workspaceModal.mode === 'manage'
+            ? projects.find(p => p.path === workspaceModal.workspacePath)
+            : undefined}
+          projects={projects}
+          scanPaths={config?.scanPaths ?? []}
+          onClose={() => setWorkspaceModal(null)}
+          onChanged={refreshProjects}
+          addToast={addToast}
         />
       )}
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, GitBranch, GitPullRequest, Play, Power, RotateCcw, Star, Trash2, Terminal, MessageSquare, Layers, Code2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitBranch, GitPullRequest, Play, Power, RotateCcw, Star, Trash2, Terminal, MessageSquare, Layers, Code2, FolderCog } from 'lucide-react';
 import LaunchModal from './LaunchModal';
 import WorktreeResumeModal from './WorktreeResumeModal';
 import { useSidebarActions } from '../hooks/useSidebarActions';
@@ -48,7 +48,7 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
     instancesByProject, selectedInstanceId, favoriteProjects, prCounts, branchStatuses,
     history, onResumeHistory,
     onSelectInstance, onKillInstance, onDismissInstance, onLaunch,
-    onDeleteWorktree, onToggleFavorite, onToggleMeta, onCheckoutDefault, onRefreshProjects,
+    onDeleteWorktree, onToggleFavorite, onToggleMeta, onCheckoutDefault, onManageWorkspace, onRefreshProjects,
     onOpenInIde, onViewPrs, installedIdes,
   } = useSidebarActions();
 
@@ -130,6 +130,15 @@ export default function ProjectRow({ project, worktrees, showWorkspace }: Projec
         )}
 
         <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-elevated/80 px-0.5 opacity-0 transition-opacity group-hover/row:opacity-100">
+          {project.type === 'workspace' && (
+            <span
+              onClick={e => { e.stopPropagation(); onManageWorkspace(project.path); }}
+              className="rounded p-0.5 text-faint transition-colors hover:text-cyan-400"
+              title="Manage workspace repos"
+            >
+              <FolderCog className="h-3 w-3" />
+            </span>
+          )}
           {project.type !== 'workspace' && (
             <span
               onClick={e => { e.stopPropagation(); onViewPrs(project.path); }}

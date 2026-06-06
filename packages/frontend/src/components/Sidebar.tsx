@@ -1,4 +1,4 @@
-import { RefreshCw, Settings, Download, ChevronDown, ChevronRight, Search, Loader2, Terminal, MessageSquare, Play, Star, Clock, X, Layers, Box } from 'lucide-react';
+import { RefreshCw, Settings, Download, ChevronDown, ChevronRight, Search, Loader2, Terminal, MessageSquare, Play, Star, Clock, X, Layers, Box, FolderPlus } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { usePlatform } from '../hooks/usePlatform';
@@ -27,6 +27,8 @@ interface SidebarProps {
   onDeleteWorktree: (projectPath: string, worktreePath: string) => void;
   onToggleFavorite: (projectPath: string) => void;
   onToggleMeta: (projectPath: string) => void;
+  onNewWorkspace: () => void;
+  onManageWorkspace: (projectPath: string) => void;
   onPullProject: (projectPath: string) => void;
   onPullAll: () => void;
   onCheckoutDefault: (projectPath: string) => void;
@@ -46,7 +48,7 @@ export default function Sidebar({
   projects, projectsLoading, projectsRefreshing, instances, selectedInstanceId,
   scanPaths, favoriteProjects, pullingProjects: _pullingProjects, checkingOutProjects: _checkingOutProjects, pullingAll, queuedIds: _queuedIds,
   onRefreshProjects, onLaunchProject, onSelectInstance, onKillInstance, onDismissInstance,
-  onDeleteWorktree, onToggleFavorite, onToggleMeta, onPullProject: _onPullProject, onPullAll, onCheckoutDefault,
+  onDeleteWorktree, onToggleFavorite, onToggleMeta, onNewWorkspace, onManageWorkspace, onPullProject: _onPullProject, onPullAll, onCheckoutDefault,
   onOpenInIde, onViewPrs, installedIdes,
   onOpenScanPaths,
   addToast,
@@ -299,6 +301,7 @@ export default function Sidebar({
     onToggleFavorite,
     onToggleMeta,
     onCheckoutDefault,
+    onManageWorkspace,
     onOpenInIde,
     onViewPrs,
     installedIdes,
@@ -311,7 +314,7 @@ export default function Sidebar({
     history,
     onResumeHistory: handleResume,
     addToast,
-  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onCheckoutDefault, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, branchStatuses, history, handleResume, addToast]);
+  }), [onSelectInstance, onKillInstance, onDismissInstance, onLaunchProject, onDeleteWorktree, onToggleFavorite, onToggleMeta, onCheckoutDefault, onManageWorkspace, onOpenInIde, onViewPrs, installedIdes, onRefreshProjects, selectedInstanceId, favoriteProjects, instancesByProject, prCounts, branchStatuses, history, handleResume, addToast]);
 
   const renderProject = useCallback((project: Project) => (
     <ProjectRow
@@ -359,6 +362,9 @@ export default function Sidebar({
               className="w-full rounded bg-elevated/40 py-1 pl-7 pr-2 text-[12px] text-secondary placeholder-placeholder outline-none transition-colors focus:bg-elevated"
             />
           </div>
+          <button onClick={onNewWorkspace} className="rounded p-1 text-faint transition-colors hover:bg-elevated/30 hover:text-cyan-400" title="New workspace — group repo clones with a CLAUDE.md">
+            <FolderPlus className="h-3 w-3" />
+          </button>
           <button onClick={onOpenScanPaths} className="rounded p-1 text-faint transition-colors hover:bg-elevated/30 hover:text-tertiary" title="Settings">
             <Settings className="h-3 w-3" />
           </button>

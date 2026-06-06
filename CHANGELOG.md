@@ -2,6 +2,13 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.37.0]
+
+### Features
+
+- **Create and manage workspaces from the UI** — New `FolderPlus` button in the sidebar opens a Workspace modal: pick a name, a parent scan path, and the repos to include — either from already-scanned projects (cloned from their `origin` remote, now exposed as `remoteUrl` by the scanner) or from free-form git URLs. The backend (`WorkspaceManager`) creates a plain folder (no `.git`) with a generated `CLAUDE.md` and clones each repo sequentially in the background via `execFile` (no shell — clone URLs can't be interpreted as shell syntax), streaming per-repo progress over socket.io (`workspace:progress` / `workspace:done`). One failed clone doesn't block the others. The scanner picks the result up as `type: 'workspace'`, so it lands in the existing Workspaces sidebar section, ready to launch a Claude instance at its root.
+- **Manage workspace repos after creation** — Workspace rows get a `FolderCog` hover action opening the same modal in manage mode: add repos (same picker + URL input, with live clone progress) or delete a clone (inline two-step confirmation; only directories containing `.git` can be deleted). The `## Repositories` table in `CLAUDE.md` is kept in sync from what's actually on disk between `<!-- dashboard:repos -->` markers — manual edits outside the markers survive. Guard rails on every endpoint: workspace name validated against path traversal, parent must be a configured scan path, target must be a workspace (not a git repo).
+
 ## [0.36.1]
 
 ### Fixes

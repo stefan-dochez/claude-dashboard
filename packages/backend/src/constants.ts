@@ -11,6 +11,8 @@ export const TIMEOUTS = {
   GIT_SHORT: 5000,
   /** Timeout for git fetch / clone / worktree add */
   GIT_LONG: 30000,
+  /** Timeout for a full git clone of a workspace repo */
+  GIT_CLONE: 10 * 60 * 1000,
   /** Timeout for git push */
   GIT_PUSH: 60000,
   /** Timeout for GitHub CLI commands (gh pr view, gh pr create) */

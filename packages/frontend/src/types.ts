@@ -9,11 +9,25 @@ export interface Project {
   name: string;
   path: string;
   gitBranch: string | null;
+  remoteUrl: string | null;
   hasClaudeMd: boolean;
   lastModified: string;
   isWorktree: boolean;
   type: ProjectType;
   parentProject?: string;
+}
+
+export interface WorkspaceProgressEvent {
+  workspacePath: string;
+  repo: string;
+  status: 'cloning' | 'done' | 'error';
+  error?: string;
+}
+
+export interface WorkspaceDoneEvent {
+  workspacePath: string;
+  results: Array<{ name: string; url: string; status: 'done' | 'error'; error?: string }>;
+  error?: string;
 }
 
 export type CiState = 'success' | 'failure' | 'running' | 'neutral';

@@ -11,6 +11,7 @@ import { ProjectScanner } from './scanner.js';
 import { ProcessManager } from './process-manager.js';
 import { StatusMonitor } from './status-monitor.js';
 import { WorktreeManager } from './worktree-manager.js';
+import { WorkspaceManager } from './workspace-manager.js';
 import { StreamProcessManager } from './stream-process.js';
 import { TaskStore } from './task-store.js';
 import { createRoutes } from './routes.js';
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
   processManager.configureHookChannel(PORT, randomBytes(32).toString('hex'));
   const statusMonitor = new StatusMonitor(processManager, config);
   const worktreeManager = new WorktreeManager();
+  const workspaceManager = new WorkspaceManager(configService);
   const taskStore = new TaskStore();
   await taskStore.load();
   const streamProcess = new StreamProcessManager(config);
@@ -87,7 +89,7 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Routes
-  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, taskStore, appVersion, ideService, prAggregator, ciStatusService, updateChecker, pluginsManager, io);
+  const routes = createRoutes(configService, scanner, processManager, streamProcess, worktreeManager, workspaceManager, taskStore, appVersion, ideService, prAggregator, ciStatusService, updateChecker, pluginsManager, io);
   app.use(routes);
 
   // In production, serve the frontend static files
@@ -99,6 +101,11 @@ async function main(): Promise<void> {
       res.sendFile(path.join(frontendPath, 'index.html'));
     });
   }
+
+  // Relay per-repo clone progress to all clients
+  workspaceManager.on('progress', (event) => {
+    io.emit('workspace:progress', event);
+  });
 
   // WebSocket
   const socketOptions = { generateTitles: config.generateTitles };

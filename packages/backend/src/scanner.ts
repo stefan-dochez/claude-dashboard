@@ -34,6 +34,7 @@ interface Project {
   name: string;
   path: string;
   gitBranch: string | null;
+  remoteUrl: string | null;
   hasClaudeMd: boolean;
   lastModified: Date;
   isWorktree: boolean;
@@ -191,6 +192,7 @@ export class ProjectScanner {
   private async buildProject(projectPath: string, parentProject?: string, projectType: ProjectType = 'repo'): Promise<Project> {
     const name = path.basename(projectPath);
     const gitBranch = projectType === 'workspace' ? null : await this.getGitBranch(projectPath);
+    const remoteUrl = projectType === 'workspace' ? null : await this.getRemoteUrl(projectPath);
     const hasClaudeMd = await fs.access(path.join(projectPath, 'CLAUDE.md')).then(() => true).catch(() => false);
     const lastModified = await this.getLastModified(projectPath);
     const isWorktree = parentProject !== undefined || await this.isGitWorktree(projectPath);
@@ -199,6 +201,7 @@ export class ProjectScanner {
       name,
       path: projectPath,
       gitBranch,
+      remoteUrl,
       hasClaudeMd,
       lastModified,
       isWorktree,
@@ -225,6 +228,20 @@ export class ProjectScanner {
       });
       const branch = stdout.trim();
       return branch || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getRemoteUrl(dir: string): Promise<string | null> {
+    try {
+      const { stdout } = await execAsync('git remote get-url origin', {
+        cwd: dir,
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      const url = stdout.trim();
+      return url || null;
     } catch {
       return null;
     }

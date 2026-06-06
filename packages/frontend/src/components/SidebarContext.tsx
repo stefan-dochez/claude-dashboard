@@ -17,6 +17,8 @@ interface SidebarActions {
   onToggleFavorite: (projectPath: string) => void;
   onToggleMeta: (projectPath: string) => void;
   onCheckoutDefault: (projectPath: string) => void;
+  /** Open the workspace modal in manage mode for a `workspace` project. */
+  onManageWorkspace: (projectPath: string) => void;
   onOpenInIde: (projectPath: string) => void;
   onViewPrs: (projectPath: string) => void;
   installedIdes: IdeInfo[];
