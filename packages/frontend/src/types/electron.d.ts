@@ -3,6 +3,8 @@ export interface UpdateStatus { phase: 'downloading' | 'preparing' | 'installing
 
 export interface ElectronAPI {
   isElectron: true;
+  /** Native folder picker. Optional: older installed app shells may not expose it. */
+  selectDirectory?: (defaultPath?: string) => Promise<string | null>;
   update: {
     install: (assetUrl: string, assetName: string) => Promise<void>;
     onProgress: (cb: (p: UpdateProgress) => void) => () => void;

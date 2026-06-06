@@ -307,6 +307,21 @@ function registerUpdateIpc() {
   });
 }
 
+// --------------- Dialog IPC ---------------
+
+function registerDialogIpc() {
+  // Native folder picker — used by the frontend for scan paths and
+  // workspace locations instead of a free-form text input.
+  ipcMain.handle('dialog:select-directory', async (_e, args?: { defaultPath?: string }) => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: args?.defaultPath ?? os.homedir(),
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+}
+
 // --------------- App lifecycle ---------------
 
 function isPortInUse(port: number): Promise<boolean> {
@@ -326,6 +341,7 @@ app.whenReady().then(async () => {
 
   setupMenu();
   registerUpdateIpc();
+  registerDialogIpc();
 
   const backendAlreadyRunning = await isPortInUse(BACKEND_PORT);
   log(`Backend already running: ${backendAlreadyRunning}`);

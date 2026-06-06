@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, X, Plus, Layers } from 'lucide-react';
+import { Settings, X, Plus, Layers, FolderOpen } from 'lucide-react';
+import DirectoryPickerModal from './DirectoryPickerModal';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useDirectoryPicker } from '../hooks/useDirectoryPicker';
 
 interface ScanPathsModalProps {
   scanPaths: string[];
@@ -15,6 +17,7 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
   const modalRef = useFocusTrap<HTMLDivElement>();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const metaInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const { pick, fallbackOpen, onFallbackSelect, closeFallback } = useDirectoryPicker();
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -62,6 +65,7 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
   };
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={onClose}
@@ -99,8 +103,15 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
                 value={path}
                 onChange={e => handleChange(index, e.target.value)}
                 placeholder="~/projects"
-                className="flex-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
+                className="min-w-0 flex-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
               />
+              <button
+                onClick={() => pick(dir => handleChange(index, dir))}
+                className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-cyan-400"
+                title="Browse folders"
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+              </button>
               <button
                 onClick={() => handleRemove(index)}
                 className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-red-400"
@@ -138,8 +149,15 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
                 value={meta}
                 onChange={e => handleChangeMeta(index, e.target.value)}
                 placeholder="~/dev/my-meta-repo"
-                className="flex-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                className="min-w-0 flex-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
               />
+              <button
+                onClick={() => pick(dir => handleChangeMeta(index, dir))}
+                className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-violet-400"
+                title="Browse folders"
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+              </button>
               <button
                 onClick={() => handleRemoveMeta(index)}
                 className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-red-400"
@@ -175,5 +193,13 @@ export default function ScanPathsModal({ scanPaths, metaProjects, onSave, onClos
         </div>
       </div>
     </div>
+
+    {fallbackOpen && (
+      <DirectoryPickerModal
+        onSelect={onFallbackSelect}
+        onClose={closeFallback}
+      />
+    )}
+    </>
   );
 }

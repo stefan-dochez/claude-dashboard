@@ -20,6 +20,8 @@ function on<T>(channel: string, cb: (payload: T) => void): Unsubscribe {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
+  selectDirectory: (defaultPath?: string): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:select-directory', { defaultPath }),
   update: {
     install: (assetUrl: string, assetName: string): Promise<void> =>
       ipcRenderer.invoke('update:install', { assetUrl, assetName }),

@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Box, X, Search, Loader2, Check, AlertCircle, Trash2, GitBranch } from 'lucide-react';
+import { Box, X, Search, Loader2, Check, AlertCircle, Trash2, GitBranch, FolderOpen } from 'lucide-react';
+import DirectoryPickerModal from './DirectoryPickerModal';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useSocketEvent } from '../hooks/useSocket';
 import { usePlatform } from '../hooks/usePlatform';
+import { useDirectoryPicker } from '../hooks/useDirectoryPicker';
 import type { Project, WorkspaceProgressEvent, WorkspaceDoneEvent } from '../types';
 import type { Toast } from '../hooks/useToasts';
 
@@ -44,6 +46,7 @@ export default function WorkspaceModal({
 }: WorkspaceModalProps) {
   const modalRef = useFocusTrap<HTMLDivElement>();
   const { shortenPath } = usePlatform();
+  const { pick, fallbackOpen, onFallbackSelect, closeFallback } = useDirectoryPicker();
 
   const [phase, setPhase] = useState<'form' | 'cloning'>('form');
   const [name, setName] = useState('');
@@ -205,6 +208,7 @@ export default function WorkspaceModal({
     : repoCount > 0 && !submitting;
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={onClose}
@@ -288,13 +292,22 @@ export default function WorkspaceModal({
                 </select>
                 {parentPath === '__custom__' && (
                   <>
-                    <input
-                      type="text"
-                      value={customParent}
-                      onChange={e => setCustomParent(e.target.value)}
-                      placeholder="~/Workspaces"
-                      className="mb-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
-                    />
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={customParent}
+                        onChange={e => setCustomParent(e.target.value)}
+                        placeholder="~/Workspaces"
+                        className="min-w-0 flex-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
+                      />
+                      <button
+                        onClick={() => pick(setCustomParent)}
+                        className="shrink-0 rounded-md border border-border-input bg-elevated p-2 text-muted transition-colors hover:border-border-focus hover:text-cyan-400"
+                        title="Browse folders"
+                      >
+                        <FolderOpen className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <p className="mb-1.5 text-[11px] text-faint">
                       The folder must exist. It will be added to your scan paths so the workspace shows up in the sidebar.
                     </p>
@@ -414,5 +427,14 @@ export default function WorkspaceModal({
         )}
       </div>
     </div>
+
+    {fallbackOpen && (
+      <DirectoryPickerModal
+        title="Workspace location"
+        onSelect={onFallbackSelect}
+        onClose={closeFallback}
+      />
+    )}
+    </>
   );
 }

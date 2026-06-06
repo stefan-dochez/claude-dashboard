@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.38.0]
+
+### Features
+
+- **Folder picker for paths everywhere** — Free-form path inputs gain a browse button: the workspace "Other folder…" location, every Scan Path row, and every Monorepo row in Settings. In the Electron app it opens the native macOS folder dialog (`dialog.showOpenDialog` with `openDirectory` + `createDirectory`, exposed as `window.electronAPI.selectDirectory` via a new `dialog:select-directory` IPC handler). In browser mode it falls back to a new in-app `DirectoryPickerModal` — subfolder navigation, parent button, "Select this folder" — backed by `GET /api/fs/dirs`, which lists subdirectories and is restricted to the user's home subtree (path traversal rejected). The shared `useDirectoryPicker` hook picks native vs fallback automatically; the fallback renders above the parent modal and its Escape/backdrop clicks don't close the modal underneath.
+
 ## [0.37.1]
 
 ### Features

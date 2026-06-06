@@ -1391,6 +1391,28 @@ export function createRoutes(
     }
   });
 
+  // Directory browser — list subdirectories for the in-app folder picker
+  // (browser fallback when the native Electron dialog isn't available).
+  // Restricted to the user's home subtree; not gated on scan paths since its
+  // purpose is precisely to pick NEW locations.
+  router.get('/api/fs/dirs', asyncHandler(async (req, res) => {
+    const raw = (req.query.path as string | undefined) ?? '~';
+    const home = os.homedir();
+    const resolved = path.resolve(raw.replace(/^~/, home));
+    if (resolved !== home && !resolved.startsWith(home + path.sep)) {
+      res.status(403).json({ error: 'Access denied: path outside home directory' });
+      return;
+    }
+    const fsPromises = await import('fs/promises');
+    const entries = await fsPromises.readdir(resolved, { withFileTypes: true });
+    const dirs = entries
+      .filter(e => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules')
+      .map(e => ({ name: e.name, path: path.join(resolved, e.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const parent = resolved === home ? null : path.dirname(resolved);
+    res.json({ path: resolved, parent, dirs });
+  }));
+
   // File explorer — list directory contents
   router.get('/api/files', asyncHandler(async (req, res) => {
     const dirPath = req.query.path as string | undefined;
