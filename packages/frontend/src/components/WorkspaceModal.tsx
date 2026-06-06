@@ -47,7 +47,8 @@ export default function WorkspaceModal({
 
   const [phase, setPhase] = useState<'form' | 'cloning'>('form');
   const [name, setName] = useState('');
-  const [parentPath, setParentPath] = useState(scanPaths[0] ?? '');
+  const [parentPath, setParentPath] = useState(scanPaths[0] ?? '__custom__');
+  const [customParent, setCustomParent] = useState('');
   const [filter, setFilter] = useState('');
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [urlsText, setUrlsText] = useState('');
@@ -109,6 +110,8 @@ export default function WorkspaceModal({
 
   const repoCount = selectedPaths.size + urlsText.split('\n').filter(l => l.trim()).length;
 
+  const effectiveParent = parentPath === '__custom__' ? customParent.trim() : parentPath;
+
   const handleSubmit = useCallback(async () => {
     const repos = buildRepos();
     setSubmitting(true);
@@ -117,7 +120,7 @@ export default function WorkspaceModal({
         const res = await fetch('/api/workspaces', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), parentPath, repos }),
+          body: JSON.stringify({ name: name.trim(), parentPath: effectiveParent, repos }),
         });
         if (!res.ok) {
           const err = await res.json();
@@ -150,7 +153,7 @@ export default function WorkspaceModal({
     } finally {
       setSubmitting(false);
     }
-  }, [mode, name, parentPath, workspace, buildRepos, addToast, onChanged, onClose]);
+  }, [mode, name, effectiveParent, workspace, buildRepos, addToast, onChanged, onClose]);
 
   // Live per-repo clone status
   useSocketEvent<WorkspaceProgressEvent>('workspace:progress', useCallback((event) => {
@@ -198,7 +201,7 @@ export default function WorkspaceModal({
   }, [workspace, addToast, onChanged]);
 
   const canSubmit = mode === 'create'
-    ? name.trim().length > 0 && parentPath.length > 0 && !submitting
+    ? name.trim().length > 0 && effectiveParent.length > 0 && !submitting
     : repoCount > 0 && !submitting;
 
   return (
@@ -276,12 +279,28 @@ export default function WorkspaceModal({
                 <select
                   value={parentPath}
                   onChange={e => setParentPath(e.target.value)}
-                  className="mb-3 cursor-pointer rounded-md border border-border-input bg-elevated px-2.5 py-1.5 text-sm text-primary outline-none focus:border-border-focus"
+                  className="mb-1.5 cursor-pointer rounded-md border border-border-input bg-elevated px-2.5 py-1.5 text-sm text-primary outline-none focus:border-border-focus"
                 >
                   {scanPaths.map(p => (
                     <option key={p} value={p}>{shortenPath(p)}</option>
                   ))}
+                  <option value="__custom__">Other folder…</option>
                 </select>
+                {parentPath === '__custom__' && (
+                  <>
+                    <input
+                      type="text"
+                      value={customParent}
+                      onChange={e => setCustomParent(e.target.value)}
+                      placeholder="~/Workspaces"
+                      className="mb-1 rounded-md border border-border-input bg-elevated px-3 py-1.5 text-sm text-primary placeholder-placeholder outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
+                    />
+                    <p className="mb-1.5 text-[11px] text-faint">
+                      The folder must exist. It will be added to your scan paths so the workspace shows up in the sidebar.
+                    </p>
+                  </>
+                )}
+                <div className="mb-1.5" />
               </>
             )}
 

@@ -2,6 +2,16 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.37.1]
+
+### Features
+
+- **Custom location for new workspaces** — The Location dropdown in the New Workspace modal gains an "Other folder…" option revealing a free-form path input (`~` supported), so a workspace can be created outside the configured scan paths (e.g. `~/Workspaces`). The backend accepts any existing directory and automatically appends it to `scanPaths` when it isn't already covered by one, so the new workspace shows up in the sidebar after the scan refresh. Non-existent parents are rejected with `Parent directory not found`.
+
+### Fixes
+
+- **Select focus ring clipped at the sides** — The global `*:focus-visible` outline rule excluded `input` and `textarea` but not `select`, so focused dropdowns (e.g. Location in the workspace modal) drew a 2px violet outline at 2px offset that got clipped horizontally by scrollable containers. `select:focus-visible` now joins the exclusion list; selects keep their focus feedback via the `focus:border-border-focus` border like the other form controls.
+
 ## [0.37.0]
 
 ### Features

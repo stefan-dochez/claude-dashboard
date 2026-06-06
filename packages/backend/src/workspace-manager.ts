@@ -107,13 +107,23 @@ export class WorkspaceManager extends EventEmitter {
     super();
   }
 
-  /** Resolve `parentPath` against the configured scan paths; throws if it isn't one. */
-  private async resolveParentScanPath(parentPath: string): Promise<string> {
-    const config = await this.configService.get();
+  /**
+   * Resolve the parent directory for a new workspace. Any existing directory
+   * is accepted; when it isn't covered by a configured scan path it's added
+   * to `scanPaths` so the scanner can discover the new workspace.
+   */
+  private async resolveParentPath(parentPath: string): Promise<string> {
     const resolved = path.resolve(parentPath.replace(/^~/, os.homedir()));
+    const stat = await fs.stat(resolved).catch(() => null);
+    if (!stat?.isDirectory()) {
+      throw new Error(`Parent directory not found: ${parentPath}`);
+    }
+    const config = await this.configService.get();
     const allowed = config.scanPaths.map(p => path.resolve(p.replace(/^~/, os.homedir())));
-    if (!allowed.includes(resolved)) {
-      throw new Error(`Parent path must be one of the configured scan paths: ${parentPath}`);
+    const covered = allowed.some(root => resolved === root || resolved.startsWith(root + path.sep));
+    if (!covered) {
+      await this.configService.save({ scanPaths: [...config.scanPaths, resolved] });
+      log.info(`Added ${resolved} to scanPaths (custom workspace location)`);
     }
     return resolved;
   }
@@ -164,7 +174,7 @@ export class WorkspaceManager extends EventEmitter {
     // Validate repo specs up front so a bad URL fails the request, not the background clone.
     this.normalizeRepos(repos);
 
-    const parent = await this.resolveParentScanPath(parentPath);
+    const parent = await this.resolveParentPath(parentPath);
     const workspacePath = path.join(parent, name);
     const exists = await fs.access(workspacePath).then(() => true).catch(() => false);
     if (exists) {
