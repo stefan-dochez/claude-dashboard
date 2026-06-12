@@ -2,6 +2,12 @@
 
 All notable changes to Claude Dashboard since the initial commit.
 
+## [0.39.0]
+
+### Features
+
+- **Reveal session folder in the OS file manager** — The main panel header gains a `FolderSymlink` button (visible when a session is selected) that opens the session's working directory (`worktreePath ?? projectPath`) in Finder on macOS, Explorer on Windows, or the default file manager via `xdg-open` on Linux. Backed by a new cross-platform `openInFileManager` helper in `platform.ts` and a `POST /api/folder/open` route that validates the folder exists (404 otherwise) and reveals the parent if given a file. The tooltip adapts to the host OS.
+
 ## [0.38.0]
 
 ### Features

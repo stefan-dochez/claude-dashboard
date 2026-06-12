@@ -1,5 +1,6 @@
 import os from 'os';
 import path from 'path';
+import { execFile } from 'child_process';
 
 export const IS_WINDOWS = process.platform === 'win32';
 
@@ -54,6 +55,24 @@ export function getExtraPaths(): string[] {
     '/usr/local/bin',
     '/opt/homebrew/bin',
   ];
+}
+
+/**
+ * Open a folder in the OS file manager (Finder on macOS, Explorer on Windows,
+ * the default file manager via `xdg-open` on Linux).
+ */
+export function openInFileManager(folderPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const command = IS_WINDOWS ? 'explorer.exe' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+    execFile(command, [folderPath], error => {
+      // explorer.exe exits with code 1 even on success — ignore the error on Windows.
+      if (error && !IS_WINDOWS) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 /**

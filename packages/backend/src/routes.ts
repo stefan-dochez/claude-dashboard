@@ -24,7 +24,7 @@ import { readChangelogSince } from './changelog-reader.js';
 import { runHealthCheck } from './health.js';
 import { TIMEOUTS, LIMITS } from './constants.js';
 import { createLogger } from './logger.js';
-import { IS_WINDOWS, PATH_SEP, getExtraPaths } from './platform.js';
+import { IS_WINDOWS, PATH_SEP, getExtraPaths, openInFileManager } from './platform.js';
 
 const log = createLogger('routes');
 const execPromise = promisify(exec);
@@ -190,6 +190,26 @@ export function createRoutes(
     }
     const result = await ideService.open(projectPath, ide as IdeType | undefined);
     res.json({ ok: true, ide: result.ide });
+  }));
+
+  // Folder — reveal a folder in the OS file manager (Finder / Explorer / xdg-open)
+  router.post('/api/folder/open', asyncHandler(async (req, res) => {
+    const { path: folderPath } = req.body as { path?: string };
+    if (!folderPath) {
+      res.status(400).json({ error: 'path is required' });
+      return;
+    }
+    const fsPromises = await import('fs/promises');
+    let stat;
+    try {
+      stat = await fsPromises.stat(folderPath);
+    } catch {
+      res.status(404).json({ error: 'Folder not found' });
+      return;
+    }
+    const target = stat.isDirectory() ? folderPath : path.dirname(folderPath);
+    await openInFileManager(target);
+    res.json({ ok: true });
   }));
 
   // Config

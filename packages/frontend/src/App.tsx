@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Terminal, MessageSquare, GitBranch, GitBranchPlus, PanelLeft, Loader2,
-  FileCode2, GitPullRequest, FolderOpen, Info, Sun, Moon, Download,
+  FileCode2, GitPullRequest, FolderOpen, FolderSymlink, Info, Sun, Moon, Download,
   Columns2, Maximize2, Radio, Package, X,
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
@@ -493,6 +493,20 @@ export default function App() {
     }
   }, [installedIdes, openInIde, addToast]);
 
+  const handleOpenFolder = useCallback(async (folderPath: string) => {
+    try {
+      const res = await fetch('/api/folder/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: folderPath }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to open folder');
+    } catch (err) {
+      addToast('error', 'Failed to open folder', err instanceof Error ? err.message : 'Unknown error');
+    }
+  }, [addToast]);
+
   const handleNewWorkspace = useCallback(() => {
     setWorkspaceModal({ mode: 'create' });
   }, []);
@@ -784,6 +798,15 @@ export default function App() {
           </button>
           {selectedInstance && (
             <>
+              {instanceProjectPath && (
+                <button
+                  onClick={() => handleOpenFolder(instanceProjectPath)}
+                  className="rounded p-1 text-faint transition-colors hover:text-secondary"
+                  title={`Reveal folder in ${navigator.platform.startsWith('Mac') ? 'Finder' : navigator.platform.startsWith('Win') ? 'Explorer' : 'file manager'}`}
+                >
+                  <FolderSymlink className="h-3.5 w-3.5" />
+                </button>
+              )}
               <button
                 onClick={() => setRightPanel(prev => prev === 'files' ? null : 'files')}
                 className={`rounded p-1 transition-colors hover:text-secondary ${rightPanel === 'files' ? 'text-tertiary' : 'text-faint'}`}
